@@ -5,10 +5,10 @@ import numpy as np
 from flask import Flask, request, render_template, send_from_directory
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from predict import predict_ripeness
-from FruitVision.member_apps.member_1_ab.extra_pdf_report import generate_pdf_report
-from FruitVision.member_apps.member_1_ab.extra_video_processor import process_video
-from FruitVision.member_apps.member_1_ab.extra_supplemental import generate_trend_chart
+from FruitVision.member_apps.member_2_bc.m2_predict import predict_ripeness
+from FruitVision.member_apps.member_2_bc.m2_pdf_report import generate_pdf_report
+from FruitVision.member_apps.member_2_bc.m2_video_processor import process_video
+from FruitVision.member_apps.member_2_bc.m2_supplemental import generate_trend_chart
 
 app = Flask(__name__)
 UPLOAD_DIR = "uploads"

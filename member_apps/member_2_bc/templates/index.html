@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>FruitiVision — App 1 (Colour + Shape)</title>
+</head>
+<body>
+  <h1>FruitiVision — Ripeness Assessment (Model A + B)</h1>
+
+  <h3>Upload image(s)</h3>
+  <form action="/analyse" method="post" enctype="multipart/form-data">
+    <input type="file" name="images" multiple accept="image/*">
+    <button type="submit">Analyse</button>
+  </form>
+
+  <h3>Upload video</h3>
+  <form action="/analyse_video" method="post" enctype="multipart/form-data">
+    <input type="file" name="video" accept="video/*">
+    <button type="submit">Analyse Video</button>
+  </form>
+</body>
+</html>

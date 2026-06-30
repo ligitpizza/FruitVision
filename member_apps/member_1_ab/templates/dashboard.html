@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dashboard — FruitiVision</title>
+</head>
+<body>
+  <h1>Data Analysis Dashboard</h1>
+
+  <div id="results-panel" style="border:1px solid #ccc; padding:16px; border-radius:8px;">
+    {% for r in results %}
+      <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #eee;">
+        <strong>{{ r.filename if r.filename else 'Frame ' ~ r.frame }}</strong><br>
+        Ripeness: <strong>{{ r.label }}</strong><br>
+        Confidence: {{ r.confidence }}%
+        <form action="/extra_export_pdf" method="post" style="display:inline;">
+          <input type="hidden" name="label" value="{{ r.label }}">
+          <input type="hidden" name="confidence" value="{{ r.confidence }}">
+          <button type="submit">Export PDF</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if chart %}
+    <h3>Ripeness Distribution</h3>
+    <img src="/../../outputs/reports/trend_chart.png" width="400">
+  {% endif %}
+
+  <a href="/">← Back to upload</a>
+</body>
+</html>

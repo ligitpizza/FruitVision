@@ -1,0 +1,9 @@
+opencv-python
+scikit-image
+scikit-learn
+numpy
+flask
+fpdf2
+joblib
+matplotlib
+Werkzeug

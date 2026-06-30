@@ -22,6 +22,7 @@ def index():
 
 @app.route("/analyse", methods=["POST"])
 def analyse():
+    fruit_type = request.form.get("fruit_type", "apple")
     files = request.files.getlist("images")  # supports single or multiple files
     results = []
     last_image_path = None
@@ -32,7 +33,7 @@ def analyse():
         last_image_path = path
 
         img = cv2.imread(path)
-        label, confidence, bbox, cleaned = predict_ripeness(img)
+        label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
 
         x0, y0, x1, y1 = bbox
         annotated = img.copy()
@@ -50,11 +51,12 @@ def analyse():
 
 @app.route("/analyse_video", methods=["POST"])
 def analyse_video():
+    fruit_type = request.form.get("fruit_type", "apple")
     f = request.files["video"]
     path = os.path.join(UPLOAD_DIR, f.filename)
     f.save(path)
 
-    results = process_video(path, predict_ripeness)
+    results = process_video(path, predict_ripeness, fruit_type)
     return render_template("dashboard.html", results=results, chart=False)
 
 

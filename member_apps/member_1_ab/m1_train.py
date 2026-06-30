@@ -19,7 +19,7 @@ CLASSES = ["unripe", "ripe", "rotten"]
 def build_dataset(fruit):
     X, y = [], []
     for label in CLASSES:
-        folder = f"../../datasets/self_prepared/{fruit}/{label}"
+        folder = f"../../datasets/fruit_ripeness/{fruit}/{label}"
         if not os.path.isdir(folder):
             continue
         for path in glob.glob(f"{folder}/*.*"):

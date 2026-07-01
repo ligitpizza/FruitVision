@@ -6,7 +6,9 @@ import joblib
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, accuracy_score
+
+from m1_train_report import plot_confusion_matrix, plot_class_distribution, plot_accuracy_summary
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
@@ -43,6 +45,8 @@ def build_dataset(fruit):
 
 
 if __name__ == "__main__":
+    accuracies = {}
+
     for fruit in FRUITS:
         print(f"\nBuilding feature dataset for {fruit}...")
         X, y = build_dataset(fruit)
@@ -53,6 +57,8 @@ if __name__ == "__main__":
                   f"datasets/fruit_ripeness/{fruit}/<class>/ folders. Skipping.")
             continue
 
+        plot_class_distribution(y, fruit)
+
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
@@ -62,8 +68,12 @@ if __name__ == "__main__":
         )
         clf.fit(X_train, y_train)
 
+        y_pred = clf.predict(X_test)
         print(f"Test set performance for {fruit}:")
-        print(classification_report(y_test, clf.predict(X_test)))
+        print(classification_report(y_test, y_pred))
+
+        accuracies[fruit] = accuracy_score(y_test, y_pred)
+        plot_confusion_matrix(y_test, y_pred, classes=CLASSES, fruit=fruit)
 
         # retrain on full dataset before saving, so the saved model uses all available data
         clf.fit(X_scaled, y)
@@ -72,3 +82,8 @@ if __name__ == "__main__":
         out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_ensemble_ab.pkl")
         joblib.dump({"model": clf, "scaler": scaler}, out_path)
         print(f"Model saved to {out_path}")
+
+    if accuracies:
+        summary_path = plot_accuracy_summary(accuracies)
+        print(f"\nAll graphs saved to outputs/training/")
+        print(f"Accuracy summary: {summary_path}")

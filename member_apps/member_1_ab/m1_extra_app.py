@@ -29,6 +29,26 @@ def outputs_file(filename):
     return send_from_directory(OUTPUTS_DIR, filename)
 
 
+TRAINING_DIR = os.path.join(OUTPUTS_DIR, "training")
+
+
+@app.route("/training-report")
+def training_report():
+    fruits = ["apple", "banana", "orange"]
+    graphs = []
+    for fruit in fruits:
+        cm_path = os.path.join(TRAINING_DIR, f"{fruit}_confusion_matrix.png")
+        dist_path = os.path.join(TRAINING_DIR, f"{fruit}_class_distribution.png")
+        if os.path.exists(cm_path) or os.path.exists(dist_path):
+            graphs.append({
+                "fruit": fruit,
+                "confusion_matrix": f"training/{fruit}_confusion_matrix.png" if os.path.exists(cm_path) else None,
+                "class_distribution": f"training/{fruit}_class_distribution.png" if os.path.exists(dist_path) else None,
+            })
+    summary_exists = os.path.exists(os.path.join(TRAINING_DIR, "accuracy_summary.png"))
+    return render_template("m1_training_report.html", graphs=graphs, summary_exists=summary_exists)
+
+
 @app.route("/history")
 def history():
     fruit_filter = request.args.get("fruit")

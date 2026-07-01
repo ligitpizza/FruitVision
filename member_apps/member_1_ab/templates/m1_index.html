@@ -1,21 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>FruitiVision — App 1 (Colour + Shape)</title>
+  <meta charset="UTF-8">
+  <title>FruitVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+    select, input[type=file], button { display: block; margin: 12px 0; padding: 10px; width: 100%; font-size: 1rem; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; border-radius: 6px; }
+    button:hover { background: #1b5e20; }
+    #preview { max-width: 100%; margin-top: 16px; border-radius: 8px; display: none; }
+    #result { margin-top: 20px; padding: 16px; border-radius: 8px; font-size: 1.1rem; display: none; }
+    .ripe    { background: #e8f5e9; color: #2e7d32; }
+    .unripe  { background: #fff8e1; color: #f57f17; }
+    .rotten  { background: #ffebee; color: #c62828; }
+  </style>
 </head>
 <body>
-  <h1>FruitiVision — Ripeness Assessment (Model A + B)</h1>
+  <h1>🍎 FruitVision</h1>
+  <p>Upload a fruit photo to check its ripeness.</p>
 
-  <h3>Upload image(s)</h3>
-  <form action="/analyse" method="post" enctype="multipart/form-data">
-    <input type="file" name="images" multiple accept="image/*">
-    <button type="submit">Analyse</button>
-  </form>
+  <label>Select Fruit:</label>
+  <select id="fruit">
+    {% for fruit in fruits %}
+    <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+    {% endfor %}
+  </select>
 
-  <h3>Upload video</h3>
-  <form action="/analyse_video" method="post" enctype="multipart/form-data">
-    <input type="file" name="video" accept="video/*">
-    <button type="submit">Analyse Video</button>
-  </form>
+  <label>Upload Image:</label>
+  <input type="file" id="imageInput" accept="image/*">
+  <img id="preview">
+
+  <button onclick="submitImage()">Check Ripeness</button>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("imageInput").addEventListener("change", function () {
+      const file = this.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const preview = document.getElementById("preview");
+        preview.src = e.target.result;
+        preview.style.display = "block";
+      };
+      reader.readAsDataURL(file);
+    });
+
+    async function submitImage() {
+      const fruit = document.getElementById("fruit").value;
+      const file = document.getElementById("imageInput").files[0];
+      const resultDiv = document.getElementById("result");
+
+      if (!file) { alert("Please select an image first."); return; }
+
+      const formData = new FormData();
+      formData.append("fruit", fruit);
+      formData.append("image", file);
+
+      resultDiv.style.display = "none";
+      resultDiv.className = "";
+      resultDiv.textContent = "Analysing...";
+      resultDiv.style.display = "block";
+
+      try {
+        const res = await fetch("/predict", { method: "POST", body: formData });
+        const data = await res.json();
+        if (data.error) {
+          resultDiv.textContent = `Error: ${data.error}`;
+        } else {
+          resultDiv.className = data.ripeness;
+          resultDiv.innerHTML = `
+            <strong>${data.fruit.charAt(0).toUpperCase() + data.fruit.slice(1)}</strong> is
+            <strong>${data.ripeness.toUpperCase()}</strong>
+            <br>Confidence: ${data.confidence}%
+          `;
+        }
+      } catch (err) {
+        resultDiv.textContent = "Server error. Is Flask running?";
+      }
+    }
+  </script>
 </body>
 </html>

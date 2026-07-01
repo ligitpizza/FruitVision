@@ -7,3 +7,5 @@ fpdf2
 joblib
 matplotlib
 Werkzeug
+torch
+torchvision

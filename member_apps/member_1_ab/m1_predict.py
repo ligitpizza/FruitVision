@@ -24,15 +24,19 @@ def predict_ripeness(raw_img, fruit_type):
     Takes a raw image (numpy array, BGR) and the selected fruit type,
     runs the full pipeline, and returns (label, confidence, bbox, cleaned_img).
     """
-    clf = _load_model(fruit_type)
+    saved = _load_model(fruit_type)
+    clf = saved["model"]
+    scaler = saved["scaler"]
 
     cleaned, bbox = preprocess(raw_img)
     vec_a = extract_colour(cleaned)
     vec_b = extract_shape(cleaned)
     combined = np.concatenate([vec_a, vec_b]).reshape(1, -1)
 
-    label = clf.predict(combined)[0]
-    proba = clf.predict_proba(combined)[0]
-    confidence = float(np.max(proba))
+    # Apply the same scaling used during training, so feature magnitudes match
+    combined_scaled = scaler.transform(combined)
 
+    label = clf.predict(combined_scaled)[0]
+    proba = clf.predict_proba(combined_scaled)[0]
+    confidence = float(np.max(proba))
     return label, confidence, bbox, cleaned

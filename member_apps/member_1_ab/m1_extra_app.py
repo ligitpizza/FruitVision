@@ -1,6 +1,6 @@
-# executable file
 import os
 import sys
+import json
 import cv2
 import numpy as np
 from flask import Flask, request, render_template, send_from_directory
@@ -8,10 +8,10 @@ from flask import Flask, request, render_template, send_from_directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
-from m1_predict import predict_ripeness
-from m1_extra_pdf_report import generate_pdf_report
+from m1_predict import predict_ripeness, NotAFruitError
+from m1_extra_pdf_report import generate_pdf_report, generate_pdf_report_batch
 from m1_extra_video_processor import process_video
-from m1_extra_supplemental import generate_trend_chart
+from m1_extra_supplemental import generate_trend_chart, generate_history_chart
 from database.m1_history_db import log_result, get_recent
 
 MEMBER_TAG = "member_1_ab"
@@ -76,7 +76,11 @@ def predict():
         path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(path)
         img = cv2.imread(path)
-        label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
+
+        try:
+            label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
+        except NotAFruitError as e:
+            return {"error": str(e), "filename": f.filename}, 422
 
         annotated_rel = None
         if bbox is not None:
@@ -123,7 +127,12 @@ def analyse():
         path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(path)
         img = cv2.imread(path)
-        label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
+
+        try:
+            label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
+        except NotAFruitError as e:
+            results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
+            continue
 
         annotated_rel = None
         if bbox is not None:
@@ -145,10 +154,29 @@ def analyse():
             source="analyse",
         )
 
-        results.append({"filename": f.filename, "label": label, "confidence": round(confidence * 100, 1)})
+        results.append({"filename": f.filename, "label": label, "confidence": round(confidence * 100, 1), "annotated_path": annotated_rel})
 
-    chart_path = generate_trend_chart(results) if len(results) > 1 else None
-    return render_template("m1_dashboard.html", results=results, chart=chart_path is not None, OUTPUTS_DIR=OUTPUTS_DIR)
+    chart_path = generate_trend_chart(results) if results else None
+    history_chart_path = generate_history_chart(MEMBER_TAG)
+
+    results_for_pdf = [
+        {
+            "filename": r.get("filename"),
+            "label": r.get("label"),
+            "confidence": r.get("confidence"),
+            "image_path": os.path.join(OUTPUTS_DIR, r["annotated_path"]) if r.get("annotated_path") else None,
+        }
+        for r in results
+    ]
+
+    return render_template(
+        "m1_dashboard.html",
+        results=results,
+        chart=chart_path is not None,
+        history_chart=history_chart_path is not None,
+        results_json=json.dumps(results_for_pdf),
+        OUTPUTS_DIR=OUTPUTS_DIR,
+    )
 
 
 @app.route("/analyse_video", methods=["POST"])
@@ -176,6 +204,18 @@ def extra_export_pdf():
     confidence = float(request.form["confidence"]) / 100
     image_path = request.form.get("image_path")
     out_path = generate_pdf_report(image_path, label, confidence)
+    return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
+
+
+@app.route("/extra_export_pdf_batch", methods=["POST"])
+def extra_export_pdf_batch():
+    """Exports every result currently shown on the dashboard into ONE combined PDF."""
+    try:
+        results = json.loads(request.form["results_json"])
+    except (KeyError, json.JSONDecodeError):
+        return {"error": "No results to export."}, 400
+
+    out_path = generate_pdf_report_batch(results)
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 

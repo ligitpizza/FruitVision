@@ -59,7 +59,7 @@ def plot_class_distribution(y, fruit):
 
 def plot_accuracy_summary(accuracies):
     """
-    accuracies: dict like {"apple": 0.91, "banana": 0.88, "orange": 0.95}
+    accuracies: dict like {"apple": 0.91, "banana": 0.88, "orange": 0.95, "mango":0.77}
     Saves one bar chart comparing test-set accuracy across all trained fruits.
     """
     out_dir = _ensure_out_dir()

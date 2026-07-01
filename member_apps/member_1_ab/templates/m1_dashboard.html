@@ -5,6 +5,8 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
     h1 { color: #2e7d32; }
+    .error-row { color: #c62828; font-style: italic; }
+    .charts { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -14,25 +16,46 @@
     {% for r in results %}
       <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #eee;">
         <strong>{{ r.filename if r.filename else 'Frame ' ~ r.frame }}</strong><br>
-        Ripeness: <strong>{{ r.label }}</strong><br>
-        Confidence: {{ r.confidence }}%
-        <form action="/extra_export_pdf" method="post" style="display:inline;">
-          <input type="hidden" name="label" value="{{ r.label }}">
-          <input type="hidden" name="confidence" value="{{ r.confidence }}">
-          {% if r.annotated_path %}
-          <input type="hidden" name="image_path" value="{{ OUTPUTS_DIR }}/{{ r.annotated_path }}">
-          {% endif %}
-          <button type="submit">Export PDF</button>
-        </form>
+        {% if r.error %}
+          <span class="error-row">⚠ {{ r.error }}</span>
+        {% else %}
+          Ripeness: <strong>{{ r.label }}</strong><br>
+          Confidence: {{ r.confidence }}%
+          <form action="/extra_export_pdf" method="post" style="display:inline;">
+            <input type="hidden" name="label" value="{{ r.label }}">
+            <input type="hidden" name="confidence" value="{{ r.confidence }}">
+            {% if r.annotated_path %}
+            <input type="hidden" name="image_path" value="{{ OUTPUTS_DIR }}/{{ r.annotated_path }}">
+            {% endif %}
+            <button type="submit">Export PDF</button>
+          </form>
+        {% endif %}
       </div>
     {% endfor %}
   </div>
 
-  {% if chart %}
-    <h3>Ripeness Distribution</h3>
-    <img src="/outputs/reports/trend_chart.png" width="400">
+  {% if results_json and results|length > 0 %}
+  <form action="/extra_export_pdf_batch" method="post" style="margin-top:14px;">
+    <input type="hidden" name="results_json" value='{{ results_json }}'>
+    <button type="submit">📄 Export All as One PDF</button>
+  </form>
   {% endif %}
 
-  <p><a href="/history">View history</a> · <a href="/">← Back to upload</a></p>
+  <div class="charts">
+    {% if chart %}
+      <div>
+        <h3>This Batch</h3>
+        <img src="/outputs/reports/trend_chart.png" width="320">
+      </div>
+    {% endif %}
+    {% if history_chart %}
+      <div>
+        <h3>All-Time History</h3>
+        <img src="/outputs/reports/history_chart.png" width="320">
+      </div>
+    {% endif %}
+  </div>
+
+  <p style="margin-top:20px;"><a href="/history">View history</a> · <a href="/">← Back to upload</a></p>
 </body>
 </html>

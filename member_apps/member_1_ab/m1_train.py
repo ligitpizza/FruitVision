@@ -1,15 +1,46 @@
-# executable file
 import os
 import sys
 import glob
 import numpy as np
 import joblib
-from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 
 from m1_train_report import plot_confusion_matrix, plot_class_distribution, plot_accuracy_summary
+
+# --- Optional GPU training path ---------------------------------------------
+# Set USE_GPU=1 as an environment variable to try GPU-accelerated training via
+# RAPIDS cuML. Falls back to CPU (scikit-learn) automatically if cuML isn't
+# installed/available, so this is safe to leave on by default.
+#
+# IMPORTANT CAVEAT: RAPIDS cuML only installs on Linux with an NVIDIA GPU +
+# CUDA toolkit (via conda, not plain pip) -- it does NOT work on Windows.
+# Also, for this project's feature set (~13 handcrafted colour+shape numbers
+# per image, likely a few hundred/thousand samples), an SVM trains in well
+# under a second on CPU already. GPU won't meaningfully speed this up -- the
+# real bottleneck if any is the per-image OpenCV preprocessing loop, which
+# this doesn't accelerate. This flag exists so you can experiment, not
+# because it's expected to give a big speedup here.
+USE_GPU = os.environ.get("USE_GPU", "0") == "1"
+
+_gpu_ready = False
+if USE_GPU:
+    try:
+        from cuml.svm import SVC as GPUSVC
+        from cuml.preprocessing import StandardScaler as GPUScaler
+        _gpu_ready = True
+        print("[train] USE_GPU=1 and cuML is available -- training on GPU.")
+    except ImportError:
+        print("[train] USE_GPU=1 but cuML is not installed (it requires Linux + "
+              "NVIDIA CUDA via conda). Falling back to CPU.")
+
+if _gpu_ready:
+    SVC = GPUSVC
+    StandardScaler = GPUScaler
+else:
+    from sklearn.svm import SVC
+    from sklearn.preprocessing import StandardScaler
+# -----------------------------------------------------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))

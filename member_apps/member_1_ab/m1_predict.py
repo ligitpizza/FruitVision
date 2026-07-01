@@ -10,8 +10,13 @@ from core_modules.preprocessing import preprocess
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models')
+MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models', 'ensemble_ab')
 _clf_cache = {}
+
+
+class NotAFruitError(Exception):
+    """Raised when the uploaded photo doesn't look like a single fruit object."""
+    pass
 
 
 def _load_model(fruit_type):
@@ -19,6 +24,29 @@ def _load_model(fruit_type):
         model_path = os.path.join(MODEL_DIR, f"{fruit_type}_ensemble_ab.pkl")
         _clf_cache[fruit_type] = joblib.load(model_path)
     return _clf_cache[fruit_type]
+
+
+def _looks_like_fruit(shape_vec, cleaned_img):
+    """
+    Heuristic sanity check using the shape descriptors we already computed.
+    This is NOT a trained classifier -- it just rejects obviously-wrong photos
+    (blank frames, text documents, very irregular/spiky objects) before we
+    waste a ripeness prediction on them.
+
+    shape_vec order (from mb_shape_contours.py): [area, perimeter, circularity, aspect_ratio, convexity]
+    """
+    area, perimeter, circularity, aspect_ratio, convexity = shape_vec
+    img_area = cleaned_img.shape[0] * cleaned_img.shape[1]
+
+    if area <= 0:
+        return False, "No distinct object detected in the photo."
+    if area < 0.03 * img_area:
+        return False, "The object in the photo is too small or unclear to analyse."
+    if convexity < 0.55:
+        return False, "The shape looks too irregular to be a fruit. Try a clearer, single-fruit photo."
+    if aspect_ratio > 4 or aspect_ratio < 0.25:
+        return False, "The object's shape doesn't look like a fruit. Try a clearer, single-fruit photo."
+    return True, None
 
 
 def predict_ripeness(raw_img, fruit_type):
@@ -33,6 +61,11 @@ def predict_ripeness(raw_img, fruit_type):
     cleaned, bbox = preprocess(raw_img)
     vec_a = extract_colour(cleaned)
     vec_b = extract_shape(cleaned)
+
+    is_fruit, reason = _looks_like_fruit(vec_b, cleaned)
+    if not is_fruit:
+        raise NotAFruitError(reason)
+
     combined = np.concatenate([vec_a, vec_b]).reshape(1, -1)
 
     # Apply the same scaling used during training, so feature magnitudes match

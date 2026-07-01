@@ -1,3 +1,5 @@
+# helper module. do not run!!
+
 """
 Plot generators for m1_train.py.
 Everything gets saved under outputs/training/ so it doesn't clash with

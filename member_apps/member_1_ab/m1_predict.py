@@ -1,3 +1,5 @@
+# helper module. do not run!!
+
 import os
 import sys
 import numpy as np

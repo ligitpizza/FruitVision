@@ -4,6 +4,7 @@ import glob
 import numpy as np
 import joblib
 from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
@@ -52,9 +53,12 @@ if __name__ == "__main__":
                   f"datasets/fruit_ripeness/{fruit}/<class>/ folders. Skipping.")
             continue
 
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
         clf = SVC(kernel='rbf', probability=True)
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
+            X_scaled, y, test_size=0.2, random_state=42, stratify=y
         )
         clf.fit(X_train, y_train)
 
@@ -62,9 +66,9 @@ if __name__ == "__main__":
         print(classification_report(y_test, clf.predict(X_test)))
 
         # retrain on full dataset before saving, so the saved model uses all available data
-        clf.fit(X, y)
+        clf.fit(X_scaled, y)
 
         os.makedirs(MODEL_OUT_DIR, exist_ok=True)
         out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_ensemble_ab.pkl")
-        joblib.dump(clf, out_path)
+        joblib.dump({"model": clf, "scaler": scaler}, out_path)
         print(f"Model saved to {out_path}")

@@ -2,6 +2,10 @@
 <html>
 <head>
   <title>Dashboard — FruitiVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+  </style>
 </head>
 <body>
   <h1>Data Analysis Dashboard</h1>
@@ -15,6 +19,9 @@
         <form action="/extra_export_pdf" method="post" style="display:inline;">
           <input type="hidden" name="label" value="{{ r.label }}">
           <input type="hidden" name="confidence" value="{{ r.confidence }}">
+          {% if r.annotated_path %}
+          <input type="hidden" name="image_path" value="{{ OUTPUTS_DIR }}/{{ r.annotated_path }}">
+          {% endif %}
           <button type="submit">Export PDF</button>
         </form>
       </div>
@@ -23,9 +30,9 @@
 
   {% if chart %}
     <h3>Ripeness Distribution</h3>
-    <img src="/../../outputs/reports/trend_chart.png" width="400">
+    <img src="/outputs/reports/trend_chart.png" width="400">
   {% endif %}
 
-  <a href="/">← Back to upload</a>
+  <p><a href="/history">View history</a> · <a href="/">← Back to upload</a></p>
 </body>
 </html>

@@ -5,3 +5,6 @@ datasets/fruit_ripeness/**/rotten*
 __pycache__/
 outputs/annotated*
 member_apps/member_1_ab/uploads/
+fruitvision.db
+
+reports/

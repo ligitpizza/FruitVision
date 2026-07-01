@@ -35,6 +35,24 @@
 
   <div id="result"></div>
 
+  <hr style="margin:30px 0;">
+
+  <h2>Batch Analysis (Dashboard)</h2>
+  <p>Upload multiple photos of the same fruit to see a distribution chart.</p>
+  <form action="/analyse" method="post" enctype="multipart/form-data">
+    <label>Select Fruit:</label>
+    <select name="fruit_type">
+      {% for fruit in fruits %}
+      <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+      {% endfor %}
+    </select>
+    <label>Upload Images (multiple):</label>
+    <input type="file" name="images" accept="image/*" multiple required>
+    <button type="submit">Analyse Batch</button>
+  </form>
+
+  <p style="margin-top:20px;"><a href="/history">View prediction history →</a></p>
+
   <script>
     document.getElementById("imageInput").addEventListener("change", function () {
       const file = this.files[0];

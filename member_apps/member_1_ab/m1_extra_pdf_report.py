@@ -2,7 +2,12 @@ from fpdf import FPDF
 from datetime import datetime
 import os
 
-def generate_pdf_report(image_path, label, confidence, output_dir="../../outputs/reports"):
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_OUTPUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports"))
+
+
+def generate_pdf_report(image_path, label, confidence, output_dir=None):
+    output_dir = output_dir or DEFAULT_OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(output_dir, f"report_{timestamp}.pdf")

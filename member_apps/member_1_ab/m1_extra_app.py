@@ -11,10 +11,31 @@ from m1_predict import predict_ripeness
 from m1_extra_pdf_report import generate_pdf_report
 from m1_extra_video_processor import process_video
 from m1_extra_supplemental import generate_trend_chart
+from database.m1_history_db import log_result, get_recent
+
+MEMBER_TAG = "member_1_ab"
 
 app = Flask(__name__)
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs"))
+
+
+@app.route("/outputs/<path:filename>")
+def outputs_file(filename):
+    """Serves annotated images and charts saved under outputs/, e.g. outputs/annotated/apple.jpg"""
+    return send_from_directory(OUTPUTS_DIR, filename)
+
+
+@app.route("/history")
+def history():
+    fruit_filter = request.args.get("fruit")
+    rows = get_recent(member=MEMBER_TAG, limit=100)
+    if fruit_filter:
+        rows = [r for r in rows if r["fruit"] == fruit_filter]
+    return render_template("m1_history.html", results=rows, fruit_filter=fruit_filter)
 
 
 @app.route("/", methods=["GET"])
@@ -36,6 +57,7 @@ def predict():
         img = cv2.imread(path)
         label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
 
+        annotated_rel = None
         if bbox is not None:
             x0, y0, x1, y1 = bbox
             annotated = img.copy()
@@ -43,6 +65,17 @@ def predict():
             annotated_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "annotated"))
             os.makedirs(annotated_dir, exist_ok=True)
             cv2.imwrite(os.path.join(annotated_dir, f.filename), annotated)
+            annotated_rel = f"annotated/{f.filename}"
+
+        log_result(
+            member=MEMBER_TAG,
+            fruit=fruit_type,
+            label=label,
+            confidence=round(confidence * 100, 1),
+            filename=f.filename,
+            annotated_path=annotated_rel,
+            source="predict",
+        )
 
         results.append({
             "filename": f.filename,
@@ -71,6 +104,7 @@ def analyse():
         img = cv2.imread(path)
         label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
 
+        annotated_rel = None
         if bbox is not None:
             x0, y0, x1, y1 = bbox
             annotated = img.copy()
@@ -78,11 +112,22 @@ def analyse():
             annotated_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "annotated"))
             os.makedirs(annotated_dir, exist_ok=True)
             cv2.imwrite(os.path.join(annotated_dir, f.filename), annotated)
+            annotated_rel = f"annotated/{f.filename}"
+
+        log_result(
+            member=MEMBER_TAG,
+            fruit=fruit_type,
+            label=label,
+            confidence=round(confidence * 100, 1),
+            filename=f.filename,
+            annotated_path=annotated_rel,
+            source="analyse",
+        )
 
         results.append({"filename": f.filename, "label": label, "confidence": round(confidence * 100, 1)})
 
     chart_path = generate_trend_chart(results) if len(results) > 1 else None
-    return render_template("m1_dashboard.html", results=results, chart=chart_path is not None)
+    return render_template("m1_dashboard.html", results=results, chart=chart_path is not None, OUTPUTS_DIR=OUTPUTS_DIR)
 
 
 @app.route("/analyse_video", methods=["POST"])
@@ -92,7 +137,16 @@ def analyse_video():
     path = os.path.join(UPLOAD_DIR, f.filename)
     f.save(path)
     results = process_video(path, predict_ripeness, fruit_type)
-    return render_template("m1_dashboard.html", results=results, chart=False)
+    for r in results:
+        log_result(
+            member=MEMBER_TAG,
+            fruit=fruit_type,
+            label=r["label"],
+            confidence=round(r["confidence"] * 100, 1),
+            filename=f"{f.filename} (frame {r['frame']})",
+            source="video",
+        )
+    return render_template("m1_dashboard.html", results=results, chart=False, OUTPUTS_DIR=OUTPUTS_DIR)
 
 
 @app.route("/extra_export_pdf", methods=["POST"])

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>History — FruitVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
+    th { background: #f5f5f5; }
+    .ripe { color: #2e7d32; font-weight: bold; }
+    .unripe { color: #f57f17; font-weight: bold; }
+    .rotten { color: #c62828; font-weight: bold; }
+    .filters a { margin-right: 10px; }
+    thumb { width: 48px; }
+    img.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🍎 Prediction History</h1>
+  <p class="filters">
+    Filter: <a href="/history">All</a>
+    <a href="/history?fruit=apple">Apple</a>
+    <a href="/history?fruit=banana">Banana</a>
+    <a href="/history?fruit=orange">Orange</a>
+  </p>
+
+  {% if results %}
+  <table>
+    <tr>
+      <th>Time</th>
+      <th>Image</th>
+      <th>Fruit</th>
+      <th>Result</th>
+      <th>Confidence</th>
+      <th>Source</th>
+    </tr>
+    {% for r in results %}
+    <tr>
+      <td>{{ r.created_at }}</td>
+      <td>
+        {% if r.annotated_path %}
+          <img class="thumb" src="/outputs/{{ r.annotated_path }}" alt="">
+        {% else %}
+          {{ r.filename or '—' }}
+        {% endif %}
+      </td>
+      <td>{{ r.fruit.capitalize() }}</td>
+      <td class="{{ r.label }}">{{ r.label.upper() }}</td>
+      <td>{{ r.confidence }}%</td>
+      <td>{{ r.source }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>No predictions logged yet. Go make one!</p>
+  {% endif %}
+
+  <p style="margin-top:20px;"><a href="/">← Back to upload</a></p>
+</body>
+</html>

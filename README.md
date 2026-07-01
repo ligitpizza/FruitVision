@@ -1,6 +1,10 @@
 
 # image processing
 
+before u cloned down, make sure you have python version 11.
+
+use `py --list` to check existing pythin version.
+
 once u cloned down please create folder and ensure the dataset structure look like this:
 
 ### apple dataset:

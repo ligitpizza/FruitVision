@@ -3,9 +3,14 @@ datasets/fruit_ripeness/**/unripe*
 datasets/fruit_ripeness/**/rotten*
 
 __pycache__/
-outputs/annotated*
+
 member_apps/member_1_ab/uploads/
+member_apps/member_2_bc/uploads/
+member_apps/member_3_cd/uploads/
+member_apps/member_4_da/uploads/
+
 fruitvision.db
 
-reports/
-training/
+outputs/annotated/
+outputs/reports/
+outputs/training/

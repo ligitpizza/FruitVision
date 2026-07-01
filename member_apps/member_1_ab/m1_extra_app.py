@@ -35,7 +35,7 @@ TRAINING_DIR = os.path.join(OUTPUTS_DIR, "training")
 
 @app.route("/training-report")
 def training_report():
-    fruits = ["apple", "banana", "orange"]
+    fruits = ["apple", "banana", "orange", "mango"]
     graphs = []
     for fruit in fruits:
         cm_path = os.path.join(TRAINING_DIR, f"{fruit}_confusion_matrix.png")
@@ -61,7 +61,7 @@ def history():
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("m1_index.html", fruits=["apple", "banana", "orange"])
+    return render_template("m1_index.html", fruits=["apple", "banana", "orange", "mango"])
 
 
 @app.route("/predict", methods=["POST"])

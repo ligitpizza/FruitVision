@@ -19,9 +19,9 @@ from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 
 DATASET_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "datasets", "fruit_ripeness"))
-MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models"))
+MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models", "ensemble_ab"))
 
-FRUITS = ["apple", "banana", "orange"]
+FRUITS = ["apple", "banana", "orange", "mango"]
 CLASSES = ["ripe", "rotten", "unripe"]
 
 

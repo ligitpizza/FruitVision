@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Record — FruitVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 60px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+    label { display: block; margin-top: 14px; font-weight: bold; }
+    select, input[type=number], input[type=text] {
+      display: block; width: 100%; padding: 8px; margin-top: 4px; font-size: 1rem;
+      box-sizing: border-box;
+    }
+    button { margin-top: 20px; padding: 10px 16px; background: #2e7d32; color: white;
+             border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    button:hover { background: #1b5e20; }
+    a.cancel { margin-left: 12px; color: #666; }
+    .meta { color: #888; font-size: 0.85rem; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>✏️ Edit Record #{{ record.id }}</h1>
+  <p class="meta">Logged {{ record.created_at }} · file: {{ record.filename or '—' }}</p>
+
+  <form method="post">
+    <label for="fruit">Fruit</label>
+    <select name="fruit" id="fruit">
+      {% for f in fruits %}
+      <option value="{{ f }}" {{ 'selected' if record.fruit == f }}>{{ f.capitalize() }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="label">Ripeness</label>
+    <select name="label" id="label">
+      {% for c in classes %}
+      <option value="{{ c }}" {{ 'selected' if record.label == c }}>{{ c.capitalize() }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="confidence">Confidence (%)</label>
+    <input type="number" step="0.1" min="0" max="100" name="confidence" id="confidence" value="{{ record.confidence }}">
+
+    <label for="source">Source</label>
+    <input type="text" name="source" id="source" value="{{ record.source or '' }}">
+
+    <button type="submit">Save Changes</button>
+    <a class="cancel" href="/history">Cancel</a>
+  </form>
+</body>
+</html>

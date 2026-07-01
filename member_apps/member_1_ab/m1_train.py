@@ -1,12 +1,19 @@
 import os
 import sys
 import glob
+import time
 import numpy as np
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 
-from m1_train_report import plot_confusion_matrix, plot_class_distribution, plot_accuracy_summary
+from m1_train_report import (
+    plot_confusion_matrix,
+    plot_class_distribution,
+    plot_accuracy_summary,
+    save_training_time,
+    format_duration,
+)
 
 # --- Optional GPU training path ---------------------------------------------
 # Set USE_GPU=1 as an environment variable to try GPU-accelerated training via
@@ -78,8 +85,12 @@ def build_dataset(fruit):
 
 if __name__ == "__main__":
     accuracies = {}
+    per_fruit_seconds = {}
+    run_start = time.time()
 
     for fruit in FRUITS:
+        fruit_start = time.time()
+
         print(f"\nBuilding feature dataset for {fruit}...")
         X, y = build_dataset(fruit)
         print(f"Loaded {len(X)} samples for {fruit} across classes: {set(y)}")
@@ -114,6 +125,13 @@ if __name__ == "__main__":
         out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_ensemble_ab.pkl")
         joblib.dump({"model": clf, "scaler": scaler}, out_path)
         print(f"Model saved to {out_path}")
+
+        per_fruit_seconds[fruit] = time.time() - fruit_start
+        print(f"[time] {fruit} took {format_duration(per_fruit_seconds[fruit])}")
+
+    total_seconds = time.time() - run_start
+    save_training_time(total_seconds, per_fruit_seconds)
+    print(f"\n[time] Total training run took {format_duration(total_seconds)}")
 
     if accuracies:
         summary_path = plot_accuracy_summary(accuracies)

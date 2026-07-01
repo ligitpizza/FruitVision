@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Analytics — FruitVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 950px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+    h2 { color: #444; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-top: 40px; }
+    .stat-cards { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+    .card {
+      flex: 1; min-width: 140px; background: #f9f9f9; border: 1px solid #eee;
+      border-radius: 10px; padding: 16px; text-align: center;
+    }
+    .card .value { font-size: 1.8rem; font-weight: bold; color: #2e7d32; }
+    .card .label { color: #777; font-size: 0.85rem; margin-top: 4px; }
+    .charts { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+    .charts img { max-width: 420px; border: 1px solid #eee; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
+    th { background: #f5f5f5; }
+    .empty { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>📈 Analytics Dashboard</h1>
+  <p>Live view across <strong>every</strong> logged prediction — not just the last batch you uploaded.</p>
+
+  {% if stats.total == 0 %}
+    <p class="empty">No predictions logged yet. Make some predictions first, then come back here.</p>
+  {% else %}
+
+  <div class="stat-cards">
+    <div class="card">
+      <div class="value">{{ stats.total }}</div>
+      <div class="label">Total Predictions</div>
+    </div>
+    {% for fruit, count in stats.by_fruit.items() %}
+    <div class="card">
+      <div class="value">{{ count }}</div>
+      <div class="label">{{ fruit.capitalize() }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2>Ripeness Breakdown by Fruit</h2>
+  <div class="charts">
+    {% if fruit_chart %}
+      <img src="/outputs/reports/fruit_breakdown_chart.png" alt="Fruit breakdown">
+    {% else %}
+      <p class="empty">Not enough data yet.</p>
+    {% endif %}
+    {% if history_chart %}
+      <img src="/outputs/reports/history_chart.png" alt="All-time ripeness distribution">
+    {% endif %}
+  </div>
+
+  <h2>Confidence Trend</h2>
+  <div class="charts">
+    {% if confidence_chart %}
+      <img src="/outputs/reports/confidence_trend_chart.png" alt="Confidence trend">
+    {% else %}
+      <p class="empty">Not enough data yet.</p>
+    {% endif %}
+  </div>
+
+  <h2>Average Confidence by Fruit</h2>
+  <table>
+    <tr><th>Fruit</th><th>Avg. Confidence</th></tr>
+    {% for fruit, avg in stats.avg_confidence_by_fruit.items() %}
+    <tr><td>{{ fruit.capitalize() }}</td><td>{{ avg }}%</td></tr>
+    {% endfor %}
+  </table>
+
+  {% endif %}
+
+  <p style="margin-top:30px;">
+    <a href="/history">View prediction history</a> ·
+    <a href="/training-report">View training report</a> ·
+    <a href="/">← Back to upload</a>
+  </p>
+</body>
+</html>

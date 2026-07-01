@@ -6,6 +6,7 @@ Everything gets saved under outputs/training/ so it doesn't clash with
 outputs/reports/ (which holds PDF reports + the live ripeness trend chart).
 """
 import os
+import json
 import matplotlib
 matplotlib.use("Agg")  # no GUI backend needed, safe for Flask/CLI use
 import matplotlib.pyplot as plt
@@ -14,6 +15,7 @@ from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training"))
+TRAINING_META_PATH = os.path.join(TRAINING_OUT_DIR, "training_meta.json")
 
 
 def _ensure_out_dir():
@@ -81,3 +83,48 @@ def plot_accuracy_summary(accuracies):
     plt.savefig(out_path)
     plt.close(fig)
     return out_path
+
+
+# --------------------------------------------------------------------------
+# New: total-training-time tracking
+# --------------------------------------------------------------------------
+def save_training_time(total_seconds, per_fruit_seconds=None):
+    """
+    Records how long the last full run of m1_train.py took, so the training
+    report page can display it. Called once at the end of m1_train.py's
+    __main__ block.
+
+    per_fruit_seconds: optional dict like {"apple": 12.3, "banana": 9.8, ...}
+    """
+    _ensure_out_dir()
+    meta = {
+        "total_seconds": round(total_seconds, 2),
+        "per_fruit_seconds": {k: round(v, 2) for k, v in (per_fruit_seconds or {}).items()},
+    }
+    with open(TRAINING_META_PATH, "w") as f:
+        json.dump(meta, f, indent=2)
+    return TRAINING_META_PATH
+
+
+def load_training_time():
+    """
+    Returns the saved training-time dict, or None if training hasn't been
+    run yet (or was run before this feature existed).
+    """
+    if not os.path.exists(TRAINING_META_PATH):
+        return None
+    try:
+        with open(TRAINING_META_PATH) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def format_duration(seconds):
+    """Human-friendly duration string, e.g. 125.4 -> '2m 5.4s'."""
+    if seconds is None:
+        return "—"
+    minutes, secs = divmod(seconds, 60)
+    if minutes >= 1:
+        return f"{int(minutes)}m {secs:.1f}s"
+    return f"{secs:.1f}s"

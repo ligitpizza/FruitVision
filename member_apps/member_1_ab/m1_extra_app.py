@@ -1,9 +1,10 @@
 import os
 import sys
 import json
+import math
 import cv2
 import numpy as np
-from flask import Flask, request, render_template, send_from_directory
+from flask import Flask, request, render_template, send_from_directory, redirect, url_for, flash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
@@ -11,12 +12,30 @@ sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 from m1_predict import predict_ripeness, NotAFruitError
 from m1_extra_pdf_report import generate_pdf_report, generate_pdf_report_batch
 from m1_extra_video_processor import process_video
-from m1_extra_supplemental import generate_trend_chart, generate_history_chart
-from database.m1_history_db import log_result, get_recent
+from m1_extra_supplemental import (
+    generate_trend_chart,
+    generate_history_chart,
+    generate_fruit_breakdown_chart,
+    generate_confidence_trend_chart,
+)
+from m1_train_report import load_training_time, format_duration
+from database.m1_history_db import (
+    log_result,
+    get_recent,
+    get_paginated,
+    get_by_id,
+    update_result,
+    delete_result,
+    get_stats,
+)
 
 MEMBER_TAG = "member_1_ab"
+FRUITS = ["apple", "banana", "orange", "mango"]
+RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
+HISTORY_PAGE_SIZE = 15  # bump to 20 if you'd rather show more rows per page
 
 app = Flask(__name__)
+app.secret_key = "fruitivision-dev-key"  # only used for flash() messages; replace for real deployment
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -35,7 +54,7 @@ TRAINING_DIR = os.path.join(OUTPUTS_DIR, "training")
 
 @app.route("/training-report")
 def training_report():
-    fruits = ["apple", "banana", "orange", "mango"]
+    fruits = FRUITS
     graphs = []
     for fruit in fruits:
         cm_path = os.path.join(TRAINING_DIR, f"{fruit}_confusion_matrix.png")
@@ -47,21 +66,107 @@ def training_report():
                 "class_distribution": f"training/{fruit}_class_distribution.png" if os.path.exists(dist_path) else None,
             })
     summary_exists = os.path.exists(os.path.join(TRAINING_DIR, "accuracy_summary.png"))
-    return render_template("m1_training_report.html", graphs=graphs, summary_exists=summary_exists)
+
+    training_time = load_training_time()
+    training_time_display = None
+    per_fruit_time_display = {}
+    if training_time:
+        training_time_display = format_duration(training_time.get("total_seconds"))
+        per_fruit_time_display = {
+            fruit: format_duration(secs)
+            for fruit, secs in training_time.get("per_fruit_seconds", {}).items()
+        }
+
+    return render_template(
+        "m1_training_report.html",
+        graphs=graphs,
+        summary_exists=summary_exists,
+        training_time=training_time_display,
+        per_fruit_time=per_fruit_time_display,
+    )
 
 
 @app.route("/history")
 def history():
-    fruit_filter = request.args.get("fruit")
-    rows = get_recent(member=MEMBER_TAG, limit=100)
-    if fruit_filter:
-        rows = [r for r in rows if r["fruit"] == fruit_filter]
-    return render_template("m1_history.html", results=rows, fruit_filter=fruit_filter)
+    fruit_filter = request.args.get("fruit") or None
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    rows, total = get_paginated(
+        member=MEMBER_TAG, fruit=fruit_filter, page=page, per_page=HISTORY_PAGE_SIZE
+    )
+    total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
+    page = min(page, total_pages)  # clamp in case someone jumps past the last page
+
+    return render_template(
+        "m1_history.html",
+        results=rows,
+        fruit_filter=fruit_filter,
+        fruits=FRUITS,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+    )
+
+
+# --------------------------------------------------------------------------
+# Simple CRUD for history records
+# --------------------------------------------------------------------------
+@app.route("/history/<int:record_id>/edit", methods=["GET", "POST"])
+def history_edit(record_id):
+    record = get_by_id(record_id)
+    if not record:
+        flash("That record no longer exists.")
+        return redirect(url_for("history"))
+
+    if request.method == "POST":
+        update_result(
+            record_id,
+            fruit=request.form.get("fruit"),
+            label=request.form.get("label"),
+            confidence=float(request.form["confidence"]) if request.form.get("confidence") else None,
+            source=request.form.get("source"),
+        )
+        flash("Record updated.")
+        return redirect(url_for("history"))
+
+    return render_template(
+        "m1_history_edit.html", record=record, fruits=FRUITS, classes=RIPENESS_CLASSES
+    )
+
+
+@app.route("/history/<int:record_id>/delete", methods=["POST"])
+def history_delete(record_id):
+    deleted = delete_result(record_id)
+    flash("Record deleted." if deleted else "Record not found.")
+    return redirect(url_for("history", page=request.form.get("page", 1)))
+
+
+# --------------------------------------------------------------------------
+# Dynamic analytics dashboard (all-time data from the DB, not just the last
+# batch you happened to upload)
+# --------------------------------------------------------------------------
+@app.route("/analytics")
+def analytics():
+    stats = get_stats(MEMBER_TAG)
+    fruit_chart = generate_fruit_breakdown_chart(MEMBER_TAG)
+    confidence_chart = generate_confidence_trend_chart(MEMBER_TAG)
+    history_chart = generate_history_chart(MEMBER_TAG)
+
+    return render_template(
+        "m1_analytics_dashboard.html",
+        stats=stats,
+        fruit_chart=fruit_chart is not None,
+        confidence_chart=confidence_chart is not None,
+        history_chart=history_chart is not None,
+    )
 
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("m1_index.html", fruits=["apple", "banana", "orange", "mango"])
+    return render_template("m1_index.html", fruits=FRUITS)
 
 
 @app.route("/predict", methods=["POST"])

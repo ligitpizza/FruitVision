@@ -1,20 +1,20 @@
 # helper module. do not run!!
 
 """
-Plot generators for m1_train.py.
-Everything gets saved under outputs/training/ so it doesn't clash with
-outputs/reports/ (which holds PDF reports + the live ripeness trend chart).
+Plot generators for m3_train.py. Mirrors member 1's m1_train_report.py.
+Everything gets saved under outputs/training/cd/ so it doesn't clash with
+other members' plots.
 """
 import os
 import json
 import matplotlib
-matplotlib.use("Agg")  # no GUI backend needed, safe for Flask/CLI use
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training", "ab"))
+TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training", "cd"))
 TRAINING_META_PATH = os.path.join(TRAINING_OUT_DIR, "training_meta.json")
 
 
@@ -24,14 +24,13 @@ def _ensure_out_dir():
 
 
 def plot_confusion_matrix(y_true, y_pred, classes, fruit):
-    """Saves a confusion matrix heatmap for one fruit's test-set predictions."""
     out_dir = _ensure_out_dir()
     cm = confusion_matrix(y_true, y_pred, labels=classes)
 
     fig, ax = plt.subplots(figsize=(5, 5))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes)
-    disp.plot(ax=ax, cmap="Greens", colorbar=False)
-    ax.set_title(f"{fruit.capitalize()} — Confusion Matrix")
+    disp.plot(ax=ax, cmap="Oranges", colorbar=False)
+    ax.set_title(f"{fruit.capitalize()} — Confusion Matrix (C+D)")
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, f"{fruit}_confusion_matrix.png")
@@ -41,7 +40,6 @@ def plot_confusion_matrix(y_true, y_pred, classes, fruit):
 
 
 def plot_class_distribution(y, fruit):
-    """Saves a bar chart showing how many samples went into each ripeness class."""
     out_dir = _ensure_out_dir()
     counts = Counter(y)
     colors = {"ripe": "#2e7d32", "unripe": "#f57f17", "rotten": "#c62828"}
@@ -60,10 +58,6 @@ def plot_class_distribution(y, fruit):
 
 
 def plot_accuracy_summary(accuracies):
-    """
-    accuracies: dict like {"apple": 0.91, "banana": 0.88, "orange": 0.95, "mango":0.77}
-    Saves one bar chart comparing test-set accuracy across all trained fruits.
-    """
     out_dir = _ensure_out_dir()
     if not accuracies:
         return None
@@ -71,10 +65,10 @@ def plot_accuracy_summary(accuracies):
     fig, ax = plt.subplots(figsize=(6, 4))
     fruits = list(accuracies.keys())
     scores = [accuracies[f] * 100 for f in fruits]
-    bars = ax.bar(fruits, scores, color="#2e7d32")
+    bars = ax.bar(fruits, scores, color="#ef6c00")
     ax.set_ylim(0, 100)
     ax.set_ylabel("Test Accuracy (%)")
-    ax.set_title("Model Accuracy by Fruit")
+    ax.set_title("Model Accuracy by Fruit (C+D)")
     for bar, score in zip(bars, scores):
         ax.text(bar.get_x() + bar.get_width() / 2, score + 1, f"{score:.1f}%", ha="center")
     plt.tight_layout()
@@ -85,17 +79,7 @@ def plot_accuracy_summary(accuracies):
     return out_path
 
 
-# --------------------------------------------------------------------------
-# New: total-training-time tracking
-# --------------------------------------------------------------------------
 def save_training_time(total_seconds, per_fruit_seconds=None):
-    """
-    Records how long the last full run of m1_train.py took, so the training
-    report page can display it. Called once at the end of m1_train.py's
-    __main__ block.
-
-    per_fruit_seconds: optional dict like {"apple": 12.3, "banana": 9.8, ...}
-    """
     _ensure_out_dir()
     meta = {
         "total_seconds": round(total_seconds, 2),
@@ -107,10 +91,6 @@ def save_training_time(total_seconds, per_fruit_seconds=None):
 
 
 def load_training_time():
-    """
-    Returns the saved training-time dict, or None if training hasn't been
-    run yet (or was run before this feature existed).
-    """
     if not os.path.exists(TRAINING_META_PATH):
         return None
     try:
@@ -121,7 +101,6 @@ def load_training_time():
 
 
 def format_duration(seconds):
-    """Human-friendly duration string, e.g. 125.4 -> '2m 5.4s'."""
     if seconds is None:
         return "—"
     minutes, secs = divmod(seconds, 60)

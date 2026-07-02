@@ -1,9 +1,9 @@
 # helper module. do not run!!
 
 """
-Plot generators for m1_train.py.
-Everything gets saved under outputs/training/ so it doesn't clash with
-outputs/reports/ (which holds PDF reports + the live ripeness trend chart).
+Plot generators for m2_train.py. Mirrors member 1's m1_train_report.py.
+Everything gets saved under outputs/training/bc/ so it doesn't clash with
+member 1's outputs/training/ plots (or member 3/4's, once they exist).
 """
 import os
 import json
@@ -14,7 +14,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training", "ab"))
+TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training", "bc"))
 TRAINING_META_PATH = os.path.join(TRAINING_OUT_DIR, "training_meta.json")
 
 
@@ -30,8 +30,8 @@ def plot_confusion_matrix(y_true, y_pred, classes, fruit):
 
     fig, ax = plt.subplots(figsize=(5, 5))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes)
-    disp.plot(ax=ax, cmap="Greens", colorbar=False)
-    ax.set_title(f"{fruit.capitalize()} — Confusion Matrix")
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    ax.set_title(f"{fruit.capitalize()} — Confusion Matrix (B+C)")
     plt.tight_layout()
 
     out_path = os.path.join(out_dir, f"{fruit}_confusion_matrix.png")
@@ -71,10 +71,10 @@ def plot_accuracy_summary(accuracies):
     fig, ax = plt.subplots(figsize=(6, 4))
     fruits = list(accuracies.keys())
     scores = [accuracies[f] * 100 for f in fruits]
-    bars = ax.bar(fruits, scores, color="#2e7d32")
+    bars = ax.bar(fruits, scores, color="#1565c0")
     ax.set_ylim(0, 100)
     ax.set_ylabel("Test Accuracy (%)")
-    ax.set_title("Model Accuracy by Fruit")
+    ax.set_title("Model Accuracy by Fruit (B+C)")
     for bar, score in zip(bars, scores):
         ax.text(bar.get_x() + bar.get_width() / 2, score + 1, f"{score:.1f}%", ha="center")
     plt.tight_layout()
@@ -86,15 +86,12 @@ def plot_accuracy_summary(accuracies):
 
 
 # --------------------------------------------------------------------------
-# New: total-training-time tracking
+# Total-training-time tracking
 # --------------------------------------------------------------------------
 def save_training_time(total_seconds, per_fruit_seconds=None):
     """
-    Records how long the last full run of m1_train.py took, so the training
-    report page can display it. Called once at the end of m1_train.py's
-    __main__ block.
-
-    per_fruit_seconds: optional dict like {"apple": 12.3, "banana": 9.8, ...}
+    Records how long the last full run of m2_train.py took. Called once at
+    the end of m2_train.py's __main__ block.
     """
     _ensure_out_dir()
     meta = {
@@ -107,10 +104,7 @@ def save_training_time(total_seconds, per_fruit_seconds=None):
 
 
 def load_training_time():
-    """
-    Returns the saved training-time dict, or None if training hasn't been
-    run yet (or was run before this feature existed).
-    """
+    """Returns the saved training-time dict, or None if training hasn't been run yet."""
     if not os.path.exists(TRAINING_META_PATH):
         return None
     try:

@@ -53,6 +53,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
 from core_modules.preprocessing import preprocess, load_image
+from core_modules.calibration import calibrate
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 
@@ -72,7 +73,8 @@ def build_dataset(fruit):
         for path in glob.glob(os.path.join(folder, "*.*")):
             try:
                 img = load_image(path)
-                cleaned, _ = preprocess(img)
+                cropped, bbox = preprocess(img)
+                cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
                 vec_a = extract_colour(cleaned)
                 vec_b = extract_shape(cleaned)
                 vec = np.concatenate([vec_a, vec_b])

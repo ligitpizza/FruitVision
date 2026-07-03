@@ -9,6 +9,7 @@ Place this file at the PROJECT ROOT (same level as member_apps/, core_modules/).
 
 Why sequential is the default:
     Member 4's m4_detection.py lazy-loads YOLOv8 and downloads yolov8n.pt on
+    (yolo is already removed in 4m_train.py to save for time)
     first run. If member 4 races other members in parallel on a machine that
     doesn't have the weights cached yet, it's the only one touching that
     download, so this isn't actually a conflict risk by itself -- but member
@@ -42,7 +43,7 @@ def run_one(folder, script):
     both the console (prefixed) and a per-member log file. Returns
     (folder, success, elapsed_seconds)."""
     member_dir = PROJECT_ROOT / "member_apps" / folder
-    log_path = PROJECT_ROOT / "trained_log" / f"{folder}_train.log"
+    log_path = PROJECT_ROOT / "trained_logs" / f"{folder}_train.log"
     start = time.time()
 
     with open(log_path, "w") as log_file:

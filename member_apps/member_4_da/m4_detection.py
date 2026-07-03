@@ -1,65 +1,47 @@
+import cv2
 import numpy as np
 
-_MODEL = None
-_MODEL_LOAD_ERROR = None
-
-
-def _get_model():
-    """Lazily loads YOLOv8n (pretrained on COCO). Downloads yolov8n.pt on
-    first run if not already cached by ultralytics."""
-    global _MODEL, _MODEL_LOAD_ERROR
-    if _MODEL is None and _MODEL_LOAD_ERROR is None:
-        try:
-            from ultralytics import YOLO
-            _MODEL = YOLO("yolov8n.pt")
-        except Exception as e:
-            _MODEL_LOAD_ERROR = str(e)
-            print(f"[m4_detection] YOLOv8 unavailable, falling back to full-frame crop: {e}")
-    return _MODEL
-
-
-def detect(enhanced_image, confidence_threshold=0.25):
+def detect(enhanced_image):
     """
-    Member 4's detection: YOLOv8, pretrained, localization only.
+    Member 4's detection: HSV saturation-channel thresholding + contour
+    tracing. Rather than segmenting on raw greyscale intensity (member 1's
+    Otsu), gradient edges (member 2's Canny), or topographic flooding
+    (member 3's watershed), this segments on colour saturation -- fruit
+    surfaces are typically far more saturated than a plain backdrop
+    (table, wall, white sheet), so thresholding the S channel of HSV tends
+    to isolate the fruit even when its brightness is close to the
+    background's (a case that can trip up a pure intensity threshold).
 
-    YOLO's own COCO class labels are IGNORED -- COCO has no "mango" class
-    and ripeness isn't a COCO concept anyway, so whatever class YOLO thinks
-    the object is doesn't matter. Only the bounding box of the
-    highest-confidence detection in the frame is used, matching the
-    (cropped_img, bbox) interface every other member's detector returns.
+    Otsu's method is still used, but applied to the saturation channel
+    instead of greyscale -- it automatically picks the split point between
+    "low-saturation background" and "high-saturation fruit" without a
+    hand-tuned constant.
 
-    This is NOT object tracking -- each call is one independent detection
-    with no cross-frame identity, so it stays inside the allowed "Video
-    Processing" scope rather than the excluded "real-time tracking" scope.
-
-    Falls back to a full-frame, uncropped result if ultralytics isn't
-    installed or nothing is detected above threshold, so the pipeline
-    degrades gracefully instead of crashing.
+    Same interface as every other member's detect(): takes the cleaned/
+    enhanced image, returns (cropped_img, bbox).
     """
-    model = _get_model()
+    hsv = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2HSV)
+    saturation = hsv[:, :, 1]
+
+    _, sat_thresh = cv2.threshold(saturation, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Close small gaps/holes left by uneven saturation across the fruit's surface
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    closed = cv2.morphologyEx(sat_thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
     h, w = enhanced_image.shape[:2]
+    if contours:
+        largest = max(contours, key=cv2.contourArea)
+        x, y_, bw, bh = cv2.boundingRect(largest)
+        pad = 10
+        x0, y0 = max(0, x - pad), max(0, y_ - pad)
+        x1, y1 = min(w, x + bw + pad), min(h, y_ + bh + pad)
+        cropped = enhanced_image[y0:y1, x0:x1]
+        bbox = (x0, y0, x1, y1)
+    else:
+        cropped = enhanced_image
+        bbox = (0, 0, w, h)
 
-    if model is None:
-        return enhanced_image, (0, 0, w, h)
-
-    results = model(enhanced_image, verbose=False)[0]
-    if results.boxes is None or len(results.boxes) == 0:
-        return enhanced_image, (0, 0, w, h)
-
-    confidences = results.boxes.conf.cpu().numpy()
-    best_idx = int(np.argmax(confidences))
-    if confidences[best_idx] < confidence_threshold:
-        return enhanced_image, (0, 0, w, h)
-
-    xyxy = results.boxes.xyxy.cpu().numpy()[best_idx]
-    x0, y0, x1, y1 = [int(v) for v in xyxy]
-
-    pad = 10
-    x0, y0 = max(0, x0 - pad), max(0, y0 - pad)
-    x1, y1 = min(w, x1 + pad), min(h, y1 + pad)
-
-    cropped = enhanced_image[y0:y1, x0:x1]
-    if cropped.size == 0:
-        return enhanced_image, (0, 0, w, h)
-
-    return cropped, (x0, y0, x1, y1)
+    return cropped, bbox

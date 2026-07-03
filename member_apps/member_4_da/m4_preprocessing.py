@@ -2,16 +2,19 @@ import cv2
 
 def clean(image):
     """
-    Member 4's preprocessing: Non-Local Means denoising (compares patches
-    across the whole image rather than just a local neighbourhood, so it
-    removes noise while preserving fine texture better than Gaussian/
-    median blur -- at noticeably higher compute cost) + CLAHE on the
-    luminance channel for adaptive local contrast, same contrast approach
-    as member 2 but paired with a heavier-weight denoiser.
+    Member 4's preprocessing: bilateral filtering (edge-preserving denoise,
+    much cheaper than Non-Local Means) + CLAHE on the luminance channel for
+    adaptive local contrast.
+
+    Previously used cv2.fastNlMeansDenoisingColored, which compares patches
+    across the whole image and was measured at ~1.1s/image -- responsible
+    for 95%+ of total training time once YOLO was removed from detection.
+    Bilateral filtering is edge-aware like NLM but weights only a local
+    neighbourhood (spatial + intensity similarity), so it's a fraction of
+    the cost while still preserving edges better than a plain Gaussian/
+    median blur. CLAHE step is unchanged.
     """
-    denoised = cv2.fastNlMeansDenoisingColored(
-        image, None, h=7, hColor=7, templateWindowSize=7, searchWindowSize=21
-    )
+    denoised = cv2.bilateralFilter(image, d=9, sigmaColor=75, sigmaSpace=75)
 
     ycrcb = cv2.cvtColor(denoised, cv2.COLOR_BGR2YCrCb)
     y, cr, cb = cv2.split(ycrcb)

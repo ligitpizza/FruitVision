@@ -23,15 +23,15 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_2_bc'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_3_cd'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_4_da'))
 
-from m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
-from m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
-from m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
+from member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
+from member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
+from member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
 
 # --- 4-model ensemble (soft/hard-voting across all members) ----------------
 from predict_ensemble import predict_ensemble
 
 from m1_extra_pdf_report import generate_pdf_report, generate_pdf_report_batch
-from m1_extra_video_processor import process_video
+# from m1_extra_video_processor import process_video
 from m1_extra_supplemental import (
     generate_trend_chart,
     generate_history_chart,
@@ -409,23 +409,23 @@ def analyse():
     )
 
 
-@app.route("/analyse_video", methods=["POST"])
-def analyse_video():
-    fruit_type = request.form.get("fruit_type", "apple")
-    f = request.files["video"]
-    path = os.path.join(UPLOAD_DIR, f.filename)
-    f.save(path)
-    results = process_video(path, m1_predict_ripeness, fruit_type)
-    for r in results:
-        log_result(
-            member=MEMBER_TAG,
-            fruit=fruit_type,
-            label=r["label"],
-            confidence=round(r["confidence"] * 100, 1),
-            filename=f"{f.filename} (frame {r['frame']})",
-            source="video",
-        )
-    return render_template("m1_dashboard.html", results=results, chart=False, OUTPUTS_DIR=OUTPUTS_DIR)
+# @app.route("/analyse_video", methods=["POST"])
+# def analyse_video():
+#     fruit_type = request.form.get("fruit_type", "apple")
+#     f = request.files["video"]
+#     path = os.path.join(UPLOAD_DIR, f.filename)
+#     f.save(path)
+#     results = process_video(path, m1_predict_ripeness, fruit_type)
+#     for r in results:
+#         log_result(
+#             member=MEMBER_TAG,
+#             fruit=fruit_type,
+#             label=r["label"],
+#             confidence=round(r["confidence"] * 100, 1),
+#             filename=f"{f.filename} (frame {r['frame']})",
+#             source="video",
+#         )
+#     return render_template("m1_dashboard.html", results=results, chart=False, OUTPUTS_DIR=OUTPUTS_DIR)
 
 
 @app.route("/extra_export_pdf", methods=["POST"])

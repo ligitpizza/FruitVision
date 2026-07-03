@@ -7,7 +7,7 @@ import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from FruitVision.member_apps.member_1_ab.m1_calibration import calibrate
+from member_apps.member_1_ab.m1_calibration import calibrate
 from m1_preprocessing import clean
 from m1_detection import detect
 from m1_calibration import calibrate

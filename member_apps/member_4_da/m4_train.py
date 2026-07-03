@@ -43,12 +43,11 @@ def build_dataset(fruit):
             continue
         for path in glob.glob(os.path.join(folder, "*.*")):
             try:
-
                 img = load_image(path)
                 enhanced = clean(img)
                 cropped, bbox = detect(enhanced)
                 cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
-                
+
                 vec_d = extract_gabor(cleaned)
                 vec_a = extract_colour(cleaned)
                 vec = np.concatenate([vec_d, vec_a])
@@ -72,7 +71,7 @@ if __name__ == "__main__":
         print(f"Loaded {len(X)} samples for {fruit} across classes: {set(y)}")
 
         if len(X) < 10:
-            print(f"Not enough images for {fruit}. Add images to "
+            print(f"Not enough images for {fruit}. Add images to "  
                   f"datasets/fruit_ripeness/{fruit}/<class>/ folders. Skipping.")
             continue
 
@@ -94,7 +93,6 @@ if __name__ == "__main__":
         accuracies[fruit] = accuracy_score(y_test, y_pred)
         plot_confusion_matrix(y_test, y_pred, classes=CLASSES, fruit=fruit)
 
-        # retrain on full dataset before saving, so the saved model uses all available data
         clf.fit(X_scaled, y)
 
         os.makedirs(MODEL_OUT_DIR, exist_ok=True)

@@ -4,9 +4,13 @@
   <meta charset="UTF-8">
   <title>FruitVision</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; }
+    body { font-family: Arial, sans-serif; max-width: 1000px; margin: 60px auto; padding: 0 20px; }
     h1 { color: #2e7d32; }
-    select, input[type=file], button { display: block; margin: 12px 0; padding: 10px; width: 100%; font-size: 1rem; }
+    h2 { margin-top: 0; }
+    .layout { display: flex; gap: 30px; align-items: flex-start; }
+    .main-col { flex: 1; min-width: 0; }
+    .model-col { width: 220px; flex-shrink: 0; }
+    select, input[type=file], button { display: block; margin: 12px 0; padding: 10px; width: 100%; font-size: 1rem; box-sizing: border-box; }
     button { background: #2e7d32; color: white; border: none; cursor: pointer; border-radius: 6px; }
     button:hover { background: #1b5e20; }
     #preview { max-width: 100%; margin-top: 16px; border-radius: 8px; display: none; }
@@ -14,31 +18,55 @@
     .ripe    { background: #e8f5e9; color: #2e7d32; }
     .unripe  { background: #fff8e1; color: #f57f17; }
     .rotten  { background: #ffebee; color: #c62828; }
+    .per-member { margin-top: 10px; font-size: 0.9rem; }
+    .per-member table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    .per-member th, .per-member td { text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(0,0,0,0.1); }
+
+    .model-btn {
+      display: block; width: 100%; margin-bottom: 12px; padding: 14px 10px;
+      background: #e0e0e0; color: #333; border: none; border-radius: 6px;
+      cursor: pointer; font-size: 1rem; text-align: center; transition: background 0.15s;
+    }
+    .model-btn:hover { background: #d0d0d0; }
+    .model-btn.selected { background: #2e7d32; color: white; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>🍎 FruitVision</h1>
   <p>Upload a fruit photo to check its ripeness.</p>
 
-  <label>Select Fruit:</label>
-  <select id="fruit">
-    {% for fruit in fruits %}
-    <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
-    {% endfor %}
-  </select>
+  <div class="layout">
+    <div class="main-col">
+      <label>Select Fruit:</label>
+      <select id="fruit">
+        {% for fruit in fruits %}
+        <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+        {% endfor %}
+      </select>
 
-  <label>Upload Image:</label>
-  <input type="file" id="imageInput" accept="image/*">
-  <img id="preview">
+      <label>Upload Image:</label>
+      <input type="file" id="imageInput" accept="image/*">
+      <img id="preview">
 
-  <button onclick="submitImage()">Check Ripeness</button>
+      <button onclick="submitImage()">Check Ripeness</button>
 
-  <div id="result"></div>
+      <div id="result"></div>
+    </div>
+
+    <div class="model-col">
+      {% for m in models %}
+        <button type="button" class="model-btn {{ 'selected' if loop.first }}"
+                data-model="{{ m }}" onclick="selectModel('{{ m }}')">
+          {% if m == 'all_four' %}Ensemble (All 4){% else %}Ensemble {{ m|upper }}{% endif %}
+        </button>
+      {% endfor %}
+    </div>
+  </div>
 
   <hr style="margin:30px 0;">
 
   <h2>Batch Analysis (Dashboard)</h2>
-  <p>Upload multiple photos of the same fruit to see a distribution chart.</p>
+  <p>Upload multiple photos of the same fruit to see a distribution chart. (Uses the AB model.)</p>
   <form action="/analyse" method="post" enctype="multipart/form-data">
     <label>Select Fruit:</label>
     <select name="fruit_type">
@@ -53,10 +81,20 @@
 
   <p style="margin-top:20px;">
     <a href="/history">View prediction history →</a><br>
+    <a href="/analytics">View analytics dashboard →</a><br>
     <a href="/training-report">View training report →</a>
   </p>
 
   <script>
+    let selectedModel = "{{ models[0] if models else 'ab' }}";
+
+    function selectModel(model) {
+      selectedModel = model;
+      document.querySelectorAll(".model-btn").forEach(btn => {
+        btn.classList.toggle("selected", btn.dataset.model === model);
+      });
+    }
+
     document.getElementById("imageInput").addEventListener("change", function () {
       const file = this.files[0];
       if (!file) return;
@@ -78,6 +116,7 @@
 
       const formData = new FormData();
       formData.append("fruit", fruit);
+      formData.append("model", selectedModel);
       formData.append("image", file);
 
       resultDiv.style.display = "none";
@@ -86,17 +125,37 @@
       resultDiv.style.display = "block";
 
       try {
-        const res = await fetch("/predict", { method: "POST", body: formData });
+        const res = await fetch("/predict_unified", { method: "POST", body: formData });
         const data = await res.json();
         if (data.error) {
+          resultDiv.className = "";
           resultDiv.textContent = `Error: ${data.error}`;
         } else {
           resultDiv.className = data.ripeness;
-          resultDiv.innerHTML = `
+          let html = `
             <strong>${data.fruit.charAt(0).toUpperCase() + data.fruit.slice(1)}</strong> is
             <strong>${data.ripeness.toUpperCase()}</strong>
             <br>Confidence: ${data.confidence}%
+            <br><small>Model: ${data.model}</small>
           `;
+          if (data.per_member) {
+            html += `<div class="per-member"><strong>Per-model breakdown (soft-voted):</strong><table>`;
+            for (const [member, r] of Object.entries(data.per_member)) {
+              if (r.error) {
+                html += `<tr><td>${member}</td><td colspan="2">skipped — ${r.error}</td></tr>`;
+              } else {
+                html += `<tr><td>${member}</td><td>${r.label}</td><td>${r.confidence}%</td></tr>`;
+              }
+            }
+            html += `</table></div>`;
+          } else if (data.proba) {
+            html += `<div class="per-member"><strong>Class probabilities:</strong><table>`;
+            for (const [cls, p] of Object.entries(data.proba)) {
+              html += `<tr><td>${cls}</td><td>${p}%</td></tr>`;
+            }
+            html += `</table></div>`;
+          }
+          resultDiv.innerHTML = html;
         }
       } catch (err) {
         resultDiv.textContent = "Server error. Is Flask running?";

@@ -7,9 +7,29 @@ import numpy as np
 from flask import Flask, request, render_template, send_from_directory, redirect, url_for, flash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, '..', '..'))
+MEMBER_APPS_DIR = os.path.normpath(os.path.join(BASE_DIR, '..'))
+PROJECT_ROOT = os.path.normpath(os.path.join(BASE_DIR, '..', '..'))
+sys.path.append(PROJECT_ROOT)
+sys.path.append(MEMBER_APPS_DIR)
 
-from m1_predict import predict_ripeness, NotAFruitError
+# --- Member 1's own model (already lived here) -----------------------------
+from m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
+
+# --- Members 2, 3, 4's models -----------------------------------------------
+# Each member's predict.py lives in its own folder; add each folder to
+# sys.path so we can import their modules by name (m2_predict, m3_predict,
+# m4_predict are unique module names so there's no import collision).
+sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_2_bc'))
+sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_3_cd'))
+sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_4_da'))
+
+from m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
+from m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
+from m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
+
+# --- 4-model ensemble (soft/hard-voting across all members) ----------------
+from predict_ensemble import predict_ensemble
+
 from m1_extra_pdf_report import generate_pdf_report, generate_pdf_report_batch
 from m1_extra_video_processor import process_video
 from m1_extra_supplemental import (
@@ -39,8 +59,36 @@ app.secret_key = "fruitivision-dev-key"  # only used for flash() messages; repla
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs"))
+
+# --------------------------------------------------------------------------
+# Unified model registry: every selectable option on the index page maps to
+# an entry here. "all_four" is handled separately (it calls predict_ensemble
+# instead of a single predict_ripeness function).
+# --------------------------------------------------------------------------
+PREDICTORS = {
+    "ab": {
+        "fn": m1_predict_ripeness,
+        "not_fruit_err": M1NotAFruitError,
+        "label": "Ensemble AB (Colour + Shape)",
+    },
+    "bc": {
+        "fn": m2_predict_ripeness,
+        "not_fruit_err": M2NotAFruitError,
+        "label": "Ensemble BC (Shape + Texture)",
+    },
+    "cd": {
+        "fn": m3_predict_ripeness,
+        "not_fruit_err": M3NotAFruitError,
+        "label": "Ensemble CD (Texture + Gabor)",
+    },
+    "da": {
+        "fn": m4_predict_ripeness,
+        "not_fruit_err": M4NotAFruitError,
+        "label": "Ensemble DA (Gabor + Colour)",
+    },
+}
+MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 
 
 @app.route("/outputs/<path:filename>")
@@ -95,7 +143,7 @@ def history():
         page = 1
 
     rows, total = get_paginated(
-        member=MEMBER_TAG, fruit=fruit_filter, page=page, per_page=HISTORY_PAGE_SIZE
+        member=None, fruit=fruit_filter, page=page, per_page=HISTORY_PAGE_SIZE
     )
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
     page = min(page, total_pages)  # clamp in case someone jumps past the last page
@@ -150,10 +198,10 @@ def history_delete(record_id):
 # --------------------------------------------------------------------------
 @app.route("/analytics")
 def analytics():
-    stats = get_stats(MEMBER_TAG)
-    fruit_chart = generate_fruit_breakdown_chart(MEMBER_TAG)
-    confidence_chart = generate_confidence_trend_chart(MEMBER_TAG)
-    history_chart = generate_history_chart(MEMBER_TAG)
+    stats = get_stats(None)
+    fruit_chart = generate_fruit_breakdown_chart(None)
+    confidence_chart = generate_confidence_trend_chart(None)
+    history_chart = generate_history_chart(None)
 
     return render_template(
         "m1_analytics_dashboard.html",
@@ -166,11 +214,29 @@ def analytics():
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("m1_index.html", fruits=FRUITS)
+    return render_template("m1_index.html", fruits=FRUITS, models=MODEL_CHOICES, predictors=PREDICTORS)
+
+
+def _save_annotated(img, bbox, filename):
+    """Shared helper: draws the detected bbox on a copy of the image and
+    saves it under outputs/annotated/. Returns the relative path, or None
+    if there's no bbox to draw."""
+    if bbox is None:
+        return None
+    x0, y0, x1, y1 = bbox
+    annotated = img.copy()
+    cv2.rectangle(annotated, (x0, y0), (x1, y1), (0, 200, 0), 3)
+    annotated_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "annotated"))
+    os.makedirs(annotated_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(annotated_dir, filename), annotated)
+    return f"annotated/{filename}"
 
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    """Legacy single-model endpoint, kept for backwards compatibility.
+    Always uses member 1's own AB model. New frontend code should use
+    /predict_unified instead, which supports all 4 models + the ensemble."""
     fruit_type = request.form.get("fruit", "apple")
     files = request.files.getlist("image")  # matches m1_index.html field name "image"
     if not files or files[0].filename == "":
@@ -183,19 +249,11 @@ def predict():
         img = cv2.imread(path)
 
         try:
-            label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
-        except NotAFruitError as e:
+            label, confidence, bbox, cleaned, proba_dict = m1_predict_ripeness(img, fruit_type)
+        except M1NotAFruitError as e:
             return {"error": str(e), "filename": f.filename}, 422
 
-        annotated_rel = None
-        if bbox is not None:
-            x0, y0, x1, y1 = bbox
-            annotated = img.copy()
-            cv2.rectangle(annotated, (x0, y0), (x1, y1), (0, 200, 0), 3)
-            annotated_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "annotated"))
-            os.makedirs(annotated_dir, exist_ok=True)
-            cv2.imwrite(os.path.join(annotated_dir, f.filename), annotated)
-            annotated_rel = f"annotated/{f.filename}"
+        annotated_rel = _save_annotated(img, bbox, f.filename)
 
         log_result(
             member=MEMBER_TAG,
@@ -214,11 +272,86 @@ def predict():
             "confidence": round(confidence * 100, 1),
         })
 
-    # m1_index.html's JS expects a single JSON object back (fruit, ripeness, confidence)
-    # so for a single-image upload, return that object directly:
     if len(results) == 1:
         return results[0]
     return {"results": results}
+
+
+@app.route("/predict_unified", methods=["POST"])
+def predict_unified():
+    """
+    Single entry point for the model-selector UI on m1_index.html.
+    Accepts a 'model' field: one of "ab", "bc", "cd", "da", "all_four".
+    Returns a consistent JSON shape regardless of which model ran.
+    """
+    fruit_type = request.form.get("fruit", "apple")
+    model_choice = request.form.get("model", "ab")
+    files = request.files.getlist("image")
+    if not files or files[0].filename == "":
+        return {"error": "No image uploaded"}, 400
+
+    f = files[0]
+    path = os.path.join(UPLOAD_DIR, f.filename)
+    f.save(path)
+    img = cv2.imread(path)
+
+    if model_choice == "all_four":
+        try:
+            label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
+        except RuntimeError as e:
+            # None of the 4 members could produce a prediction (e.g. all
+            # rejected the photo as "not a fruit", or all failed to load).
+            return {"error": str(e), "filename": f.filename}, 422
+
+        annotated_rel = _save_annotated(img, bbox, f.filename)
+
+        log_result(
+            member="ensemble_all_four",
+            fruit=fruit_type,
+            label=label,
+            confidence=confidence,
+            filename=f.filename,
+            annotated_path=annotated_rel,
+            source="predict_unified",
+        )
+
+        return {
+            "model": "all_four",
+            "fruit": fruit_type,
+            "ripeness": label,
+            "confidence": confidence,
+            "per_member": per_member,
+        }
+
+    entry = PREDICTORS.get(model_choice)
+    if not entry:
+        return {"error": f"Unknown model '{model_choice}'"}, 400
+
+    try:
+        label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
+    except entry["not_fruit_err"] as e:
+        return {"error": str(e), "filename": f.filename}, 422
+
+    annotated_rel = _save_annotated(img, bbox, f.filename)
+
+    log_result(
+        member=f"ensemble_{model_choice}",
+        fruit=fruit_type,
+        label=label,
+        confidence=round(confidence * 100, 1),
+        filename=f.filename,
+        annotated_path=annotated_rel,
+        source="predict_unified",
+    )
+
+    return {
+        "model": model_choice,
+        "fruit": fruit_type,
+        "ripeness": label,
+        "confidence": round(confidence * 100, 1),
+        "per_member": None,
+        "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+    }
 
 
 @app.route("/analyse", methods=["POST"])
@@ -234,20 +367,12 @@ def analyse():
         img = cv2.imread(path)
 
         try:
-            label, confidence, bbox, cleaned = predict_ripeness(img, fruit_type)
-        except NotAFruitError as e:
+            label, confidence, bbox, cleaned, proba_dict = m1_predict_ripeness(img, fruit_type)
+        except M1NotAFruitError as e:
             results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
             continue
 
-        annotated_rel = None
-        if bbox is not None:
-            x0, y0, x1, y1 = bbox
-            annotated = img.copy()
-            cv2.rectangle(annotated, (x0, y0), (x1, y1), (0, 200, 0), 3)
-            annotated_dir = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "annotated"))
-            os.makedirs(annotated_dir, exist_ok=True)
-            cv2.imwrite(os.path.join(annotated_dir, f.filename), annotated)
-            annotated_rel = f"annotated/{f.filename}"
+        annotated_rel = _save_annotated(img, bbox, f.filename)
 
         log_result(
             member=MEMBER_TAG,
@@ -290,7 +415,7 @@ def analyse_video():
     f = request.files["video"]
     path = os.path.join(UPLOAD_DIR, f.filename)
     f.save(path)
-    results = process_video(path, predict_ripeness, fruit_type)
+    results = process_video(path, m1_predict_ripeness, fruit_type)
     for r in results:
         log_result(
             member=MEMBER_TAG,

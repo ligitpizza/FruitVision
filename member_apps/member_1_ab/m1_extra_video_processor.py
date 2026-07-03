@@ -17,7 +17,7 @@ def process_video(video_path, predict_fn, fruit_type, sample_every_n=15):
 
         if frame_idx % sample_every_n == 0:
             try:
-                label, confidence, bbox, _ = predict_fn(frame, fruit_type)
+                label, confidence, bbox, _, _proba_dict = predict_fn(frame, fruit_type)
                 results.append({"frame": frame_idx, "label": label, "confidence": confidence})
             except Exception as e:
                 print(f"Frame {frame_idx} skipped: {e}")

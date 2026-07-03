@@ -46,7 +46,7 @@
 
   {% if summary_exists %}
     <h2>Accuracy Summary</h2>
-    <img src="/outputs/training/accuracy_summary.png" style="max-width:500px;">
+    <img src="/outputs/training/ab/accuracy_summary.png" style="max-width:500px;">
   {% endif %}
 
   {% if graphs %}
@@ -54,10 +54,10 @@
     <h2>{{ g.fruit.capitalize() }}</h2>
     <div class="graph-row">
       {% if g.class_distribution %}
-        <img src="/outputs/{{ g.class_distribution }}" alt="{{ g.fruit }} class distribution">
+        <img src="/outputs/training/ab/{{ g.class_distribution }}" alt="{{ g.fruit }} class distribution">
       {% endif %}
       {% if g.confusion_matrix %}
-        <img src="/outputs/{{ g.confusion_matrix }}" alt="{{ g.fruit }} confusion matrix">
+        <img src="/outputs/training/ab/{{ g.confusion_matrix }}" alt="{{ g.fruit }} confusion matrix">
       {% endif %}
     </div>
     {% endfor %}

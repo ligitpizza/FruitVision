@@ -54,7 +54,12 @@ def _looks_like_fruit(shape_vec, cleaned_img):
 def predict_ripeness(raw_img, fruit_type):
     """
     Takes a raw image (numpy array, BGR) and the selected fruit type,
-    runs the full B+C pipeline, and returns (label, confidence, bbox, cleaned_img).
+    runs the full B+C pipeline, and returns:
+        (label, confidence, bbox, cleaned_img, proba_dict)
+
+    proba_dict is the full class-probability distribution, e.g.
+        {"ripe": 0.62, "unripe": 0.31, "rotten": 0.07}
+    This is what predict_ensemble.py needs to do soft voting.
 
     Pipeline: preprocess (denoise/contrast/crop) -> calibrate (rectify to a
     square, no aspect-ratio distortion; resize to model input size happens
@@ -84,4 +89,5 @@ def predict_ripeness(raw_img, fruit_type):
     label = clf.predict(combined_scaled)[0]
     proba = clf.predict_proba(combined_scaled)[0]
     confidence = float(np.max(proba))
-    return label, confidence, bbox, cleaned
+    proba_dict = {cls: float(p) for cls, p in zip(clf.classes_, proba)}
+    return label, confidence, bbox, cleaned, proba_dict

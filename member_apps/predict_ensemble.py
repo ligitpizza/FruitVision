@@ -1,16 +1,3 @@
-# ---------------------------------------------------------------------------
-# Upgrade path (do this once all 4 members are trained):
-#
-# Change each member's predict_ripeness() to also return the full probability
-# array (not just the max), e.g.:
-#     return label, confidence, bbox, cleaned, proba_dict
-# where proba_dict = {"ripe": 0.7, "unripe": 0.2, "rotten": 0.1}
-#
-# Then in predict_ensemble(), instead of majority-voting on labels, average
-# the proba_dict across all members class-by-class and pick the highest —
-# that's true soft voting and is usually more accurate than hard voting.
-# ---------------------------------------------------------------------------
-
 """
 Combines all four members' predictions (A+B, B+C, C+D, D+A) into one final
 ripeness verdict for a single uploaded photo.
@@ -19,17 +6,17 @@ Design notes:
 - Each member's predict_ripeness() is loaded independently and wrapped in a
   try/except. If a member's model isn't trained yet, or their predict.py
   still has bugs, the ensemble skips that member instead of crashing.
-- Combination strategy: MAJORITY VOTE across members that succeeded, with
-  average confidence (of the members who voted for the winning label) used
-  as the final confidence score.
-- This is intentionally simple/robust rather than "true" soft-voting, because
-  right now member predict_ripeness() functions only return the top class's
-  confidence, not a full probability vector over all 3 classes. See the
-  "Upgrade path" note at the bottom of this file for how to make it soft-vote.
+- Combination strategy: SOFT VOTING. Each member returns its full 3-class
+  probability distribution (ripe/unripe/rotten), not just its top label.
+  We average those distributions across every member that succeeded, and
+  the final label is whichever class has the highest averaged probability.
+  This is more informative than hard (majority) voting -- a member that is
+  90% sure of "unripe" should outweigh two members that are barely 51%
+  sure of "ripe", and hard voting can't see that difference because it
+  only ever kept each member's top label.
 """
 import os
 import sys
-from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.normpath(os.path.join(BASE_DIR, ".."))
@@ -65,23 +52,30 @@ _load_all_members()
 
 def _run_member(member, fn, raw_img, fruit_type):
     """Calls a member's predict_ripeness, tolerating both signatures:
-    member_1 takes (raw_img, fruit_type); members 2-4 currently only take (raw_img)
-    since they haven't been updated to be fruit-aware yet."""
+    all current members take (raw_img, fruit_type); the except TypeError
+    fallback stays here as a safety net for any predict.py that hasn't
+    been updated to be fruit-aware yet.
+
+    Every member's predict_ripeness() now returns 5 values, the last being
+    proba_dict -- the full class-probability distribution needed for soft
+    voting (see module docstring)."""
     try:
-        label, confidence, bbox, _ = fn(raw_img, fruit_type)
+        label, confidence, bbox, _, proba_dict = fn(raw_img, fruit_type)
     except TypeError:
-        label, confidence, bbox, _ = fn(raw_img)
-    return label, float(confidence), bbox
+        label, confidence, bbox, _, proba_dict = fn(raw_img)
+    return label, float(confidence), bbox, proba_dict
 
 
 def predict_ensemble(raw_img, fruit_type):
     """
-    Runs every successfully-loaded member model on the same image.
+    Runs every successfully-loaded member model on the same image and
+    combines them via soft voting.
 
     Returns:
         final_label (str)
-        final_confidence (float, 0-100)
-        per_member (dict) -- each member's individual result or error, for transparency
+        final_confidence (float, 0-100) -- the winning class's averaged probability
+        per_member (dict) -- each member's individual result (label, confidence,
+            and full per-class probability breakdown) or error, for transparency
         bbox (tuple or None)
     """
     per_member = {}
@@ -89,8 +83,12 @@ def predict_ensemble(raw_img, fruit_type):
 
     for member, fn in _MEMBER_PREDICTORS.items():
         try:
-            label, confidence, member_bbox = _run_member(member, fn, raw_img, fruit_type)
-            per_member[member] = {"label": label, "confidence": round(confidence * 100, 1)}
+            label, confidence, member_bbox, proba_dict = _run_member(member, fn, raw_img, fruit_type)
+            per_member[member] = {
+                "label": label,
+                "confidence": round(confidence * 100, 1),
+                "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+            }
             bbox = bbox or member_bbox
         except Exception as e:
             per_member[member] = {"label": None, "confidence": None, "error": str(e)}
@@ -98,7 +96,7 @@ def predict_ensemble(raw_img, fruit_type):
     for member in _LOAD_ERRORS:
         per_member.setdefault(member, {"label": None, "confidence": None, "error": _LOAD_ERRORS[member]})
 
-    valid = {m: r for m, r in per_member.items() if r.get("label")}
+    valid = {m: r for m, r in per_member.items() if r.get("label") and r.get("proba")}
 
     if not valid:
         raise RuntimeError(
@@ -106,27 +104,22 @@ def predict_ensemble(raw_img, fruit_type):
             "Check that trained_models/ has the right .pkl files for at least one member."
         )
 
-    votes = Counter(r["label"] for r in valid.values())
-    top_label, _ = votes.most_common(1)[0]
+    # Soft voting: average each member's class-probability distribution
+    # (already expressed as percentages, 0-100), then pick the class with
+    # the highest averaged probability.
+    all_classes = set()
+    for r in valid.values():
+        all_classes.update(r["proba"].keys())
 
-    supporting = [r["confidence"] for r in valid.values() if r["label"] == top_label]
-    final_confidence = round(sum(supporting) / len(supporting), 1)
+    averaged = {}
+    for cls in all_classes:
+        probs = [r["proba"].get(cls, 0.0) for r in valid.values()]
+        averaged[cls] = sum(probs) / len(probs)
+
+    top_label = max(averaged, key=averaged.get)
+    final_confidence = round(averaged[top_label], 1)
 
     return top_label, final_confidence, per_member, bbox
-
-
-# ---------------------------------------------------------------------------
-# Upgrade path (do this once all 4 members are trained):
-#
-# Change each member's predict_ripeness() to also return the full probability
-# array (not just the max), e.g.:
-#     return label, confidence, bbox, cleaned, proba_dict
-# where proba_dict = {"ripe": 0.7, "unripe": 0.2, "rotten": 0.1}
-#
-# Then in predict_ensemble(), instead of majority-voting on labels, average
-# the proba_dict across all members class-by-class and pick the highest —
-# that's true soft voting and is usually more accurate than hard voting.
-# ---------------------------------------------------------------------------
 
 
 if __name__ == "__main__":
@@ -142,10 +135,11 @@ if __name__ == "__main__":
 
     label, confidence, per_member, bbox = predict_ensemble(img, sys.argv[2])
 
-    print(f"\nFinal ensemble result: {label.upper()} ({confidence}% confidence)\n")
+    print(f"\nFinal ensemble result (soft voting): {label.upper()} ({confidence}% confidence)\n")
     print("Per-member breakdown:")
     for member, result in per_member.items():
         if result.get("error"):
             print(f"  {member}: SKIPPED — {result['error']}")
         else:
-            print(f"  {member}: {result['label']} ({result['confidence']}%)")
+            proba_str = ", ".join(f"{cls}: {p}%" for cls, p in result["proba"].items())
+            print(f"  {member}: top={result['label']} ({result['confidence']}%)  [{proba_str}]")

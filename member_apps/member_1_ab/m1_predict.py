@@ -6,8 +6,10 @@ import numpy as np
 import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from core_modules.preprocessing import preprocess
-from core_modules.calibration import calibrate
+
+from FruitVision.member_apps.member_1_ab.m1_preprocessing import preprocess
+from FruitVision.member_apps.member_1_ab.m1_calibration import calibrate
+
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 

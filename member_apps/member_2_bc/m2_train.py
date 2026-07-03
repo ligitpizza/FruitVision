@@ -20,8 +20,11 @@ from m2_train_report import (
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
-from core_modules.preprocessing import preprocess, load_image
-from core_modules.calibration import calibrate
+from core_modules.image_io import load_image
+from m2_preprocessing import clean
+from m2_detection import detect
+from m2_calibration import calibrate
+
 from core_modules.mb_shape_contours import extract_shape
 from core_modules.mc_texture_glmc import extract_texture_glcm
 
@@ -41,8 +44,10 @@ def build_dataset(fruit):
         for path in glob.glob(os.path.join(folder, "*.*")):
             try:
                 img = load_image(path)
-                cropped, bbox = preprocess(img)
+                enhanced = clean(img)
+                cropped, bbox = detect(enhanced)
                 cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
+                
                 vec_b = extract_shape(cleaned)
                 vec_c = extract_texture_glcm(cleaned)
                 vec = np.concatenate([vec_b, vec_c])

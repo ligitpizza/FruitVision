@@ -20,8 +20,11 @@ from m4_train_report import (
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
-from core_modules.preprocessing import preprocess, load_image
-from core_modules.calibration import calibrate
+from core_modules.image_io import load_image
+from m4_preprocessing import clean
+from m4_detection import detect
+from m4_calibration import calibrate
+
 from core_modules.md_gabor_filters import extract_gabor
 from core_modules.ma_colour_space import extract_colour
 
@@ -40,9 +43,12 @@ def build_dataset(fruit):
             continue
         for path in glob.glob(os.path.join(folder, "*.*")):
             try:
+
                 img = load_image(path)
-                cropped, bbox = preprocess(img)
+                enhanced = clean(img)
+                cropped, bbox = detect(enhanced)
                 cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
+                
                 vec_d = extract_gabor(cleaned)
                 vec_a = extract_colour(cleaned)
                 vec = np.concatenate([vec_d, vec_a])

@@ -6,8 +6,9 @@ import numpy as np
 import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from core_modules.preprocessing import preprocess
-from core_modules.calibration import calibrate
+from m2_preprocessing import clean
+from m2_detection import detect
+from m2_calibration import calibrate
 from core_modules.mb_shape_contours import extract_shape
 from core_modules.mc_texture_glmc import extract_texture_glcm
 
@@ -71,7 +72,8 @@ def predict_ripeness(raw_img, fruit_type):
     clf = saved["model"]
     scaler = saved["scaler"]
 
-    cropped, bbox = preprocess(raw_img)
+    enhanced = clean(raw_img)
+    cropped, bbox = detect(enhanced)
     cleaned, calib_info = calibrate(cropped, bbox, target_size=(256, 256))
 
     vec_b = extract_shape(cleaned)

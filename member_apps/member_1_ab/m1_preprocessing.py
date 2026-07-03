@@ -46,9 +46,20 @@ def preprocess(image):
 
     return cropped, bbox
 
+def clean(image):
+    """
+    Member 1's preprocessing: Gaussian blur (denoise) + per-channel
+    histogram equalization on the luminance channel (global contrast
+    stretch). This is the original pipeline's preprocessing half, split
+    out from what used to be a single preprocess() function that also did
+    detection -- detection now lives separately in m1_detection.py so it
+    can be graded/compared as its own stage.
+    """
+    denoised = cv2.GaussianBlur(image, (5, 5), 0)
 
-def load_image(path):
-    img = cv2.imread(path)
-    if img is None:
-        raise FileNotFoundError(f"Could not read image: {path}")
-    return img
+    ycrcb = cv2.cvtColor(denoised, cv2.COLOR_BGR2YCrCb)
+    y, cr, cb = cv2.split(ycrcb)
+    y_eq = cv2.equalizeHist(y)
+    enhanced = cv2.cvtColor(cv2.merge([y_eq, cr, cb]), cv2.COLOR_YCrCb2BGR)
+
+    return enhanced

@@ -52,8 +52,10 @@ else:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
-from FruitVision.member_apps.member_1_ab.m1_preprocessing import preprocess, load_image
-from FruitVision.member_apps.member_1_ab.m1_calibration import calibrate
+from core_modules.image_io import load_image
+from m1_preprocessing import clean
+from m1_detection import detect
+from m1_calibration import calibrate
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 
@@ -73,7 +75,8 @@ def build_dataset(fruit):
         for path in glob.glob(os.path.join(folder, "*.*")):
             try:
                 img = load_image(path)
-                cropped, bbox = preprocess(img)
+                enhanced = clean(img)
+                cropped, bbox = detect(enhanced)
                 cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
                 vec_a = extract_colour(cleaned)
                 vec_b = extract_shape(cleaned)

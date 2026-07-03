@@ -7,8 +7,10 @@ import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from FruitVision.member_apps.member_1_ab.m1_preprocessing import preprocess
 from FruitVision.member_apps.member_1_ab.m1_calibration import calibrate
+from m1_preprocessing import clean
+from m1_detection import detect
+from m1_calibration import calibrate
 
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
@@ -77,7 +79,8 @@ def predict_ripeness(raw_img, fruit_type):
     clf = saved["model"]
     scaler = saved["scaler"]
 
-    cropped, bbox = preprocess(raw_img)
+    enhanced = clean(raw_img)
+    cropped, bbox = detect(enhanced)
     cleaned, calib_info = calibrate(cropped, bbox, target_size=(256, 256))
 
     vec_a = extract_colour(cleaned)

@@ -9,4 +9,5 @@ matplotlib
 Werkzeug
 torch
 torchvision
+torchaudio
 ultralytics

@@ -13,7 +13,7 @@ sys.path.append(PROJECT_ROOT)
 sys.path.append(MEMBER_APPS_DIR)
 
 # --- Member 1's own model (already lived here) -----------------------------
-from m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
+from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
 
 # --- Members 2, 3, 4's models -----------------------------------------------
 # Each member's predict.py lives in its own folder; add each folder to
@@ -23,14 +23,14 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_2_bc'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_3_cd'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_4_da'))
 
-from member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
-from member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
-from member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
+from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
+from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
+from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
 
 # --- 4-model ensemble (soft/hard-voting across all members) ----------------
-from predict_ensemble import predict_ensemble
+from member_apps.predict_ensemble import predict_ensemble
 
-from m1_extra_pdf_report import generate_pdf_report, generate_pdf_report_batch
+from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
 # from m1_extra_video_processor import process_video
 from m1_extra_supplemental import (
     generate_trend_chart,
@@ -39,7 +39,7 @@ from m1_extra_supplemental import (
     generate_confidence_trend_chart,
 )
 from m1_train_report import load_training_time, format_duration
-from database.m1_history_db import (
+from FruitVision.database.history_db import (
     log_result,
     get_recent,
     get_paginated,

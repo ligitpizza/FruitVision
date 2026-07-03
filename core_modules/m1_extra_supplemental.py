@@ -4,7 +4,7 @@ import matplotlib
 matplotlib.use("Agg")  # no GUI backend needed, safe for Flask
 import matplotlib.pyplot as plt
 
-from database.m1_history_db import get_recent
+from FruitVision.database.history_db import get_recent
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CHART_OUT_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports", "trend_chart.png"))

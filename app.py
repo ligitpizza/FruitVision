@@ -65,6 +65,9 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 TRAINING_DIR = os.path.join(OUTPUTS_DIR, "training")
 
+from realtime.stream_routes import realtime_bp
+app.register_blueprint(realtime_bp)
+
 # --------------------------------------------------------------------------
 # Unified model registry: every selectable option across every route maps
 # to an entry here. "all_four" is handled separately (it calls

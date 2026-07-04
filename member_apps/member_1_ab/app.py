@@ -16,9 +16,7 @@ sys.path.append(MEMBER_APPS_DIR)
 from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
 
 # --- Members 2, 3, 4's models -----------------------------------------------
-# Each member's predict.py lives in its own folder; add each folder to
-# sys.path so we can import their modules by name (m2_predict, m3_predict,
-# m4_predict are unique module names so there's no import collision).
+sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_1_ab'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_2_bc'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_3_cd'))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, 'member_4_da'))
@@ -31,15 +29,14 @@ from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ri
 from member_apps.predict_ensemble import predict_ensemble
 
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
-# from m1_extra_video_processor import process_video
-from m1_extra_supplemental import (
+from member_apps.member_1_ab.m1_extra_supplemental import (
     generate_trend_chart,
     generate_history_chart,
     generate_fruit_breakdown_chart,
     generate_confidence_trend_chart,
 )
-from m1_train_report import load_training_time, format_duration
-from FruitVision.database.history_db import (
+from member_apps.member_1_ab.m1_train_report import load_training_time, format_duration
+from database.history_db import (
     log_result,
     get_recent,
     get_paginated,
@@ -52,19 +49,17 @@ from FruitVision.database.history_db import (
 MEMBER_TAG = "member_1_ab"
 FRUITS = ["apple", "banana", "orange", "mango"]
 RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
-HISTORY_PAGE_SIZE = 15  # bump to 20 if you'd rather show more rows per page
+HISTORY_PAGE_SIZE = 15
 
 app = Flask(__name__)
-app.secret_key = "fruitivision-dev-key"  # only used for flash() messages; replace for real deployment
+app.secret_key = "fruitivision-dev-key"
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs"))
 
 # --------------------------------------------------------------------------
-# Unified model registry: every selectable option on the index page maps to
-# an entry here. "all_four" is handled separately (it calls predict_ensemble
-# instead of a single predict_ripeness function).
+# Unified model registry.
 # --------------------------------------------------------------------------
 PREDICTORS = {
     "ab": {
@@ -93,7 +88,6 @@ MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 
 @app.route("/outputs/<path:filename>")
 def outputs_file(filename):
-    """Serves annotated images and charts saved under outputs/, e.g. outputs/annotated/apple.jpg"""
     return send_from_directory(OUTPUTS_DIR, filename)
 
 
@@ -146,7 +140,7 @@ def history():
         member=None, fruit=fruit_filter, page=page, per_page=HISTORY_PAGE_SIZE
     )
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
-    page = min(page, total_pages)  # clamp in case someone jumps past the last page
+    page = min(page, total_pages)
 
     return render_template(
         "m1_history.html",
@@ -159,9 +153,6 @@ def history():
     )
 
 
-# --------------------------------------------------------------------------
-# Simple CRUD for history records
-# --------------------------------------------------------------------------
 @app.route("/history/<int:record_id>/edit", methods=["GET", "POST"])
 def history_edit(record_id):
     record = get_by_id(record_id)
@@ -192,16 +183,12 @@ def history_delete(record_id):
     return redirect(url_for("history", page=request.form.get("page", 1)))
 
 
-# --------------------------------------------------------------------------
-# Dynamic analytics dashboard (all-time data from the DB, not just the last
-# batch you happened to upload)
-# --------------------------------------------------------------------------
 @app.route("/analytics")
 def analytics():
     stats = get_stats(None)
     fruit_chart = generate_fruit_breakdown_chart(None)
     confidence_chart = generate_confidence_trend_chart(None)
-    history_chart = generate_history_chart(None)
+    history_chart = generate_history_chart(None)  # member_tag=None -> global history_chart.png
 
     return render_template(
         "m1_analytics_dashboard.html",
@@ -218,9 +205,6 @@ def index():
 
 
 def _save_annotated(img, bbox, filename):
-    """Shared helper: draws the detected bbox on a copy of the image and
-    saves it under outputs/annotated/. Returns the relative path, or None
-    if there's no bbox to draw."""
     if bbox is None:
         return None
     x0, y0, x1, y1 = bbox
@@ -235,10 +219,9 @@ def _save_annotated(img, bbox, filename):
 @app.route("/predict", methods=["POST"])
 def predict():
     """Legacy single-model endpoint, kept for backwards compatibility.
-    Always uses member 1's own AB model. New frontend code should use
-    /predict_unified instead, which supports all 4 models + the ensemble."""
+    Always uses member 1's own AB model."""
     fruit_type = request.form.get("fruit", "apple")
-    files = request.files.getlist("image")  # matches m1_index.html field name "image"
+    files = request.files.getlist("image")
     if not files or files[0].filename == "":
         return {"error": "No image uploaded"}, 400
 
@@ -279,11 +262,6 @@ def predict():
 
 @app.route("/predict_unified", methods=["POST"])
 def predict_unified():
-    """
-    Single entry point for the model-selector UI on m1_index.html.
-    Accepts a 'model' field: one of "ab", "bc", "cd", "da", "all_four".
-    Returns a consistent JSON shape regardless of which model ran.
-    """
     fruit_type = request.form.get("fruit", "apple")
     model_choice = request.form.get("model", "ab")
     files = request.files.getlist("image")
@@ -299,8 +277,6 @@ def predict_unified():
         try:
             label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
         except RuntimeError as e:
-            # None of the 4 members could produce a prediction (e.g. all
-            # rejected the photo as "not a fruit", or all failed to load).
             return {"error": str(e), "filename": f.filename}, 422
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
@@ -356,9 +332,25 @@ def predict_unified():
 
 @app.route("/analyse", methods=["POST"])
 def analyse():
-    """Multi-image dashboard view (renders m1_dashboard.html)."""
+    """
+    Multi-image dashboard view (renders member_dashboard.html).
+
+    FIXED: this used to always call m1_predict_ripeness and hardcode
+    MEMBER_TAG = "member_1_ab", regardless of what model the person picked
+    on the upload form. It's now model-aware, same PREDICTORS lookup used
+    by /predict_unified. It also used to render "m1_dashboard.html", which
+    doesn't exist (the real file is member_dashboard.html) -- every batch
+    analysis would 500 on render. Both are fixed below.
+    """
     fruit_type = request.form.get("fruit_type", "apple")
+    model_choice = request.form.get("model", "ab")
     files = request.files.getlist("images")
+
+    entry = PREDICTORS.get(model_choice)
+    if not entry:
+        return {"error": f"Unknown model '{model_choice}'"}, 400
+
+    member_tag = f"ensemble_{model_choice}"
     results = []
 
     for f in files:
@@ -367,15 +359,15 @@ def analyse():
         img = cv2.imread(path)
 
         try:
-            label, confidence, bbox, cleaned, proba_dict = m1_predict_ripeness(img, fruit_type)
-        except M1NotAFruitError as e:
+            label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
+        except entry["not_fruit_err"] as e:
             results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
             continue
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
 
         log_result(
-            member=MEMBER_TAG,
+            member=member_tag,
             fruit=fruit_type,
             label=label,
             confidence=round(confidence * 100, 1),
@@ -386,8 +378,10 @@ def analyse():
 
         results.append({"filename": f.filename, "label": label, "confidence": round(confidence * 100, 1), "annotated_path": annotated_rel})
 
-    chart_path = generate_trend_chart(results) if results else None
-    history_chart_path = generate_history_chart(MEMBER_TAG)
+    # file_suffix namespaces the chart PNGs per model so one member's batch
+    # run doesn't overwrite another's (or the global /analytics charts).
+    chart_path = generate_trend_chart(results, file_suffix=model_choice) if results else None
+    history_chart_path = generate_history_chart(member_tag, file_suffix=model_choice)
 
     results_for_pdf = [
         {
@@ -400,32 +394,15 @@ def analyse():
     ]
 
     return render_template(
-        "m1_dashboard.html",
+        "member_dashboard.html",
         results=results,
         chart=chart_path is not None,
         history_chart=history_chart_path is not None,
         results_json=json.dumps(results_for_pdf),
         OUTPUTS_DIR=OUTPUTS_DIR,
+        model_choice=model_choice,
+        predictors=PREDICTORS,
     )
-
-
-# @app.route("/analyse_video", methods=["POST"])
-# def analyse_video():
-#     fruit_type = request.form.get("fruit_type", "apple")
-#     f = request.files["video"]
-#     path = os.path.join(UPLOAD_DIR, f.filename)
-#     f.save(path)
-#     results = process_video(path, m1_predict_ripeness, fruit_type)
-#     for r in results:
-#         log_result(
-#             member=MEMBER_TAG,
-#             fruit=fruit_type,
-#             label=r["label"],
-#             confidence=round(r["confidence"] * 100, 1),
-#             filename=f"{f.filename} (frame {r['frame']})",
-#             source="video",
-#         )
-#     return render_template("m1_dashboard.html", results=results, chart=False, OUTPUTS_DIR=OUTPUTS_DIR)
 
 
 @app.route("/extra_export_pdf", methods=["POST"])
@@ -433,7 +410,10 @@ def extra_export_pdf():
     label = request.form["label"]
     confidence = float(request.form["confidence"]) / 100
     image_path = request.form.get("image_path")
-    out_path = generate_pdf_report(image_path, label, confidence)
+    # FIXED: model_tag was never read from the form, so every export was
+    # silently labelled "Ensemble AB" no matter which model actually ran.
+    model_tag = request.form.get("model_tag", "ab")
+    out_path = generate_pdf_report(image_path, label, confidence, model_tag=model_tag)
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 
@@ -445,7 +425,8 @@ def extra_export_pdf_batch():
     except (KeyError, json.JSONDecodeError):
         return {"error": "No results to export."}, 400
 
-    out_path = generate_pdf_report_batch(results)
+    model_tag = request.form.get("model_tag", "ab")
+    out_path = generate_pdf_report_batch(results, model_tag=model_tag)
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 

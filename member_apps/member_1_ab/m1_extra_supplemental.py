@@ -4,23 +4,49 @@ import matplotlib
 matplotlib.use("Agg")  # no GUI backend needed, safe for Flask
 import matplotlib.pyplot as plt
 
-from FruitVision.database.history_db import get_recent
+from database.history_db import get_recent
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CHART_OUT_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports", "trend_chart.png"))
-HISTORY_CHART_OUT_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports", "history_chart.png"))
-FRUIT_BREAKDOWN_OUT_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports", "fruit_breakdown_chart.png"))
-CONFIDENCE_TREND_OUT_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports", "confidence_trend_chart.png"))
+REPORTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "reports"))
+
+# Kept for the global (all-member) analytics dashboard, which always uses
+# these exact unsuffixed filenames.
+FRUIT_BREAKDOWN_OUT_PATH = os.path.join(REPORTS_DIR, "fruit_breakdown_chart.png")
+CONFIDENCE_TREND_OUT_PATH = os.path.join(REPORTS_DIR, "confidence_trend_chart.png")
 
 COLORS = {"ripe": "#2e7d32", "unripe": "#f57f17", "rotten": "#c62828"}
 
 
-def generate_trend_chart(results):
+def _suffixed_path(base_name, file_suffix):
+    """
+    Builds an output path for a chart, namespaced by file_suffix when given.
+
+    FIXED: these charts used to always be written to fixed filenames
+    (trend_chart.png, history_chart.png). That meant one member's batch
+    analysis would silently overwrite another member's chart -- and the
+    global /analytics dashboard's all-time history chart would get
+    clobbered by whichever member dashboard last ran a batch, since they
+    both wrote to outputs/reports/history_chart.png. Passing file_suffix
+    (e.g. "bc", "da") keeps each member's dashboard charts separate;
+    leaving it as None preserves the original unsuffixed filename for the
+    global analytics view.
+    """
+    if file_suffix:
+        name = f"{base_name}_{file_suffix}.png"
+    else:
+        name = f"{base_name}.png"
+    return os.path.join(REPORTS_DIR, name)
+
+
+def generate_trend_chart(results, file_suffix=None):
     """
     Takes a list of prediction result dicts (each with a 'label' key,
     e.g. {'filename': ..., 'label': 'ripe', 'confidence': 92.3}) and
     generates a bar chart showing the distribution of ripeness labels
     for THIS batch/upload. Returns the path to the saved chart image.
+
+    file_suffix: pass the model key (e.g. "ab", "bc") to keep this
+    member's "this batch" chart from overwriting another member's.
     """
     labels = [r["label"] for r in results if r.get("label")]
     if not labels:
@@ -36,19 +62,25 @@ def generate_trend_chart(results):
     plt.ylabel("Count")
     plt.tight_layout()
 
-    os.makedirs(os.path.dirname(CHART_OUT_PATH), exist_ok=True)
-    plt.savefig(CHART_OUT_PATH)
+    out_path = _suffixed_path("trend_chart", file_suffix)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path)
     plt.close()
 
-    return CHART_OUT_PATH
+    return out_path
 
 
-def generate_history_chart(member_tag, limit=500):
+def generate_history_chart(member_tag, limit=500, file_suffix=None):
     """
     Pulls ALL logged predictions for this member from the database and
     generates a pie chart of the overall ripeness distribution to date.
-    This is the "analytical" view -- trends across every upload ever made,
-    not just the current batch.
+
+    member_tag: used to filter the DB query (None = every member, used by
+        the global /analytics dashboard).
+    file_suffix: controls the output filename independently of member_tag,
+        so callers can choose e.g. "bc" for a member dashboard's chart
+        while the global analytics view keeps writing history_chart.png
+        (file_suffix=None).
     """
     rows = get_recent(member=member_tag, limit=limit)
     labels = [r["label"] for r in rows if r.get("label")]
@@ -69,16 +101,19 @@ def generate_history_chart(member_tag, limit=500):
     plt.title(f"All-Time Ripeness Distribution (last {len(rows)} predictions)")
     plt.tight_layout()
 
-    os.makedirs(os.path.dirname(HISTORY_CHART_OUT_PATH), exist_ok=True)
-    plt.savefig(HISTORY_CHART_OUT_PATH)
+    out_path = _suffixed_path("history_chart", file_suffix)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    plt.savefig(out_path)
     plt.close()
 
-    return HISTORY_CHART_OUT_PATH
+    return out_path
+
 
 def generate_fruit_breakdown_chart(member_tag, limit=500):
     """
     Grouped bar chart: for each fruit, how many ripe/unripe/rotten predictions
-    have been logged (all-time), so you can compare label distribution across fruits.
+    have been logged (all-time). Global-only chart (used by /analytics),
+    intentionally not suffixed.
     """
     rows = get_recent(member=member_tag, limit=limit)
     if not rows:
@@ -115,15 +150,14 @@ def generate_fruit_breakdown_chart(member_tag, limit=500):
 
 def generate_confidence_trend_chart(member_tag, limit=500):
     """
-    Line chart of prediction confidence over time (most recent `limit` predictions,
-    in chronological order), so you can see whether confidence is drifting.
+    Line chart of prediction confidence over time. Global-only chart (used
+    by /analytics), intentionally not suffixed.
     """
     rows = get_recent(member=member_tag, limit=limit)
     rows = [r for r in rows if r.get("confidence") is not None]
     if not rows:
         return None
 
-    # get_recent typically returns newest-first; flip to chronological order for the trend line
     rows = list(reversed(rows))
     confidences = [r["confidence"] for r in rows]
     x = range(1, len(confidences) + 1)

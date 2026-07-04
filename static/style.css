@@ -1,0 +1,135 @@
+/* ==========================================================================
+   FruitVision — site-wide dark theme
+   Uses !important because every template currently has its own inline
+   <style> block with light-theme colors (background: #f9f9f9, #eee borders,
+   etc). Without !important, those inline rules would keep winning over
+   this external stylesheet regardless of <link> order. Drop this file at
+   static/style.css and link it in every template's <head>.
+   ========================================================================== */
+
+:root {
+  --bg: #0d0d0d;
+  --bg-card: #1a1a1a;
+  --bg-card-alt: #1f1f1f;
+  --text: #e8e8e8;
+  --text-dim: #a0a0a0;
+  --border: #333333;
+  --brand: #43a047;
+  --brand-dark: #2e7d32;
+  --link: #64b5f6;
+  --ripe: #66bb6a;
+  --unripe: #ffca28;
+  --rotten: #ef5350;
+}
+
+/* Base */
+body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+h1, h2, h3 { color: var(--brand) !important; }
+.subtitle, .empty, .hint, p.meta, .card .label, .time-card .label, .status-msg {
+  color: var(--text-dim) !important;
+}
+a { color: var(--link) !important; }
+a.cancel { color: var(--text-dim) !important; }
+
+/* Forms */
+select, input[type=number], input[type=text], input[type=file] {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+button {
+  background: var(--brand) !important;
+  color: #ffffff !important;
+}
+button:hover { background: var(--brand-dark) !important; }
+button:disabled { background: #555 !important; color: #999 !important; }
+
+/* Cards / boxes (analytics stat-cards, training time-card) */
+.card, .time-card, #results-panel, .tab-panel {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.card .value, .time-card .value { color: var(--brand) !important; }
+
+/* Tables (history, training-report time-table) */
+table, table.time-table { color: var(--text) !important; }
+th, td, table.time-table th, table.time-table td {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+th, table.time-table th { background: var(--bg-card-alt) !important; }
+tr:hover td { background: var(--bg-card) !important; }
+
+/* Status labels — brightened slightly so they read on black, not just white */
+.ripe   { color: var(--ripe) !important; }
+.unripe { color: var(--unripe) !important; }
+.rotten { color: var(--rotten) !important; }
+
+/* Flash messages */
+.flash {
+  background: #123018 !important;
+  color: var(--ripe) !important;
+  border: 1px solid #1e4d28 !important;
+}
+.error-row { color: var(--rotten) !important; }
+
+/* Nav tabs (training_report, member_dashboard) */
+.nav-tabs a {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.nav-tabs a.active {
+  background: var(--brand) !important;
+  color: #ffffff !important;
+  border-color: var(--brand) !important;
+}
+
+/* Model selector buttons (index.html) */
+.model-btn {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+}
+.model-btn:hover { background: #262626 !important; }
+.model-btn.selected {
+  background: var(--brand) !important;
+  color: #ffffff !important;
+}
+
+/* Filters (history.html) */
+.filters .group a { color: var(--link) !important; }
+.filters .group a.active { color: var(--text) !important; }
+
+/* Pagination */
+.pagination a, .pagination span.current {
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.pagination span.current {
+  background: var(--brand) !important;
+  color: #ffffff !important;
+  border-color: var(--brand) !important;
+}
+.pagination span.info { color: var(--text-dim) !important; }
+
+/* Images / thumbnails / charts */
+img.thumb, .graph-row img, .charts img {
+  border-color: var(--border) !important;
+}
+
+/* Realtime page tab buttons */
+.tab-btn {
+  background: var(--bg-card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.tab-btn.active {
+  background: var(--brand) !important;
+  color: #ffffff !important;
+  border-color: var(--brand) !important;
+}
+#feed-img, #video-feed-img { border-color: var(--border) !important; }

@@ -5,12 +5,8 @@ def calibrate(cropped_img, bbox=None, target_size=(256, 256)):
     """
     Member 2's calibration: aspect-preserving letterboxing like member 1's,
     but using REFLECT padding (mirrored edge pixels) instead of a solid
-    fill colour. A solid white/neutral border can leak a subtle colour cue
-    into ma_colour_space.py's Lab/HSV means near the image edge (especially
-    for oddly-shaped fruit where the crop is far from square); reflect
-    padding avoids introducing any new colour, at the cost of a faint
-    mirrored artifact right at the pad boundary. Same square-then-resize
-    geometry as member 1, so shape features stay undistorted.
+    fill colour, to avoid leaking a colour cue into ma_colour_space.py's
+    Lab/HSV means near the image edge.
     """
     if cropped_img is None or cropped_img.size == 0:
         rectified = np.zeros((target_size[1], target_size[0], 3), dtype=np.uint8)

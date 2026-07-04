@@ -1,6 +1,11 @@
 """
 Lightweight SQLite logging for prediction results.
-Shared table so /predict and /analyse (and later members) all write here.
+
+Renamed from m1_history_db.py -> history_db.py. The logic is unchanged: it
+was already member-agnostic (every function takes `member` as an optional
+filter), it just lived under a filename that made it look like it belonged
+only to member 1. Every route in the global app.py, and every member's
+dashboard, reads/writes through this single module + table.
 """
 import os
 import sqlite3
@@ -93,7 +98,7 @@ def delete_result(result_id):
 
 def get_stats(member=None):
     """
-    Summary stats for the dashboard, optionally filtered by member.
+    Summary stats for a dashboard, optionally filtered by member.
     Returns a dict: total count, counts per label, counts per fruit,
     overall average confidence, and average confidence per fruit.
     """
@@ -168,7 +173,7 @@ def log_result(member, fruit, label, confidence, filename=None, annotated_path=N
 
 
 def get_recent(member=None, limit=50):
-    """Fetch most recent results, optionally filtered by member (e.g. 'member_1_ab')."""
+    """Fetch most recent results, optionally filtered by member (e.g. 'ensemble_ab')."""
     conn = _connect()
     if member:
         rows = conn.execute(

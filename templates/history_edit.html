@@ -20,7 +20,7 @@
 </head>
 <body>
   <h1>✏️ Edit Record #{{ record.id }}</h1>
-  <p class="meta">Logged {{ record.created_at }} · file: {{ record.filename or '—' }}</p>
+  <p class="meta">Logged {{ record.created_at }} · model: {{ record.member.replace('ensemble_', '')|upper }} · file: {{ record.filename or '—' }}</p>
 
   <form method="post">
     <label for="fruit">Fruit</label>

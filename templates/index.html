@@ -29,6 +29,11 @@
     }
     .model-btn:hover { background: #d0d0d0; }
     .model-btn.selected { background: #2e7d32; color: white; font-weight: bold; }
+    .dashboard-links a {
+      display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px;
+      border: 1px solid #ccc; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.9rem;
+    }
+    .dashboard-links a:hover { background: #f5f5f5; }
   </style>
 </head>
 <body>
@@ -65,13 +70,19 @@
 
   <hr style="margin:30px 0;">
 
-  <h2>Batch Analysis (Dashboard)</h2>
-  <p>Upload multiple photos of the same fruit to see a distribution chart. (Uses the AB model.)</p>
+  <h2>Batch Analysis (Data Analysis Dashboard)</h2>
+  <p>Upload multiple photos of the same fruit to see a distribution chart and export a PDF report. Pick which member's model to run.</p>
   <form action="/analyse" method="post" enctype="multipart/form-data">
     <label>Select Fruit:</label>
     <select name="fruit_type">
       {% for fruit in fruits %}
       <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+      {% endfor %}
+    </select>
+    <label>Select Model:</label>
+    <select name="model">
+      {% for key, entry in predictors.items() %}
+      <option value="{{ key }}">{{ entry.label }}</option>
       {% endfor %}
     </select>
     <label>Upload Images (multiple):</label>
@@ -81,8 +92,15 @@
 
   <p style="margin-top:20px;">
     <a href="/history">View prediction history →</a><br>
-    <a href="/analytics">View analytics dashboard →</a><br>
-    <a href="/training-report">View training report →</a>
+    <a href="/analytics">View all-time analytics dashboard →</a>
+  </p>
+
+  <h2 style="margin-top:30px;">Per-Member Dashboards</h2>
+  <p class="dashboard-links">
+    {% for key, entry in predictors.items() %}
+      <a href="/dashboard/{{ key }}">{{ entry.label }} — Dashboard</a>
+      <a href="/training-report/{{ key }}">{{ key|upper }} — Training Report</a>
+    {% endfor %}
   </p>
 
   <script>

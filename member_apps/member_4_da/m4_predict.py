@@ -31,15 +31,8 @@ def _load_model(fruit_type):
 
 def _looks_like_fruit(shape_vec, cleaned_img):
     """
-    Heuristic sanity check using the shape descriptors -- same logic as
-    member 1's m1_predict.py. This member's classifier (D+A: gabor +
-    colour) doesn't use shape at all, so extract_shape() is called
-    separately just for this check -- it's not part of the feature vector
-    fed to the classifier below.
-
-    shape_vec order (from mb_shape_contours.py): [norm_area, norm_perimeter,
-    circularity, aspect_ratio, convexity]. norm_area is already a fraction
-    of the frame (relative-scale normalized -- see core_modules/calibration.py).
+    This member's classifier (D+A: gabor + colour) doesn't use shape at
+    all, so extract_shape() is called separately just for this check.
     """
     norm_area, norm_perimeter, circularity, aspect_ratio, convexity = shape_vec
 
@@ -55,20 +48,6 @@ def _looks_like_fruit(shape_vec, cleaned_img):
 
 
 def predict_ripeness(raw_img, fruit_type):
-    """
-    Takes a raw image (numpy array, BGR) and the selected fruit type,
-    runs the full D+A pipeline, and returns:
-        (label, confidence, bbox, cleaned_img, proba_dict)
-
-    proba_dict is the full class-probability distribution, e.g.
-        {"ripe": 0.62, "unripe": 0.31, "rotten": 0.07}
-    This is what predict_ensemble.py needs to do soft voting.
-
-    Pipeline: preprocess (denoise/contrast/crop) -> calibrate (rectify to a
-    square, no aspect-ratio distortion; resize to model input size happens
-    here, not in preprocess) -> shape check (sanity only) + feature
-    extraction (D: gabor, A: colour) -> classification.
-    """
     saved = _load_model(fruit_type)
     clf = saved["model"]
     scaler = saved["scaler"]
@@ -85,8 +64,6 @@ def predict_ripeness(raw_img, fruit_type):
     vec_d = extract_gabor(cleaned)
     vec_a = extract_colour(cleaned)
     combined = np.concatenate([vec_d, vec_a]).reshape(1, -1)
-
-    # Apply the same scaling used during training, so feature magnitudes match
     combined_scaled = scaler.transform(combined)
 
     label = clf.predict(combined_scaled)[0]

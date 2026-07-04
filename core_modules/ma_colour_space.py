@@ -13,8 +13,8 @@ def extract_colour(cleaned_img):
     H, S, V = cv2.split(hsv)
 
     features = np.array([
-        A.mean(), A.std(),     # green <-> red shift
-        B.mean(), B.std(),     # blue <-> yellow shift
+        A.mean(), A.std(),
+        B.mean(), B.std(),
         H.mean(), H.std(),
         S.mean(), S.std(),
     ], dtype=np.float32)

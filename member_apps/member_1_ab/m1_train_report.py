@@ -2,13 +2,13 @@
 
 """
 Plot generators for m1_train.py.
-Everything gets saved under outputs/training/ so it doesn't clash with
-outputs/reports/ (which holds PDF reports + the live ripeness trend chart).
+Everything gets saved under outputs/training/ab/ so it doesn't clash with
+other members' plots or outputs/reports/ (PDF reports + dashboard charts).
 """
 import os
 import json
 import matplotlib
-matplotlib.use("Agg")  # no GUI backend needed, safe for Flask/CLI use
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from collections import Counter
@@ -24,7 +24,6 @@ def _ensure_out_dir():
 
 
 def plot_confusion_matrix(y_true, y_pred, classes, fruit):
-    """Saves a confusion matrix heatmap for one fruit's test-set predictions."""
     out_dir = _ensure_out_dir()
     cm = confusion_matrix(y_true, y_pred, labels=classes)
 
@@ -41,7 +40,6 @@ def plot_confusion_matrix(y_true, y_pred, classes, fruit):
 
 
 def plot_class_distribution(y, fruit):
-    """Saves a bar chart showing how many samples went into each ripeness class."""
     out_dir = _ensure_out_dir()
     counts = Counter(y)
     colors = {"ripe": "#2e7d32", "unripe": "#f57f17", "rotten": "#c62828"}
@@ -60,10 +58,6 @@ def plot_class_distribution(y, fruit):
 
 
 def plot_accuracy_summary(accuracies):
-    """
-    accuracies: dict like {"apple": 0.91, "banana": 0.88, "orange": 0.95, "mango":0.77}
-    Saves one bar chart comparing test-set accuracy across all trained fruits.
-    """
     out_dir = _ensure_out_dir()
     if not accuracies:
         return None
@@ -85,17 +79,7 @@ def plot_accuracy_summary(accuracies):
     return out_path
 
 
-# --------------------------------------------------------------------------
-# New: total-training-time tracking
-# --------------------------------------------------------------------------
 def save_training_time(total_seconds, per_fruit_seconds=None):
-    """
-    Records how long the last full run of m1_train.py took, so the training
-    report page can display it. Called once at the end of m1_train.py's
-    __main__ block.
-
-    per_fruit_seconds: optional dict like {"apple": 12.3, "banana": 9.8, ...}
-    """
     _ensure_out_dir()
     meta = {
         "total_seconds": round(total_seconds, 2),
@@ -107,10 +91,6 @@ def save_training_time(total_seconds, per_fruit_seconds=None):
 
 
 def load_training_time():
-    """
-    Returns the saved training-time dict, or None if training hasn't been
-    run yet (or was run before this feature existed).
-    """
     if not os.path.exists(TRAINING_META_PATH):
         return None
     try:
@@ -121,7 +101,6 @@ def load_training_time():
 
 
 def format_duration(seconds):
-    """Human-friendly duration string, e.g. 125.4 -> '2m 5.4s'."""
     if seconds is None:
         return "—"
     minutes, secs = divmod(seconds, 60)

@@ -3,9 +3,8 @@ import cv2
 def detect(enhanced_image):
     """
     Member 1's detection: Otsu threshold + Suzuki-Abe contour tracing.
-    This is the original pipeline's detection half, split out from the old
-    preprocess() function. Same interface as every other member's
-    detect(): takes the cleaned/enhanced image, returns (cropped_img, bbox).
+    Same interface as every other member's detect(): takes the
+    cleaned/enhanced image, returns (cropped_img, bbox).
     """
     gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)

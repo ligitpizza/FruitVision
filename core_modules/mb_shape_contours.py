@@ -4,24 +4,10 @@ import numpy as np
 def extract_shape(cleaned_img):
     """
     Extracts shape descriptors via Suzuki-Abe contour tracing, from a
-    CALIBRATED image (i.e. already run through core_modules.calibration
-    .calibrate(), so it's square and not aspect-ratio-distorted).
+    CALIBRATED image (already square, not aspect-ratio-distorted).
 
     Returns a 5-value feature vector: [norm_area, norm_perimeter,
     circularity, aspect_ratio, convexity].
-
-    norm_area / norm_perimeter are RELATIVE-SCALE normalized -- expressed as
-    a fraction of the image frame (area) / image diagonal (perimeter),
-    rather than raw pixel counts. This is a fallback, not true physical-unit
-    calibration: there's no reference object (coin/checkerboard/ruler) in
-    the dataset to derive a pixels-per-mm ratio from. Normalizing this way
-    at least makes size-based features comparable across photos taken at
-    different zoom/distance, which raw pixel counts are not. See
-    core_modules/calibration.py for the full rationale.
-
-    aspect_ratio is computed from the calibrated image, so (unlike before)
-    it reflects the fruit's true proportions instead of being pulled toward
-    1.0 by a naive squash-resize.
     """
     gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)

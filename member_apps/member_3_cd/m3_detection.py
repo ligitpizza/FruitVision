@@ -3,16 +3,9 @@ import numpy as np
 
 def detect(enhanced_image):
     """
-    Member 3's detection: marker-based watershed segmentation. Unlike a
-    single global threshold (member 1) or an edge map (member 2), watershed
-    treats the image as a topographic surface and floods it from confident
-    "sure foreground"/"sure background" seed regions, which tends to
-    separate a fruit from a background of similar brightness/texture
-    better than either.
-
-    Steps: Otsu threshold -> morphological opening (remove speckle noise)
-    -> distance transform for "sure foreground" -> dilate threshold mask
-    for "sure background" -> watershed floods the "unknown" region between.
+    Member 3's detection: marker-based watershed segmentation. Treats the
+    image as a topographic surface and floods it from confident "sure
+    foreground"/"sure background" seed regions.
 
     Returns (cropped_img, bbox), same interface as the other detectors.
     """
@@ -38,8 +31,6 @@ def detect(enhanced_image):
 
     cv2.watershed(enhanced_image, markers)
 
-    # label 1 = background, -1 = watershed boundary lines; anything > 1 is
-    # a distinct foreground region. Pick the largest as the fruit.
     fg_labels = [l for l in np.unique(markers) if l > 1]
     if fg_labels:
         areas = [(l, np.sum(markers == l)) for l in fg_labels]

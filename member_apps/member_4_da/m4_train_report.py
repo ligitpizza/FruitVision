@@ -1,10 +1,5 @@
 # helper module. do not run!!
 
-"""
-Plot generators for m4_train.py. Mirrors member 1's m1_train_report.py.
-Everything gets saved under outputs/training/da/ so it doesn't clash with
-other members' plots.
-"""
 import os
 import json
 import matplotlib

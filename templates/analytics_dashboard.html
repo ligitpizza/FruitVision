@@ -24,7 +24,7 @@
 </head>
 <body>
   <h1>📈 Analytics Dashboard</h1>
-  <p>Live view across <strong>every</strong> logged prediction — not just the last batch you uploaded.</p>
+  <p>Live view across <strong>every</strong> logged prediction, from all 4 members' models — not just the last batch you uploaded.</p>
 
   {% if stats.total == 0 %}
     <p class="empty">No predictions logged yet. Make some predictions first, then come back here.</p>
@@ -46,19 +46,19 @@
   <h2>Ripeness Breakdown by Fruit</h2>
   <div class="charts">
     {% if fruit_chart %}
-      <img src="/outputs/reports/fruit_breakdown_chart.png" alt="Fruit breakdown">
+      <img src="/outputs/reports/fruit_breakdown_chart_all.png" alt="Fruit breakdown">
     {% else %}
       <p class="empty">Not enough data yet.</p>
     {% endif %}
     {% if history_chart %}
-      <img src="/outputs/reports/history_chart.png" alt="All-time ripeness distribution">
+      <img src="/outputs/reports/history_chart_all.png" alt="All-time ripeness distribution">
     {% endif %}
   </div>
 
   <h2>Confidence Trend</h2>
   <div class="charts">
     {% if confidence_chart %}
-      <img src="/outputs/reports/confidence_trend_chart.png" alt="Confidence trend">
+      <img src="/outputs/reports/confidence_trend_chart_all.png" alt="Confidence trend">
     {% else %}
       <p class="empty">Not enough data yet.</p>
     {% endif %}
@@ -76,7 +76,6 @@
 
   <p style="margin-top:30px;">
     <a href="/history">View prediction history</a> ·
-    <a href="/training-report">View training report</a> ·
     <a href="/">← Back to upload</a>
   </p>
 </body>

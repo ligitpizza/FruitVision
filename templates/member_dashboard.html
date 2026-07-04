@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{ model_label }} — Dashboard — FruitiVision</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #2e7d32; }
+    .subtitle { color: #666; margin-top: -8px; }
+    .error-row { color: #c62828; font-style: italic; }
+    .charts { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px; }
+    select, input[type=file], button { display: block; margin: 10px 0; padding: 10px; width: 100%; font-size: 1rem; box-sizing: border-box; }
+    button { background: #2e7d32; color: white; border: none; cursor: pointer; border-radius: 6px; }
+    button:hover { background: #1b5e20; }
+    .flash { background: #e8f5e9; color: #2e7d32; padding: 10px 14px; border-radius: 6px; margin-top: 16px; }
+    .nav-tabs a {
+      display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px;
+      border: 1px solid #ccc; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.9rem;
+    }
+    .nav-tabs a.active { background: #2e7d32; color: white; border-color: #2e7d32; }
+  </style>
+</head>
+<body>
+  <h1>Data Analysis Dashboard</h1>
+  <p class="subtitle">{{ model_label }}</p>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="nav-tabs">
+    {% for key, entry in predictors.items() %}
+      <a href="/dashboard/{{ key }}" class="{{ 'active' if key == model_choice }}">{{ entry.label }}</a>
+    {% endfor %}
+  </div>
+
+  <h2>Batch Analysis</h2>
+  <form action="/analyse" method="post" enctype="multipart/form-data">
+    <label>Select Fruit:</label>
+    <select name="fruit_type">
+      {% for fruit in fruits %}
+      <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+      {% endfor %}
+    </select>
+    <input type="hidden" name="model" value="{{ model_choice }}">
+    <label>Upload Images (multiple):</label>
+    <input type="file" name="images" accept="image/*" multiple required>
+    <button type="submit">Analyse Batch with {{ model_label }}</button>
+  </form>
+
+  {% if results %}
+  <div id="results-panel" style="border:1px solid #ccc; padding:16px; border-radius:8px; margin-top:20px;">
+    {% for r in results %}
+      <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #eee;">
+        <strong>{{ r.filename if r.filename else 'Frame ' ~ r.frame }}</strong><br>
+        {% if r.error %}
+          <span class="error-row">⚠ {{ r.error }}</span>
+        {% else %}
+          Ripeness: <strong>{{ r.label }}</strong><br>
+          Confidence: {{ r.confidence }}%
+          <form action="/extra_export_pdf" method="post" style="display:inline;">
+            <input type="hidden" name="label" value="{{ r.label }}">
+            <input type="hidden" name="confidence" value="{{ r.confidence }}">
+            <input type="hidden" name="model_tag" value="{{ model_choice }}">
+            {% if r.annotated_path %}
+            <input type="hidden" name="image_path" value="{{ OUTPUTS_DIR }}/{{ r.annotated_path }}">
+            {% endif %}
+            <button type="submit" style="width:auto; display:inline-block; padding:6px 12px;">Export PDF</button>
+          </form>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if results_json and results|length > 0 %}
+  <form action="/extra_export_pdf_batch" method="post" style="margin-top:14px;">
+    <input type="hidden" name="results_json" value='{{ results_json }}'>
+    <input type="hidden" name="model_tag" value="{{ model_choice }}">
+    <button type="submit">📄 Export All as One PDF</button>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  <div class="charts">
+    {% if chart %}
+      <div>
+        <h3>This Batch</h3>
+        <img src="/outputs/reports/trend_chart_{{ model_choice }}.png" width="320">
+      </div>
+    {% endif %}
+    {% if history_chart %}
+      <div>
+        <h3>All-Time History ({{ model_choice|upper }})</h3>
+        <img src="/outputs/reports/history_chart_{{ model_choice }}.png" width="320">
+      </div>
+    {% endif %}
+  </div>
+
+  <p style="margin-top:20px;">
+    <a href="/history?member=ensemble_{{ model_choice }}">View {{ model_choice|upper }} history</a> ·
+    <a href="/training-report/{{ model_choice }}">Training report</a> ·
+    <a href="/analytics">All-time analytics (all members)</a> ·
+    <a href="/">← Back to upload</a>
+  </p>
+</body>
+</html>

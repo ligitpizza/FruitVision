@@ -7,7 +7,6 @@ import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from member_apps.member_1_ab.m1_calibration import calibrate
 from m1_preprocessing import clean
 from m1_detection import detect
 from m1_calibration import calibrate
@@ -40,11 +39,6 @@ def _looks_like_fruit(shape_vec, cleaned_img):
 
     shape_vec order (from mb_shape_contours.py): [norm_area, norm_perimeter,
     circularity, aspect_ratio, convexity]
-
-    NOTE: norm_area is now already a fraction of the frame (relative-scale
-    normalized in extract_shape -- see core_modules/calibration.py), so the
-    "too small" check below compares it directly to a fraction threshold
-    instead of multiplying by img_area like it used to.
     """
     norm_area, norm_perimeter, circularity, aspect_ratio, convexity = shape_vec
 
@@ -67,9 +61,7 @@ def predict_ripeness(raw_img, fruit_type):
 
     proba_dict is the full class-probability distribution, e.g.
         {"ripe": 0.62, "unripe": 0.31, "rotten": 0.07}
-    This is what predict_ensemble.py needs to do soft voting -- averaging
-    probability distributions across members instead of just counting each
-    member's top label.
+    This is what predict_ensemble.py needs to do soft voting.
 
     Pipeline: preprocess (denoise/contrast/crop) -> calibrate (rectify to a
     square, no aspect-ratio distortion; the resize to model input size now
@@ -91,8 +83,6 @@ def predict_ripeness(raw_img, fruit_type):
         raise NotAFruitError(reason)
 
     combined = np.concatenate([vec_a, vec_b]).reshape(1, -1)
-
-    # Apply the same scaling used during training, so feature magnitudes match
     combined_scaled = scaler.transform(combined)
 
     label = clf.predict(combined_scaled)[0]

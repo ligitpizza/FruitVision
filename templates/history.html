@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>History — FruitVision</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    body { font-family: Arial, sans-serif; max-width: 950px; margin: 40px auto; padding: 0 20px; }
     h1 { color: #2e7d32; }
     table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
@@ -12,9 +12,9 @@
     .ripe { color: #2e7d32; font-weight: bold; }
     .unripe { color: #f57f17; font-weight: bold; }
     .rotten { color: #c62828; font-weight: bold; }
-    .filters a { margin-right: 10px; }
-    .filters a.active { text-decoration: underline; font-weight: bold; }
-    thumb { width: 48px; }
+    .filters { display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; margin-top: 10px; }
+    .filters .group a { margin-right: 10px; }
+    .filters .group a.active { text-decoration: underline; font-weight: bold; }
     img.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; }
     .actions { white-space: nowrap; }
     .actions a, .actions button {
@@ -34,6 +34,7 @@
 </head>
 <body>
   <h1>🍎 Prediction History</h1>
+  <p>Across every member's model — filter by fruit or by which model produced the prediction.</p>
 
   {% with messages = get_flashed_messages() %}
     {% if messages %}
@@ -41,19 +42,29 @@
     {% endif %}
   {% endwith %}
 
-  <p class="filters">
-    Filter:
-    <a href="/history" class="{{ 'active' if not fruit_filter }}">All</a>
-    {% for fruit in fruits %}
-      <a href="/history?fruit={{ fruit }}" class="{{ 'active' if fruit_filter == fruit }}">{{ fruit.capitalize() }}</a>
-    {% endfor %}
-  </p>
+  <div class="filters">
+    <div class="group">
+      Fruit:
+      <a href="/history{{ '?member=' ~ member_filter if member_filter }}" class="{{ 'active' if not fruit_filter }}">All</a>
+      {% for fruit in fruits %}
+        <a href="/history?fruit={{ fruit }}{{ '&member=' ~ member_filter if member_filter }}" class="{{ 'active' if fruit_filter == fruit }}">{{ fruit.capitalize() }}</a>
+      {% endfor %}
+    </div>
+    <div class="group">
+      Model:
+      <a href="/history{{ '?fruit=' ~ fruit_filter if fruit_filter }}" class="{{ 'active' if not member_filter }}">All</a>
+      {% for m in member_options %}
+        <a href="/history?member={{ m }}{{ '&fruit=' ~ fruit_filter if fruit_filter }}" class="{{ 'active' if member_filter == m }}">{{ m.replace('ensemble_', '')|upper }}</a>
+      {% endfor %}
+    </div>
+  </div>
 
   {% if results %}
   <table>
     <tr>
       <th>Time</th>
       <th>Image</th>
+      <th>Model</th>
       <th>Fruit</th>
       <th>Result</th>
       <th>Confidence</th>
@@ -70,6 +81,7 @@
           {{ r.filename or '—' }}
         {% endif %}
       </td>
+      <td>{{ r.member.replace('ensemble_', '')|upper }}</td>
       <td>{{ r.fruit.capitalize() }}</td>
       <td class="{{ r.label }}">{{ r.label.upper() }}</td>
       <td>{{ r.confidence }}%</td>
@@ -87,20 +99,22 @@
   </table>
 
   <div class="pagination">
+    {% set base_qs = ('fruit=' ~ fruit_filter if fruit_filter else '') %}
+    {% set base_qs = base_qs ~ ('&member=' ~ member_filter if member_filter else '') %}
     {% if page > 1 %}
-      <a href="/history?page={{ page - 1 }}{{ '&fruit=' ~ fruit_filter if fruit_filter else '' }}">← Prev</a>
+      <a href="/history?page={{ page - 1 }}{{ '&' ~ base_qs if base_qs }}">← Prev</a>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
       {% if p == page %}
         <span class="current">{{ p }}</span>
       {% else %}
-        <a href="/history?page={{ p }}{{ '&fruit=' ~ fruit_filter if fruit_filter else '' }}">{{ p }}</a>
+        <a href="/history?page={{ p }}{{ '&' ~ base_qs if base_qs }}">{{ p }}</a>
       {% endif %}
     {% endfor %}
 
     {% if page < total_pages %}
-      <a href="/history?page={{ page + 1 }}{{ '&fruit=' ~ fruit_filter if fruit_filter else '' }}">Next →</a>
+      <a href="/history?page={{ page + 1 }}{{ '&' ~ base_qs if base_qs }}">Next →</a>
     {% endif %}
 
     <span class="info">{{ total }} record{{ 's' if total != 1 else '' }} total · page {{ page }} of {{ total_pages }}</span>

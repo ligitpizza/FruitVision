@@ -4,14 +4,8 @@ import numpy as np
 def detect(enhanced_image):
     """
     Member 2's detection: Canny edge detection + morphological closing to
-    bridge small gaps in the edge map, then contours on the closed edge map
-    -- rather than an Otsu threshold of raw intensity (member 1). Canny
-    responds to gradient magnitude, so it tends to hold the fruit's outline
-    even when fruit and background have similar overall brightness but a
-    visible edge, where a single global threshold can merge them.
-
-    Returns (cropped_img, bbox), same interface as
-    core_modules.preprocessing.preprocess().
+    bridge small gaps in the edge map, then contours on the closed edge map.
+    Returns (cropped_img, bbox), same interface as every other member's detect().
     """
     gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)

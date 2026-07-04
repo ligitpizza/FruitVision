@@ -6,10 +6,7 @@ def calibrate(cropped_img, bbox=None, target_size=(256, 256), pad_color=(255, 25
     Member 4's calibration: affine deskewing before letterboxing. Finds the
     fruit's minimum-area rotated bounding rectangle and warps the crop so
     that rectangle's long axis is horizontal, correcting for a fruit
-    photographed at an angle -- before the square-pad-then-resize step.
-    A tilted banana, for instance, gets an artificially inflated
-    aspect_ratio under a simple axis-aligned crop; deskewing first makes
-    aspect_ratio reflect the fruit's true shape, not its rotation.
+    photographed at an angle before the square-pad-then-resize step.
     """
     if cropped_img is None or cropped_img.size == 0:
         rectified = np.full((target_size[1], target_size[0], 3), pad_color, dtype=np.uint8)
@@ -28,7 +25,7 @@ def calibrate(cropped_img, bbox=None, target_size=(256, 256), pad_color=(255, 25
         largest = max(contours, key=cv2.contourArea)
         (cx, cy), (rw, rh), raw_angle = cv2.minAreaRect(largest)
 
-        if rw < rh:  # normalize so we rotate the LONG axis to horizontal
+        if rw < rh:
             raw_angle += 90
 
         h, w = cropped_img.shape[:2]

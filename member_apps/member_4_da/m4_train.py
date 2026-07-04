@@ -71,7 +71,7 @@ if __name__ == "__main__":
         print(f"Loaded {len(X)} samples for {fruit} across classes: {set(y)}")
 
         if len(X) < 10:
-            print(f"Not enough images for {fruit}. Add images to "  
+            print(f"Not enough images for {fruit}. Add images to "
                   f"datasets/fruit_ripeness/{fruit}/<class>/ folders. Skipping.")
             continue
 

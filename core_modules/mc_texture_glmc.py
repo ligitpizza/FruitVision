@@ -8,7 +8,7 @@ def extract_texture_glcm(cleaned_img):
     Returns a 4-value feature vector.
     """
     gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
-    gray = (gray / 4).astype(np.uint8)  # reduce to 64 grey levels for speed
+    gray = (gray / 4).astype(np.uint8)
 
     glcm = graycomatrix(gray, distances=[1], angles=[0, np.pi/4, np.pi/2, 3*np.pi/4],
                          levels=64, symmetric=True, normed=True)

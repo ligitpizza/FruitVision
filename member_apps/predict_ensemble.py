@@ -10,10 +10,6 @@ Design notes:
   probability distribution (ripe/unripe/rotten), not just its top label.
   We average those distributions across every member that succeeded, and
   the final label is whichever class has the highest averaged probability.
-  This is more informative than hard (majority) voting -- a member that is
-  90% sure of "unripe" should outweigh two members that are barely 51%
-  sure of "ripe", and hard voting can't see that difference because it
-  only ever kept each member's top label.
 """
 import os
 import sys
@@ -51,14 +47,7 @@ _load_all_members()
 
 
 def _run_member(member, fn, raw_img, fruit_type):
-    """Calls a member's predict_ripeness, tolerating both signatures:
-    all current members take (raw_img, fruit_type); the except TypeError
-    fallback stays here as a safety net for any predict.py that hasn't
-    been updated to be fruit-aware yet.
-
-    Every member's predict_ripeness() now returns 5 values, the last being
-    proba_dict -- the full class-probability distribution needed for soft
-    voting (see module docstring)."""
+    """Calls a member's predict_ripeness, tolerating both signatures."""
     try:
         label, confidence, bbox, _, proba_dict = fn(raw_img, fruit_type)
     except TypeError:
@@ -73,9 +62,8 @@ def predict_ensemble(raw_img, fruit_type):
 
     Returns:
         final_label (str)
-        final_confidence (float, 0-100) -- the winning class's averaged probability
-        per_member (dict) -- each member's individual result (label, confidence,
-            and full per-class probability breakdown) or error, for transparency
+        final_confidence (float, 0-100)
+        per_member (dict) -- each member's individual result or error
         bbox (tuple or None)
     """
     per_member = {}
@@ -104,9 +92,6 @@ def predict_ensemble(raw_img, fruit_type):
             "Check that trained_models/ has the right .pkl files for at least one member."
         )
 
-    # Soft voting: average each member's class-probability distribution
-    # (already expressed as percentages, 0-100), then pick the class with
-    # the highest averaged probability.
     all_classes = set()
     for r in valid.values():
         all_classes.update(r["proba"].keys())

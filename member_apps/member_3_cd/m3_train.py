@@ -47,7 +47,7 @@ def build_dataset(fruit):
                 enhanced = clean(img)
                 cropped, bbox = detect(enhanced)
                 cleaned, _calib_info = calibrate(cropped, bbox, target_size=(256, 256))
-                
+
                 vec_c = extract_texture_glcm(cleaned)
                 vec_d = extract_gabor(cleaned)
                 vec = np.concatenate([vec_c, vec_d])
@@ -93,7 +93,6 @@ if __name__ == "__main__":
         accuracies[fruit] = accuracy_score(y_test, y_pred)
         plot_confusion_matrix(y_test, y_pred, classes=CLASSES, fruit=fruit)
 
-        # retrain on full dataset before saving, so the saved model uses all available data
         clf.fit(X_scaled, y)
 
         os.makedirs(MODEL_OUT_DIR, exist_ok=True)

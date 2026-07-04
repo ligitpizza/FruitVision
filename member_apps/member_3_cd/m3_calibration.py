@@ -2,24 +2,16 @@ import cv2
 import numpy as np
 
 # Real-world diameter (mm) of the reference coin/card assumed to be placed
-# next to the fruit in-frame. Swap out for your actual reference object
-# (e.g. US quarter = 24.26mm, UK £1 coin = 23.43mm).
+# next to the fruit in-frame. Swap out for your actual reference object.
 REFERENCE_DIAMETER_MM = 24.0
 
 
 def _find_reference_coin(image):
     """
     Looks for a circular reference object via Hough Circle Transform.
-    Returns (center_x, center_y, radius_px) for the most confident circular
-    match, or None if nothing circular enough is found.
-
-    NOTE: as calibration.py's module docstring flags, the current dataset
-    has no reference object in any photo. This is the building block for
-    TRUE physical-unit calibration once such photos exist; until then it
-    won't find a circle and calibrate() below falls back to the same
-    relative-scale normalization every other member uses. Report this
-    distinction honestly -- don't claim physical calibration is active on
-    the current dataset.
+    Returns (center_x, center_y, radius_px), or None if nothing circular
+    enough is found -- which is every photo in the current dataset, so
+    calibrate() below falls back to relative-scale normalization.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.medianBlur(gray, 5)
@@ -32,8 +24,6 @@ def _find_reference_coin(image):
         return None
 
     circles = np.round(circles[0, :]).astype(int)
-    # Assume the reference object is the SMALLEST confident circle found --
-    # coins/cards are typically smaller in-frame than the fruit itself.
     cx, cy, r = min(circles, key=lambda c: c[2])
     return int(cx), int(cy), int(r)
 
@@ -41,9 +31,8 @@ def _find_reference_coin(image):
 def calibrate(cropped_img, bbox=None, target_size=(256, 256), pad_color=(255, 255, 255)):
     """
     Member 3's calibration: TRUE physical-unit calibration via pixels-per-mm
-    from a reference object, falling back to member 1's relative-scale
-    (frame-fraction) normalization when no reference object is detected --
-    which is every photo in the current dataset.
+    from a reference object, falling back to relative-scale (frame-fraction)
+    normalization when no reference object is detected.
     """
     if cropped_img is None or cropped_img.size == 0:
         rectified = np.full((target_size[1], target_size[0], 3), pad_color, dtype=np.uint8)

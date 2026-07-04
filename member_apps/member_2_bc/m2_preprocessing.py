@@ -7,11 +7,6 @@ def clean(image):
     preserving edges / removing salt-and-pepper noise) + CLAHE (Contrast
     Limited Adaptive Histogram Equalization) on the luminance channel only,
     so colour info (needed by ma_colour_space.py) isn't distorted.
-
-    Unlike member 1's global histogram equalization, CLAHE operates on
-    small tiles and clips the histogram before equalizing, avoiding
-    over-amplifying noise in flat regions -- better for uneven lighting
-    across the fruit's surface.
     """
     denoised = cv2.medianBlur(image, 5)
 

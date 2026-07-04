@@ -6,21 +6,6 @@ Usage:
     python train_all.py --parallel   # runs members 2-4 concurrently
 
 Place this file at the PROJECT ROOT (same level as member_apps/, core_modules/).
-
-Why sequential is the default:
-    Member 4's m4_detection.py lazy-loads YOLOv8 and downloads yolov8n.pt on
-    (yolo is already removed in 4m_train.py to save for time)
-    first run. If member 4 races other members in parallel on a machine that
-    doesn't have the weights cached yet, it's the only one touching that
-    download, so this isn't actually a conflict risk by itself -- but member
-    1 always runs first regardless of mode, since m1_train.py doesn't depend
-    on anything the others produce and it's the most likely to reveal a
-    broken import path early, before burning time on the other three.
-
-Why --parallel is safe when you use it:
-    Each member writes only to their own trained_models/ensemble_xx/ and
-    outputs/training/xx/ directories -- no shared files are written by more
-    than one member, so running 2-4 concurrently won't corrupt anything.
 """
 import subprocess
 import sys
@@ -39,11 +24,9 @@ MEMBERS = [
 
 
 def run_one(folder, script):
-    """Runs one member's train.py in its own folder, streaming output to
-    both the console (prefixed) and a per-member log file. Returns
-    (folder, success, elapsed_seconds)."""
     member_dir = PROJECT_ROOT / "member_apps" / folder
     log_path = PROJECT_ROOT / "trained_logs" / f"{folder}_train.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     start = time.time()
 
     with open(log_path, "w") as log_file:
@@ -71,10 +54,6 @@ def main():
           f"({'member 1 then 2-4 in parallel' if args.parallel else 'sequentially'})...\n")
 
     results = []
-
-    # Member 1 always goes first and alone: nothing depends on it, and it's
-    # the cheapest place to catch a broken import before burning time on
-    # the other three (especially member 4's YOLO download).
     results.append(run_one(*MEMBERS[0]))
 
     remaining = MEMBERS[1:]

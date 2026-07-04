@@ -15,3 +15,5 @@ outputs/annotated/
 outputs/reports/
 outputs/training/
 outputs/realtime_snapshots/
+
+uploads/

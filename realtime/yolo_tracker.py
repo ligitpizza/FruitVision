@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from collections import deque, Counter
 import cv2
 from ultralytics import YOLO
 
@@ -20,18 +21,37 @@ _yolo = YOLO("yolov8n.pt")
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
 CLASSIFY_EVERY_N_FRAMES = 5
 
+# --- Temporal smoothing tuning -----------------------------------------
+# A single frame's ensemble prediction can be noisy (motion blur, odd
+# lighting, a YOLO box that clips part of the fruit). Instead of trusting
+# one frame, each track keeps a rolling window of its last N classifications
+# and only commits/displays a label once enough of them agree.
+ROLLING_WINDOW = 7          # how many recent classifications each track remembers
+MIN_VOTES_TO_COMMIT = 3     # need at least this many usable frames before showing a real label
+MIN_FRAME_CONFIDENCE = 0.35 # single-frame predictions below this are treated as too unreliable to vote
+
+# Extra pixels added around YOLO's box before cropping, so the classical
+# detect()/calibrate() step downstream (which the SVMs were trained against)
+# has enough context to find the fruit's own contour instead of working off
+# a crop that's already clipped right at the fruit's edge.
+CROP_PAD = 15
+
 _track_state = {}
-_session_log = []  # every fresh classification made during the current stream(s)
+_mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
+_session_log = []  # every *committed* (post-smoothing) classification made during the current session
 
 
 def get_session_log():
-    """Snapshot of every real-time classification logged so far, used by the
-    /realtime/export_pdf route. Returns a plain list, safe to iterate/copy."""
     return list(_session_log)
 
 
 def clear_session_log():
     _session_log.clear()
+
+
+def _pad_box(x0, y0, x1, y1, frame_shape, pad=CROP_PAD):
+    h, w = frame_shape[:2]
+    return max(0, x0 - pad), max(0, y0 - pad), min(w, x1 + pad), min(h, y1 + pad)
 
 
 def _save_snapshot(crop, tag):
@@ -41,15 +61,42 @@ def _save_snapshot(crop, tag):
     return path
 
 
+def _update_rolling_vote(state, label, confidence):
+    """
+    Feeds one frame's (label, confidence) into a track's rolling window and
+    returns (committed_label, committed_confidence, is_stable).
+
+    Frames with confidence below MIN_FRAME_CONFIDENCE are dropped -- they're
+    more likely noise than signal, so we don't let them out-vote a run of
+    confident frames. Once at least MIN_VOTES_TO_COMMIT usable frames are in
+    the window, the committed label is whichever label has the most votes,
+    and its displayed confidence is the average confidence of only the
+    frames that agreed with it (not the whole window).
+    """
+    if label is not None and confidence is not None and confidence >= MIN_FRAME_CONFIDENCE:
+        state["history"].append((label, confidence))
+
+    if len(state["history"]) < MIN_VOTES_TO_COMMIT:
+        return state["label"], state["confidence"], False
+
+    votes = Counter(l for l, _ in state["history"])
+    top_label, _ = votes.most_common(1)[0]
+    agreeing_confidences = [c for l, c in state["history"] if l == top_label]
+    top_confidence = sum(agreeing_confidences) / len(agreeing_confidences)
+
+    return top_label, top_confidence, True
+
+
 def _record_classification(crop, fruit_type, label, confidence, tag):
-    """Logs a fresh classification into the same history DB every other
-    pipeline uses, and appends it to this session's in-memory log so it can
-    be bundled into a PDF export later."""
+    """Logs a COMMITTED (post-smoothing) classification to the shared history
+    DB, and appends it to this session's in-memory log for PDF export. Only
+    called on a label transition, so a track sitting still doesn't spam the
+    same result every window."""
     if label is None:
         return
 
     snapshot_path = _save_snapshot(crop, tag)
-    confidence_pct = round(confidence * 100, 1) if confidence is not None else 0.0
+    confidence_pct = round(confidence * 100, 1) if confidence <= 1.0 else round(confidence, 1)
 
     log_result(
         member="realtime_yolo",
@@ -77,19 +124,27 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
         return frame, False
 
     x0, y0, x1, y1 = bbox
-    try:
-        label, confidence, _, _ = predict_ensemble(cropped, fruit_type)
-    except Exception:
-        label, confidence = None, None
 
-    # Mango has no tracker/track-id to key off, so throttle logging by frame
-    # count instead of by track state -- otherwise every processed frame logs.
-    if label is not None and frame_idx % (CLASSIFY_EVERY_N_FRAMES * 4) == 0:
-        _record_classification(cropped, fruit_type, label, confidence, tag=f"mango_frame{frame_idx}")
+    frame_label, frame_confidence = None, None
+    if frame_idx - _mango_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
+        try:
+            frame_label, frame_confidence, _, _ = predict_ensemble(cropped, fruit_type)
+        except Exception:
+            pass
+        _mango_state["last_frame"] = frame_idx
 
-    colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(label, (200, 200, 200))
+    prev_label = _mango_state["label"]
+    committed_label, committed_confidence, stable = _update_rolling_vote(_mango_state, frame_label, frame_confidence)
+    _mango_state["label"], _mango_state["confidence"] = committed_label, committed_confidence
+
+    if stable and committed_label != prev_label:
+        _record_classification(cropped, fruit_type, committed_label, committed_confidence, tag=f"mango_frame{frame_idx}")
+
+    display_label = committed_label if stable else "analysing..."
+    colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
+    conf_str = f"{committed_confidence:.1f}%" if stable and committed_confidence else ""
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
-    cv2.putText(frame, f"mango {label or '...'} {confidence or ''}", (x0, max(y0 - 8, 0)),
+    cv2.putText(frame, f"mango {display_label} {conf_str}", (x0, max(y0 - 8, 0)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)
     return frame, True
 
@@ -117,21 +172,43 @@ def process_frame(frame, fruit_type, frame_idx):
 
 def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
     x0, y0, x1, y1 = map(int, box)
-    crop = frame[y0:y1, x0:x1]
+    px0, py0, px1, py1 = _pad_box(x0, y0, x1, y1, frame.shape)
+    crop = frame[py0:py1, px0:px1]
     if crop.size == 0:
         return
 
-    state = _track_state.get(tid, {"label": None, "confidence": None, "last_frame": -999})
+    state = _track_state.setdefault(tid, {
+        "history": deque(maxlen=ROLLING_WINDOW),
+        "label": None, "confidence": None, "last_frame": -999,
+    })
+
+    # frame_label, frame_confidence = None, None
+    # if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
+    #     try:
+    #         frame_label, frame_confidence, _, _ = predict_ensemble(crop, fruit_type)
+    #     except Exception:
+    #         pass
+    #     state["last_frame"] = frame_idx
+    frame_label, frame_confidence, per_member, _ = None, None, None, None
     if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
         try:
-            label, confidence, _, _ = predict_ensemble(crop, fruit_type)
-            state = {"label": label, "confidence": confidence, "last_frame": frame_idx}
-            _record_classification(crop, fruit_type, label, confidence, tag=f"track{tid}_frame{frame_idx}")
+            frame_label, frame_confidence, per_member, _ = predict_ensemble(crop, fruit_type)
+            # TEMP DEBUG: watch which members disagree on a known-ripe apple
+            print(f"[debug] track {tid} frame {frame_idx}: {per_member}")
         except Exception:
             pass
-    _track_state[tid] = state
+        state["last_frame"] = frame_idx
 
-    colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(state["label"], (200, 200, 200))
+    prev_label = state["label"]
+    committed_label, committed_confidence, stable = _update_rolling_vote(state, frame_label, frame_confidence)
+    state["label"], state["confidence"] = committed_label, committed_confidence
+
+    if stable and committed_label != prev_label:
+        _record_classification(crop, fruit_type, committed_label, committed_confidence, tag=f"track{tid}_frame{frame_idx}")
+
+    display_label = committed_label if stable else "analysing..."
+    colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
+    conf_str = f"{committed_confidence:.1f}%" if stable and committed_confidence else ""
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
-    text = f"#{tid} {class_name} {state['label'] or '...'} {state['confidence'] or ''}"
+    text = f"#{tid} {class_name} {display_label} {conf_str}"
     cv2.putText(frame, text, (x0, max(y0 - 8, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)

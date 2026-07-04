@@ -1,20 +1,74 @@
-from ultralytics import YOLO
+import os
+import sys
+import time
 import cv2
-import sys, os
+from ultralytics import YOLO
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "member_apps"))
-from member_apps.predict_ensemble import predict_ensemble  # reuse your soft-voting ensemble
-
-# sys.path.append(os.path.join(os.path.dirname(__file__), "..", "member_apps", "member_1_ab"))
+from member_apps.predict_ensemble import predict_ensemble
 from member_apps.member_1_ab.m1_preprocessing import clean
-from member_apps.member_1_ab.m1_detection import detect as classical_detect 
+from member_apps.member_1_ab.m1_detection import detect as classical_detect
 
-_yolo = YOLO("yolov8n.pt")  # stock weights, downloads once
-# _yolo = YOLO(os.path.normpath(os.path.join("..", "trained_models", "yolo8n.pt")))
+from database.history_db import log_result
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "outputs"))
+SNAPSHOT_DIR = os.path.join(OUTPUTS_DIR, "realtime_snapshots")
+os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+
+_yolo = YOLO("yolov8n.pt")
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
 CLASSIFY_EVERY_N_FRAMES = 5
 
-_track_state = {}  # track_id -> {"label", "confidence", "last_frame"}
+_track_state = {}
+_session_log = []  # every fresh classification made during the current stream(s)
+
+
+def get_session_log():
+    """Snapshot of every real-time classification logged so far, used by the
+    /realtime/export_pdf route. Returns a plain list, safe to iterate/copy."""
+    return list(_session_log)
+
+
+def clear_session_log():
+    _session_log.clear()
+
+
+def _save_snapshot(crop, tag):
+    filename = f"{tag}_{int(time.time() * 1000)}.jpg"
+    path = os.path.join(SNAPSHOT_DIR, filename)
+    cv2.imwrite(path, crop)
+    return path
+
+
+def _record_classification(crop, fruit_type, label, confidence, tag):
+    """Logs a fresh classification into the same history DB every other
+    pipeline uses, and appends it to this session's in-memory log so it can
+    be bundled into a PDF export later."""
+    if label is None:
+        return
+
+    snapshot_path = _save_snapshot(crop, tag)
+    confidence_pct = round(confidence * 100, 1) if confidence is not None else 0.0
+
+    log_result(
+        member="realtime_yolo",
+        fruit=fruit_type,
+        label=label,
+        confidence=confidence_pct,
+        filename=os.path.basename(snapshot_path),
+        annotated_path=os.path.relpath(snapshot_path, OUTPUTS_DIR),
+        source="realtime",
+    )
+
+    _session_log.append({
+        "tag": tag,
+        "fruit": fruit_type,
+        "label": label,
+        "confidence": confidence_pct,
+        "image_path": snapshot_path,
+    })
+
 
 def _process_mango_fallback(frame, fruit_type, frame_idx):
     enhanced = clean(frame)
@@ -28,11 +82,17 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
     except Exception:
         label, confidence = None, None
 
+    # Mango has no tracker/track-id to key off, so throttle logging by frame
+    # count instead of by track state -- otherwise every processed frame logs.
+    if label is not None and frame_idx % (CLASSIFY_EVERY_N_FRAMES * 4) == 0:
+        _record_classification(cropped, fruit_type, label, confidence, tag=f"mango_frame{frame_idx}")
+
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(label, (200, 200, 200))
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
     cv2.putText(frame, f"mango {label or '...'} {confidence or ''}", (x0, max(y0 - 8, 0)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)
     return frame, True
+
 
 def process_frame(frame, fruit_type, frame_idx):
     detected_any = False
@@ -66,6 +126,7 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
         try:
             label, confidence, _, _ = predict_ensemble(crop, fruit_type)
             state = {"label": label, "confidence": confidence, "last_frame": frame_idx}
+            _record_classification(crop, fruit_type, label, confidence, tag=f"track{tid}_frame{frame_idx}")
         except Exception:
             pass
     _track_state[tid] = state

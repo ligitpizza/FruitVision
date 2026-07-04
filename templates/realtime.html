@@ -43,6 +43,11 @@
     <img id="video-feed-img" alt="Uploaded video feed will appear here">
   </div>
 
+  <p style="margin-top:20px;">
+    <button onclick="exportRealtimePdf()">📄 Export PDF Report</button>
+    <a href="/history?member=realtime_yolo">View real-time history →</a>
+  </p>
+
   <p style="margin-top:30px;"><a href="/">← Back to upload</a></p>
 
   <script>
@@ -93,6 +98,29 @@
         statusEl.textContent = "Upload failed. Is Flask running?";
       }
     }
+
+    async function exportRealtimePdf() {
+    const statusEl = document.getElementById("upload-status");
+    try {
+      const res = await fetch("/realtime/export_pdf", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Nothing to export yet — classify something first.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "realtime_report.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Export failed. Is Flask running?");
+    }
+  }
   </script>
 </body>
 </html>

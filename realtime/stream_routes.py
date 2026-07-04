@@ -1,6 +1,7 @@
-from flask import Blueprint, Response, request, render_template
-import cv2, os, time
-from .yolo_tracker import process_frame
+from flask import Blueprint, Response, request, render_template, send_from_directory
+import cv2, os
+from .yolo_tracker import process_frame, get_session_log, clear_session_log
+from core_modules.pdf_report import generate_pdf_report_batch
 
 realtime_bp = Blueprint("realtime", __name__)
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "uploads", "video")
@@ -45,3 +46,25 @@ def video_feed(filename):
     fruit_type = request.args.get("fruit", "apple")
     path = os.path.join(UPLOAD_DIR, filename)
     return Response(_gen_frames(path, fruit_type), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+
+@realtime_bp.route("/realtime/export_pdf", methods=["POST"])
+def realtime_export_pdf():
+    """Bundles every classification logged during the current real-time
+    session into one combined PDF, the same way batch-analysis does."""
+    session_results = get_session_log()
+    if not session_results:
+        return {"error": "No real-time classifications logged yet in this session."}, 400
+
+    results_for_pdf = [
+        {"filename": r["tag"], "label": r["label"], "confidence": r["confidence"], "image_path": r["image_path"]}
+        for r in session_results
+    ]
+    out_path = generate_pdf_report_batch(results_for_pdf, model_tag="realtime_yolo")
+    return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
+
+
+@realtime_bp.route("/realtime/clear_session", methods=["POST"])
+def realtime_clear_session():
+    clear_session_log()
+    return {"status": "cleared"}

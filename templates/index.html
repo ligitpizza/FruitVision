@@ -50,12 +50,15 @@
       <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
       {% endfor %}
     </select>
+
     <label>Select Model:</label>
     <select name="model">
       {% for key, entry in predictors.items() %}
       <option value="{{ key }}">{{ entry.label }}</option>
       {% endfor %}
+      <option value="all_four">Ensemble (All 4 members, soft-voted)</option>
     </select>
+
     <label>Upload Images (multiple):</label>
     <input type="file" name="images" accept="image/*" multiple required>
     <button type="submit">Analyse Batch</button>
@@ -72,6 +75,7 @@
       <a href="/dashboard/{{ key }}">{{ entry.label }} — Dashboard</a>
       <a href="/training-report/{{ key }}">{{ key|upper }} — Training Report</a>
     {% endfor %}
+    <a href="/dashboard/all_four">Ensemble (All 4) — Dashboard</a>
   </p>
 
   <script>

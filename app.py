@@ -265,16 +265,17 @@ def predict_unified():
 # --------------------------------------------------------------------------
 @app.route("/dashboard/<model_key>", methods=["GET"])
 def dashboard(model_key):
-    """Landing page for one member's Data Analysis Dashboard -- shows
-    all-time charts for that member with no batch results yet (upload a
-    batch from here, or from the home page, to populate the 'this batch'
-    chart)."""
-    entry = PREDICTORS.get(model_key)
-    if not entry:
-        flash(f"Unknown model '{model_key}'.")
-        return redirect(url_for("index"))
+    if model_key == ALL_FOUR_KEY:
+        member_filter = "ensemble_all_four"
+        model_label = ALL_FOUR_LABEL
+    else:
+        entry = PREDICTORS.get(model_key)
+        if not entry:
+            flash(f"Unknown model '{model_key}'.")
+            return redirect(url_for("index"))
+        member_filter = _member_tag(model_key)
+        model_label = entry["label"]
 
-    member_filter = _member_tag(model_key)
     history_chart_path = generate_history_chart(member_filter, file_tag=model_key)
 
     return render_template(
@@ -284,58 +285,103 @@ def dashboard(model_key):
         history_chart=history_chart_path is not None,
         results_json=None,
         model_choice=model_key,
-        model_label=entry["label"],
-        predictors=PREDICTORS,
+        model_label=model_label,
+        predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
     )
 
+ALL_FOUR_LABEL = "Ensemble (All 4 members, soft-voted)"
+ALL_FOUR_KEY = "all_four"
+
+# Same PREDICTORS dict, plus a display-only entry for the ensemble, so
+# dashboard/analyse templates can list it alongside ab/bc/cd/da without
+# giving it a fake "fn"/"not_fruit_err" (predict_ensemble has a different
+# signature and is called directly instead).
+PREDICTORS_WITH_ENSEMBLE = dict(PREDICTORS)
+PREDICTORS_WITH_ENSEMBLE[ALL_FOUR_KEY] = {"label": ALL_FOUR_LABEL}
 
 @app.route("/analyse", methods=["POST"])
 def analyse():
-    """Multi-image batch analysis for a single chosen model. Renders
-    member_dashboard.html with per-image results + charts for that batch
-    and for the model's all-time history."""
+    """Multi-image batch analysis. `model` is one of ab/bc/cd/da for a single
+    member, or 'all_four' to run the full soft-voted ensemble on every image."""
     fruit_type = request.form.get("fruit_type", "apple")
     model_choice = request.form.get("model", "ab")
     files = request.files.getlist("images")
 
-    entry = PREDICTORS.get(model_choice)
-    if not entry:
-        flash(f"Unknown model '{model_choice}'.")
-        return redirect(url_for("index"))
+    if model_choice == ALL_FOUR_KEY:
+        member_tag = "ensemble_all_four"
+        model_label = ALL_FOUR_LABEL
+        results = []
 
-    member_tag = _member_tag(model_choice)
-    results = []
+        for f in files:
+            path = os.path.join(UPLOAD_DIR, f.filename)
+            f.save(path)
+            img = cv2.imread(path)
 
-    for f in files:
-        path = os.path.join(UPLOAD_DIR, f.filename)
-        f.save(path)
-        img = cv2.imread(path)
+            try:
+                label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
+            except RuntimeError as e:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
+                continue
 
-        try:
-            label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
-        except entry["not_fruit_err"] as e:
-            results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
-            continue
+            annotated_rel = _save_annotated(img, bbox, f.filename)
 
-        annotated_rel = _save_annotated(img, bbox, f.filename)
+            log_result(
+                member=member_tag,
+                fruit=fruit_type,
+                label=label,
+                confidence=confidence,
+                filename=f.filename,
+                annotated_path=annotated_rel,
+                source="analyse",
+            )
 
-        log_result(
-            member=member_tag,
-            fruit=fruit_type,
-            label=label,
-            confidence=round(confidence * 100, 1),
-            filename=f.filename,
-            annotated_path=annotated_rel,
-            source="analyse",
-        )
+            results.append({
+                "filename": f.filename,
+                "label": label,
+                "confidence": confidence,
+                "annotated_path": annotated_rel,
+                "per_member": per_member,
+            })
+    else:
+        entry = PREDICTORS.get(model_choice)
+        if not entry:
+            flash(f"Unknown model '{model_choice}'.")
+            return redirect(url_for("index"))
 
-        results.append({
-            "filename": f.filename,
-            "label": label,
-            "confidence": round(confidence * 100, 1),
-            "annotated_path": annotated_rel,
-        })
+        member_tag = _member_tag(model_choice)
+        model_label = entry["label"]
+        results = []
+
+        for f in files:
+            path = os.path.join(UPLOAD_DIR, f.filename)
+            f.save(path)
+            img = cv2.imread(path)
+
+            try:
+                label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
+            except entry["not_fruit_err"] as e:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
+                continue
+
+            annotated_rel = _save_annotated(img, bbox, f.filename)
+
+            log_result(
+                member=member_tag,
+                fruit=fruit_type,
+                label=label,
+                confidence=round(confidence * 100, 1),
+                filename=f.filename,
+                annotated_path=annotated_rel,
+                source="analyse",
+            )
+
+            results.append({
+                "filename": f.filename,
+                "label": label,
+                "confidence": round(confidence * 100, 1),
+                "annotated_path": annotated_rel,
+            })
 
     chart_path = generate_trend_chart(results, file_tag=model_choice) if results else None
     history_chart_path = generate_history_chart(member_tag, file_tag=model_choice)
@@ -357,8 +403,8 @@ def analyse():
         history_chart=history_chart_path is not None,
         results_json=json.dumps(results_for_pdf),
         model_choice=model_choice,
-        model_label=entry["label"],
-        predictors=PREDICTORS,
+        model_label=model_label,
+        predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
         OUTPUTS_DIR=OUTPUTS_DIR,
     )
@@ -408,7 +454,8 @@ def history():
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
     page = min(page, total_pages)
 
-    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"]
+    # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove 
+    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"]
 
     return render_template(
         "history.html",

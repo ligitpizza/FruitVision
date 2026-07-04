@@ -22,6 +22,7 @@ MODEL_LABELS = {
     "cd": "Ensemble CD (Texture + Gabor)",
     "da": "Ensemble DA (Gabor + Colour)",
     "all_four": "Ensemble (All 4 members, soft-voted)",
+    "realtime_yolo": "Real-Time YOLO Tracking + Ensemble",
 }
 
 

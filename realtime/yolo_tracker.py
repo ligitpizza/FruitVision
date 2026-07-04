@@ -40,7 +40,7 @@ def process_frame(frame, fruit_type, frame_idx):
     if fruit_type == "mango":
         frame, detected_any = _process_mango_fallback(frame, fruit_type, frame_idx)
     else:
-        results = _yolo.track(frame, persist=True, verbose=False, conf=0.4)[0]
+        results = _yolo.track(frame, persist=True, verbose=False, tracker="botsort.yaml")[0]
         if results.boxes.id is not None:
             for box, track_id, cls_id in zip(results.boxes.xyxy, results.boxes.id, results.boxes.cls):
                 class_name = _yolo.names[int(cls_id)]

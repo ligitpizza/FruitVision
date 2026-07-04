@@ -3,26 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>Analytics — FruitVision</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 950px; margin: 40px auto; padding: 0 20px; background: #313131}
-    h1 { color: #2e7d32; }
-    h2 { color: #444; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-top: 40px; }
-    .stat-cards { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
-    .card {
-      flex: 1; min-width: 140px; background: #f9f9f9; border: 1px solid #eee;
-      border-radius: 10px; padding: 16px; text-align: center;
-    }
-    .card .value { font-size: 1.8rem; font-weight: bold; color: #2e7d32; }
-    .card .label { color: #777; font-size: 0.85rem; margin-top: 4px; }
-    .charts { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
-    .charts img { max-width: 420px; border: 1px solid #eee; border-radius: 8px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
-    th { background: #f5f5f5; }
-    .empty { color: #888; font-style: italic; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
 </head>
-<body>
+<body id="page-analytics">
   <h1>📈 Analytics Dashboard</h1>
   <p>Live view across <strong>every</strong> logged prediction, from all 4 members' models — not just the last batch you uploaded.</p>
 

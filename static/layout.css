@@ -1,0 +1,183 @@
+/* ==========================================================================
+   FruitVision — structural/layout styles
+   Extracted from each template's old inline <style> block. Rules that were
+   identical across pages live in the "Shared" section up top. Rules that
+   reused the same class name for a DIFFERENT purpose per page (e.g. .card,
+   .ripe/.unripe/.rotten) are scoped under that page's <body id="page-...">
+   so they can't collide.
+
+   Load this file BEFORE static/style.css. style.css's color rules use
+   !important, so it still wins on colors regardless of load order — this
+   file only owns layout (spacing, sizing, flex, borders-as-structure).
+   ========================================================================== */
+
+/* ---------- Shared across every page ---------- */
+body {
+  font-family: Arial, sans-serif;
+  padding: 0 20px;
+}
+
+h1 { color: #2e7d32; }
+.subtitle { color: #666; margin-top: -8px; }
+.empty { color: #888; font-style: italic; }
+
+button {
+  background: #2e7d32; color: white; border: none; cursor: pointer;
+  border-radius: 6px; font-size: 1rem;
+}
+button:hover { background: #1b5e20; }
+
+select, input[type=file], input[type=number], input[type=text] {
+  padding: 8px; font-size: 1rem; box-sizing: border-box;
+}
+
+.flash {
+  background: #e8f5e9; color: #2e7d32; padding: 10px 14px;
+  border-radius: 6px; margin-top: 16px;
+}
+
+.nav-tabs a {
+  display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px;
+  border: 1px solid #ccc; border-radius: 6px; text-decoration: none;
+  color: #333; font-size: 0.9rem;
+}
+.nav-tabs a.active { background: #2e7d32; color: white; border-color: #2e7d32; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }
+th { background: #f5f5f5; }
+
+.charts { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+.charts img { max-width: 420px; border: 1px solid #eee; border-radius: 8px; }
+
+
+/* ---------- page-analytics (analytics_dashboard.html) ---------- */
+#page-analytics { max-width: 950px; margin: 40px auto; }
+#page-analytics h2 { color: #444; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-top: 40px; }
+#page-analytics .stat-cards { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+#page-analytics .card {
+  flex: 1; min-width: 140px; background: #f9f9f9; border: 1px solid #eee;
+  border-radius: 10px; padding: 16px; text-align: center;
+}
+#page-analytics .card .value { font-size: 1.8rem; font-weight: bold; color: #2e7d32; }
+#page-analytics .card .label { color: #777; font-size: 0.85rem; margin-top: 4px; }
+
+
+/* ---------- page-history (history.html) ---------- */
+#page-history { max-width: 950px; margin: 40px auto; }
+#page-history .ripe { color: #2e7d32; font-weight: bold; }
+#page-history .unripe { color: #f57f17; font-weight: bold; }
+#page-history .rotten { color: #c62828; font-weight: bold; }
+#page-history .filters { display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; margin-top: 10px; }
+#page-history .filters .group a { margin-right: 10px; }
+#page-history .filters .group a.active { text-decoration: underline; font-weight: bold; }
+#page-history img.thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; }
+#page-history .actions { white-space: nowrap; }
+#page-history .actions a, #page-history .actions button {
+  font-size: 0.85rem; padding: 4px 8px; margin-right: 4px;
+  border-radius: 4px; border: 1px solid #ccc; background: #fff; cursor: pointer;
+  text-decoration: none; color: #333;
+}
+#page-history .actions button.danger { color: #c62828; border-color: #c62828; }
+#page-history .pagination { margin-top: 20px; display: flex; gap: 6px; align-items: center; }
+#page-history .pagination a, #page-history .pagination span.current {
+  padding: 6px 12px; border-radius: 4px; border: 1px solid #ccc; text-decoration: none; color: #333;
+}
+#page-history .pagination span.current { background: #2e7d32; color: white; border-color: #2e7d32; }
+#page-history .pagination span.info { margin-left: 10px; color: #777; font-size: 0.9rem; }
+
+
+/* ---------- page-history-edit (history_edit.html) ---------- */
+#page-history-edit { max-width: 500px; margin: 60px auto; }
+#page-history-edit label { display: block; margin-top: 14px; font-weight: bold; }
+#page-history-edit select, #page-history-edit input[type=number], #page-history-edit input[type=text] {
+  display: block; width: 100%; margin-top: 4px;
+}
+#page-history-edit button { margin-top: 20px; padding: 10px 16px; }
+#page-history-edit a.cancel { margin-left: 12px; color: #666; }
+#page-history-edit .meta { color: #888; font-size: 0.85rem; margin-top: 4px; }
+
+
+/* ---------- page-index (index.html) ---------- */
+#page-index { max-width: 1000px; margin: 60px auto; }
+#page-index h2 { margin-top: 0; }
+#page-index .layout { display: flex; gap: 30px; align-items: flex-start; }
+#page-index .main-col { flex: 1; min-width: 0; }
+#page-index .model-col { width: 220px; flex-shrink: 0; }
+#page-index select, #page-index input[type=file], #page-index button {
+  display: block; margin: 12px 0; width: 100%;
+}
+#page-index #preview { max-width: 100%; margin-top: 16px; border-radius: 8px; display: none; }
+#page-index #result { margin-top: 20px; padding: 16px; border-radius: 8px; font-size: 1.1rem; display: none; }
+#page-index .ripe    { background: #e8f5e9; color: #2e7d32; }
+#page-index .unripe  { background: #fff8e1; color: #f57f17; }
+#page-index .rotten  { background: #ffebee; color: #c62828; }
+#page-index .per-member { margin-top: 10px; font-size: 0.9rem; }
+#page-index .per-member table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+#page-index .per-member th, #page-index .per-member td {
+  text-align: left; padding: 4px 6px; border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+#page-index .model-btn {
+  display: block; width: 100%; margin-bottom: 12px; padding: 14px 10px;
+  background: #e0e0e0; color: #333; border: none; border-radius: 6px;
+  cursor: pointer; font-size: 1rem; text-align: center; transition: background 0.15s;
+}
+#page-index .model-btn:hover { background: #d0d0d0; }
+#page-index .model-btn.selected { background: #2e7d32; color: white; font-weight: bold; }
+#page-index .dashboard-links a {
+  display: inline-block; margin: 4px 8px 4px 0; padding: 6px 12px;
+  border: 1px solid #ccc; border-radius: 6px; text-decoration: none; color: #333; font-size: 0.9rem;
+}
+#page-index .dashboard-links a:hover { background: #f5f5f5; }
+
+
+/* ---------- page-member-dashboard (member_dashboard.html) ---------- */
+#page-member-dashboard { max-width: 760px; margin: 40px auto; }
+#page-member-dashboard .error-row { color: #c62828; font-style: italic; }
+#page-member-dashboard select, #page-member-dashboard input[type=file], #page-member-dashboard button {
+  display: block; margin: 10px 0; width: 100%;
+}
+
+
+/* ---------- page-realtime (realtime.html) ---------- */
+#page-realtime { max-width: 900px; margin: 40px auto; }
+#page-realtime .controls { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; margin-top: 20px; }
+#page-realtime .control-group { flex: 1; min-width: 180px; }
+#page-realtime label { display: block; font-weight: bold; margin-bottom: 6px; }
+#page-realtime select, #page-realtime input[type=file] { width: 100%; }
+#page-realtime button { padding: 10px 18px; }
+#page-realtime button:disabled { background: #aaa; cursor: not-allowed; }
+#page-realtime .tabs { margin-top: 24px; }
+#page-realtime .tab-btn {
+  padding: 8px 16px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer;
+  border-radius: 6px 6px 0 0; margin-right: 4px; font-size: 0.95rem;
+}
+#page-realtime .tab-btn.active { background: #2e7d32; color: white; border-color: #2e7d32; }
+#page-realtime .tab-panel {
+  display: none; border: 1px solid #ccc; border-radius: 0 8px 8px 8px; padding: 20px;
+}
+#page-realtime .tab-panel.active { display: block; }
+#page-realtime #feed-img, #page-realtime #video-feed-img {
+  width: 100%; max-width: 640px; border-radius: 8px; border: 1px solid #ddd;
+  background: #000; display: block; margin-top: 12px;
+}
+#page-realtime .hint { color: #888; font-size: 0.85rem; margin-top: 8px; }
+#page-realtime .status-msg { margin-top: 10px; font-size: 0.9rem; color: #555; }
+
+
+/* ---------- page-training-report (training_report.html) ---------- */
+#page-training-report { max-width: 900px; margin: 40px auto; }
+#page-training-report h2 { color: #444; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-top: 40px; }
+#page-training-report .graph-row { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+#page-training-report .graph-row img { max-width: 380px; border: 1px solid #eee; border-radius: 8px; }
+#page-training-report .time-card {
+  display: inline-block; background: #f9f9f9; border: 1px solid #eee; border-radius: 10px;
+  padding: 14px 20px; margin-top: 12px;
+}
+#page-training-report .time-card .value { font-size: 1.6rem; font-weight: bold; color: #2e7d32; }
+#page-training-report .time-card .label { color: #777; font-size: 0.85rem; }
+#page-training-report table.time-table { border-collapse: collapse; margin-top: 12px; }
+#page-training-report table.time-table th, #page-training-report table.time-table td {
+  text-align: left; padding: 6px 14px; border-bottom: 1px solid #eee;
+}
+#page-training-report table.time-table th { background: #f5f5f5; }

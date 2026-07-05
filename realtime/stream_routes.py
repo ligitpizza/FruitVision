@@ -1,6 +1,6 @@
 from flask import Blueprint, Response, request, render_template, send_from_directory
 import cv2, os
-from .yolo_tracker import process_frame, get_session_log, clear_session_log
+from .svm_yolo_tracker import process_frame, get_session_log, clear_session_log
 from core_modules.pdf_report import generate_pdf_report_batch
 
 realtime_bp = Blueprint("realtime", __name__)

@@ -148,15 +148,23 @@ def _classify_crop(crop, fruit_type):
     also re-runs clean()+detect() per member internally. Kept consistent
     rather than special-casing this one predictor.
     """
+    # try:
+    #     label, confidence, _bbox, _cleaned, _proba = yolo_cls_predict_ripeness(crop, fruit_type)
+    #     return label, float(confidence)
+    # except NotAFruitError:
+    #     return None, None
+    # except Exception:
+    #     # No trained {fruit}_cls.pt yet, bad crop, etc. -- same
+    #     # tolerate-and-skip behaviour svm_yolo_tracker.py uses around
+    #     # predict_ensemble().
+    #     return None, None
     try:
         label, confidence, _bbox, _cleaned, _proba = yolo_cls_predict_ripeness(crop, fruit_type)
         return label, float(confidence)
     except NotAFruitError:
         return None, None
-    except Exception:
-        # No trained {fruit}_cls.pt yet, bad crop, etc. -- same
-        # tolerate-and-skip behaviour svm_yolo_tracker.py uses around
-        # predict_ensemble().
+    except Exception as e:
+        print(f"[debug] yolo_cls classify failed: {e}")  # TEMP
         return None, None
 
 

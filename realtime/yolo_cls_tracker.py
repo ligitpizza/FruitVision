@@ -34,9 +34,9 @@ sys.path.append(PROJECT_ROOT)
 sys.path.append(os.path.join(PROJECT_ROOT, "pipeline", "pure_yolo"))
 sys.path.append(os.path.join(PROJECT_ROOT, "member_apps", "member_1_ab"))
 
-from yolo_cls_predict import predict_ripeness as yolo_cls_predict_ripeness, NotAFruitError
-from m1_preprocessing import clean as m1_clean
-from m1_detection import detect as m1_detect
+from pipeline.pure_yolo.yolo_cls_predict import predict_ripeness as yolo_cls_predict_ripeness, NotAFruitError
+from member_apps.member_1_ab.m1_preprocessing import clean as m1_clean
+from member_apps.member_1_ab.m1_detection import detect as m1_detect
 
 from database.history_db import log_result
 

@@ -41,7 +41,7 @@ PROJECT_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", ".."))
 sys.path.append(PROJECT_ROOT)
 
 DATASET_ROOT = os.path.join(PROJECT_ROOT, "datasets", "yolo_cls")
-MODEL_OUT_DIR = os.path.join(PROJECT_ROOT, "trained_models", "pure_yolo")
+MODEL_OUT_DIR = os.path.join(PROJECT_ROOT, "trained_models", "yolo_pure")
 RUNS_DIR = os.path.join(BASE_DIR, "runs")  # keep Ultralytics' own run artifacts local to this pipeline folder
 
 FRUITS = ["apple", "banana", "orange", "mango"]
@@ -119,7 +119,8 @@ def train_one_fruit(fruit, base_model="yolov8n-cls.pt", epochs=25, imgsz=224, ba
 
     # Reload the best checkpoint from this run for evaluation + final copy,
     # rather than trusting the in-memory `model` object post-train().
-    best_weights = os.path.join(RUNS_DIR, "classify", run_name, "weights", "best.pt")
+    # best_weights = os.path.join(RUNS_DIR, "classify", run_name, "weights", "best.pt")
+    best_weights = os.path.join(RUNS_DIR, run_name, "weights", "best.pt")
     if not os.path.exists(best_weights):
         print(f"WARNING: expected best.pt not found at {best_weights}; "
               f"check the Ultralytics run output above for the real path.")

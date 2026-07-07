@@ -26,13 +26,17 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_1_ab"))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_2_bc"))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_3_cd"))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_4_da"))
+# --- Pure-YOLO pipeline (5th, independent predictor -- NOT part of the
+#     4-member soft-voted ensemble; see pipeline/pure_yolo/ for rationale) --
+sys.path.append(os.path.join(BASE_DIR, "pipeline", "pure_yolo"))
 
 from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
 from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
 from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
 from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
+from yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
 
-# --- 4-model ensemble (soft-voting across all members) -----------------
+# --- 4-member ensemble (soft-voting across all members) -----------------
 from member_apps.predict_ensemble import predict_ensemble
 
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
@@ -72,6 +76,17 @@ app.register_blueprint(realtime_bp)
 # Unified model registry: every selectable option across every route maps
 # to an entry here. "all_four" is handled separately (it calls
 # predict_ensemble instead of a single predict_ripeness function).
+#
+# "yolo_pure" is a 5th, fully independent predictor (YOLOv8 classification
+# head, no SVM/hand-crafted features involved). It slots into this same
+# dict because yolo_cls_predict.predict_ripeness() matches the exact
+# (label, confidence, bbox, cleaned_img, proba_dict) signature every member
+# uses -- but it is deliberately NOT folded into predict_ensemble.py's
+# soft vote. That ensemble's whole design point is averaging 4
+# complementary hand-crafted feature pairs; YOLO's CNN features aren't
+# that, and naively equal-weighting a 5th very-different predictor into it
+# would need the (currently unimplemented) weighted-voting work first.
+# yolo_pure stays visible as its own always-selectable option instead.
 # --------------------------------------------------------------------------
 PREDICTORS = {
     "ab": {
@@ -94,13 +109,18 @@ PREDICTORS = {
         "not_fruit_err": M4NotAFruitError,
         "label": "Ensemble DA (Gabor + Colour)",
     },
+    "yolo_pure": {
+        "fn": yolo_pure_predict_ripeness,
+        "not_fruit_err": YoloPureNotAFruitError,
+        "label": "YOLOv8 Classification (pure CNN, no SVM)",
+    },
 }
 MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 
 
 def _member_tag(model_key):
     """DB `member` column value + chart filename tag for a given model key."""
-    return f"ensemble_{model_key}"
+    return f"ensemble_{model_key}" if model_key != "yolo_pure" else "yolo_pure"
 
 
 @app.route("/outputs/<path:filename>")
@@ -187,8 +207,8 @@ def predict():
 def predict_unified():
     """
     Single entry point for the model-selector UI on index.html.
-    Accepts a 'model' field: one of "ab", "bc", "cd", "da", "all_four".
-    Returns a consistent JSON shape regardless of which model ran.
+    Accepts a 'model' field: one of "ab", "bc", "cd", "da", "yolo_pure",
+    "all_four". Returns a consistent JSON shape regardless of which model ran.
     """
     fruit_type = request.form.get("fruit", "apple")
     model_choice = request.form.get("model", "ab")
@@ -260,8 +280,8 @@ def predict_unified():
 
 # --------------------------------------------------------------------------
 # Data Analysis Dashboard — batch upload + per-member analytics.
-# Every member (ab/bc/cd/da) shares this same route/template; the only
-# difference is which model_choice was posted / is in the URL.
+# Every member (ab/bc/cd/da/yolo_pure) shares this same route/template; the
+# only difference is which model_choice was posted / is in the URL.
 # --------------------------------------------------------------------------
 @app.route("/dashboard/<model_key>", methods=["GET"])
 def dashboard(model_key):
@@ -286,6 +306,7 @@ def dashboard(model_key):
         results_json=None,
         model_choice=model_key,
         model_label=model_label,
+        history_member_tag=member_filter,
         predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
     )
@@ -294,16 +315,16 @@ ALL_FOUR_LABEL = "Ensemble (All 4 members, soft-voted)"
 ALL_FOUR_KEY = "all_four"
 
 # Same PREDICTORS dict, plus a display-only entry for the ensemble, so
-# dashboard/analyse templates can list it alongside ab/bc/cd/da without
-# giving it a fake "fn"/"not_fruit_err" (predict_ensemble has a different
-# signature and is called directly instead).
+# dashboard/analyse templates can list it alongside ab/bc/cd/da/yolo_pure
+# without giving it a fake "fn"/"not_fruit_err" (predict_ensemble has a
+# different signature and is called directly instead).
 PREDICTORS_WITH_ENSEMBLE = dict(PREDICTORS)
 PREDICTORS_WITH_ENSEMBLE[ALL_FOUR_KEY] = {"label": ALL_FOUR_LABEL}
 
 @app.route("/analyse", methods=["POST"])
 def analyse():
-    """Multi-image batch analysis. `model` is one of ab/bc/cd/da for a single
-    member, or 'all_four' to run the full soft-voted ensemble on every image."""
+    """Multi-image batch analysis. `model` is one of ab/bc/cd/da/yolo_pure for
+    a single model, or 'all_four' to run the full soft-voted ensemble on every image."""
     fruit_type = request.form.get("fruit_type", "apple")
     model_choice = request.form.get("model", "ab")
     files = request.files.getlist("images")
@@ -404,6 +425,7 @@ def analyse():
         results_json=json.dumps(results_for_pdf),
         model_choice=model_choice,
         model_label=model_label,
+        history_member_tag=member_tag,
         predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
         OUTPUTS_DIR=OUTPUTS_DIR,
@@ -455,7 +477,8 @@ def history():
     page = min(page, total_pages)
 
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove 
-    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"]
+    # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"] do not remove
+    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo", "yolo_pure_realtime"]
 
     return render_template(
         "history.html",

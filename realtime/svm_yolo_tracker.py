@@ -18,7 +18,11 @@ OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "outputs"))
 SNAPSHOT_DIR = os.path.join(OUTPUTS_DIR, "realtime_snapshots")
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-_yolo = YOLO("yolov8n.pt")
+YOLO_WEIGHTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "trained_models", "svm_yolo"))
+os.makedirs(YOLO_WEIGHTS_DIR, exist_ok=True)
+YOLO_WEIGHTS_PATH = os.path.join(YOLO_WEIGHTS_DIR, "yolov8n.pt")
+
+_yolo = YOLO(YOLO_WEIGHTS_PATH)
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
 CLASSIFY_EVERY_N_FRAMES = 5
 

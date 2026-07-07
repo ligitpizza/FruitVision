@@ -27,10 +27,10 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_2_bc"))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_3_cd"))
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_4_da"))
 
-from m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
-from m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
-from m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
-from m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
+from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
+from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
+from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
+from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
 
 # --- 4-model ensemble (soft-voting across all members) -----------------
 from member_apps.predict_ensemble import predict_ensemble

@@ -41,7 +41,7 @@ PROJECT_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", ".."))
 sys.path.append(PROJECT_ROOT)
 
 DATASET_ROOT = os.path.join(PROJECT_ROOT, "datasets", "yolo_cls")
-MODEL_OUT_DIR = os.path.join(PROJECT_ROOT, "trained_models", "yolo_pure")
+MODEL_OUT_DIR = os.path.join(PROJECT_ROOT, "trained_models", "pure_yolo")
 RUNS_DIR = os.path.join(BASE_DIR, "runs")  # keep Ultralytics' own run artifacts local to this pipeline folder
 
 FRUITS = ["apple", "banana", "orange", "mango"]

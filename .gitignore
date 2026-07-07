@@ -20,3 +20,5 @@ outputs/realtime_snapshots/
 uploads/
 
 pipeline/pure_yolo/runs/
+
+datasets/tolo_cls/

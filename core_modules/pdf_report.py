@@ -23,6 +23,7 @@ MODEL_LABELS = {
     "da": "Ensemble DA (Gabor + Colour)",
     "all_four": "Ensemble (All 4 members, soft-voted)",
     "realtime_yolo": "Real-Time YOLO Tracking + Ensemble",
+    "yolo_pure_realtime": "Real-Time YOLO Tracking + Pure-YOLO Classification",
 }
 
 

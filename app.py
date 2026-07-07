@@ -477,7 +477,8 @@ def history():
     page = min(page, total_pages)
 
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove 
-    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"]
+    # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"] do not remove
+    member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo", "yolo_pure_realtime"]
 
     return render_template(
         "history.html",

@@ -1,6 +1,7 @@
 datasets/fruit_ripeness/**/ripe*
 datasets/fruit_ripeness/**/unripe*
 datasets/fruit_ripeness/**/rotten*
+datasets/yolo_cls/
 
 __pycache__/
 
@@ -17,3 +18,5 @@ outputs/training/
 outputs/realtime_snapshots/
 
 uploads/
+
+pipeline/pure_yolo/runs/

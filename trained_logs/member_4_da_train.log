@@ -16,70 +16,70 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
   warnings.warn(
 
 Building feature dataset for apple (D: gabor + A: colour)...
-Loaded 5969 samples for apple across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Loaded 5969 samples for apple across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
-        ripe       0.87      0.85      0.86       339
-      rotten       0.90      0.92      0.91       468
-      unripe       0.96      0.95      0.95       387
+        ripe       0.85      0.88      0.87       339
+      rotten       0.92      0.91      0.91       468
+      unripe       0.96      0.94      0.95       387
 
     accuracy                           0.91      1194
    macro avg       0.91      0.91      0.91      1194
 weighted avg       0.91      0.91      0.91      1194
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\apple_ensemble_da.pkl
-[time] apple took 7m 35.6s
+[time] apple took 6m 55.8s
 
 Building feature dataset for banana (D: gabor + A: colour)...
-Loaded 5902 samples for banana across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Loaded 5902 samples for banana across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for banana:
               precision    recall  f1-score   support
 
-        ripe       0.93      0.94      0.93       316
-      rotten       0.94      0.98      0.96       445
+        ripe       0.92      0.94      0.93       316
+      rotten       0.95      0.98      0.96       445
       unripe       0.96      0.92      0.94       420
 
     accuracy                           0.94      1181
    macro avg       0.94      0.94      0.94      1181
-weighted avg       0.94      0.94      0.94      1181
+weighted avg       0.95      0.94      0.94      1181
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\banana_ensemble_da.pkl
-[time] banana took 4m 48.4s
+[time] banana took 8m 43.2s
 
 Building feature dataset for orange (D: gabor + A: colour)...
-Loaded 4346 samples for orange across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Loaded 4346 samples for orange across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
-        ripe       0.89      0.91      0.90       294
-      rotten       0.90      0.87      0.88       319
-      unripe       0.95      0.95      0.95       257
+        ripe       0.89      0.90      0.90       294
+      rotten       0.90      0.86      0.88       319
+      unripe       0.93      0.96      0.94       257
 
-    accuracy                           0.91       870
+    accuracy                           0.90       870
    macro avg       0.91      0.91      0.91       870
-weighted avg       0.91      0.91      0.91       870
+weighted avg       0.90      0.90      0.90       870
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\orange_ensemble_da.pkl
-[time] orange took 6m 12.8s
+[time] orange took 5m 11.2s
 
 Building feature dataset for mango (D: gabor + A: colour)...
-Loaded 1240 samples for mango across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Loaded 1240 samples for mango across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
-        ripe       0.76      0.94      0.84       106
-      rotten       0.62      0.16      0.26        31
+        ripe       0.83      0.59      0.69       106
+      rotten       0.36      0.74      0.48        31
       unripe       0.97      0.95      0.96       111
 
-    accuracy                           0.85       248
-   macro avg       0.78      0.68      0.69       248
-weighted avg       0.84      0.85      0.82       248
+    accuracy                           0.77       248
+   macro avg       0.72      0.76      0.71       248
+weighted avg       0.83      0.77      0.79       248
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\mango_ensemble_da.pkl
-[time] mango took 1m 40.1s
+[time] mango took 27.4s
 
-[time] Total training run took 20m 16.9s
+[time] Total training run took 21m 17.7s
 
 All graphs saved to outputs/training/da/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\da\accuracy_summary.png

@@ -20,66 +20,66 @@ Loaded 5969 samples for apple across classes: {np.str_('rotten'), np.str_('unrip
 Test set performance for apple:
               precision    recall  f1-score   support
 
-        ripe       0.61      0.42      0.50       339
-      rotten       0.62      0.60      0.61       468
-      unripe       0.72      0.94      0.81       387
+        ripe       0.56      0.65      0.60       339
+      rotten       0.71      0.43      0.53       468
+      unripe       0.70      0.95      0.81       387
 
     accuracy                           0.66      1194
-   macro avg       0.65      0.66      0.64      1194
-weighted avg       0.65      0.66      0.65      1194
+   macro avg       0.66      0.67      0.65      1194
+weighted avg       0.66      0.66      0.64      1194
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\apple_ensemble_cd.pkl
-[time] apple took 7m 49.6s
+[time] apple took 7m 47.0s
 
 Building feature dataset for banana (C: texture + D: gabor)...
 Loaded 5902 samples for banana across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
 Test set performance for banana:
               precision    recall  f1-score   support
 
-        ripe       0.82      0.81      0.81       316
-      rotten       0.89      0.75      0.81       445
-      unripe       0.78      0.93      0.85       420
+        ripe       0.79      0.84      0.81       316
+      rotten       0.90      0.73      0.80       445
+      unripe       0.79      0.91      0.84       420
 
-    accuracy                           0.83      1181
-   macro avg       0.83      0.83      0.83      1181
-weighted avg       0.83      0.83      0.83      1181
+    accuracy                           0.82      1181
+   macro avg       0.83      0.83      0.82      1181
+weighted avg       0.83      0.82      0.82      1181
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\banana_ensemble_cd.pkl
-[time] banana took 8m 43.3s
+[time] banana took 8m 58.5s
 
 Building feature dataset for orange (C: texture + D: gabor)...
 Loaded 4346 samples for orange across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
-        ripe       0.75      0.78      0.76       294
-      rotten       0.79      0.66      0.72       319
-      unripe       0.77      0.89      0.83       257
+        ripe       0.75      0.81      0.78       294
+      rotten       0.82      0.62      0.71       319
+      unripe       0.75      0.91      0.82       257
 
     accuracy                           0.77       870
-   macro avg       0.77      0.78      0.77       870
-weighted avg       0.77      0.77      0.77       870
+   macro avg       0.78      0.78      0.77       870
+weighted avg       0.78      0.77      0.77       870
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\orange_ensemble_cd.pkl
-[time] orange took 5m 30.3s
+[time] orange took 6m 5.7s
 
 Building feature dataset for mango (C: texture + D: gabor)...
 Loaded 1240 samples for mango across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
-        ripe       0.64      0.86      0.73       106
-      rotten       0.67      0.06      0.12        31
-      unripe       0.85      0.79      0.82       111
+        ripe       0.75      0.54      0.63       106
+      rotten       0.33      0.74      0.46        31
+      unripe       0.85      0.78      0.82       111
 
-    accuracy                           0.73       248
-   macro avg       0.72      0.57      0.56       248
-weighted avg       0.74      0.73      0.70       248
+    accuracy                           0.67       248
+   macro avg       0.64      0.69      0.63       248
+weighted avg       0.74      0.67      0.69       248
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\mango_ensemble_cd.pkl
-[time] mango took 1m 58.5s
+[time] mango took 34.4s
 
-[time] Total training run took 24m 1.8s
+[time] Total training run took 23m 25.5s
 
 All graphs saved to outputs/training/cd/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\cd\accuracy_summary.png

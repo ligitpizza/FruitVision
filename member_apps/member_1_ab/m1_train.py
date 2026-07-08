@@ -74,6 +74,27 @@ def build_dataset(fruit):
     return np.array(X), np.array(y)
 
 
+def _make_classifier():
+    """
+    SVM-improvement backlog item #1: class_weight='balanced' re-weights the
+    loss inversely proportional to class frequency, so majority classes
+    (e.g. mango's ripe/unripe) stop dominating the decision boundary at the
+    expense of the minority class (mango's rotten, which has been sitting
+    at 0.03-0.16 recall across all 4 members in the training logs).
+
+    NOTE: cuML's SVC (the optional GPU path) does not support
+    class_weight as of the current cuml release used here, so it's only
+    applied on the CPU (sklearn) path. If you're training with USE_GPU=1,
+    you will NOT get the class-weight fix -- either train on CPU for now,
+    or check whether your installed cuml version has added support.
+    """
+    if _gpu_ready:
+        print("[train] class_weight='balanced' is NOT applied on the GPU (cuML) path "
+              "-- cuML's SVC does not support it. Train with USE_GPU=0 to get the fix.")
+        return SVC(kernel='rbf', probability=True)
+    return SVC(kernel='rbf', probability=True, class_weight='balanced')
+
+
 if __name__ == "__main__":
     accuracies = {}
     per_fruit_seconds = {}
@@ -96,7 +117,7 @@ if __name__ == "__main__":
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        clf = SVC(kernel='rbf', probability=True)
+        clf = _make_classifier()
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.2, random_state=42, stratify=y
         )

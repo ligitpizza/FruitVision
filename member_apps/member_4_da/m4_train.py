@@ -80,7 +80,9 @@ if __name__ == "__main__":
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        clf = SVC(kernel='rbf', probability=True)
+        # SVM-improvement backlog item #1: class_weight='balanced', see
+        # m2_train.py for the full rationale (targets mango-rotten recall).
+        clf = SVC(kernel='rbf', probability=True, class_weight='balanced')
         X_train, X_test, y_train, y_test = train_test_split(
             X_scaled, y, test_size=0.2, random_state=42, stratify=y
         )

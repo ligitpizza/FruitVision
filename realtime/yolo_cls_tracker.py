@@ -10,7 +10,11 @@ track gets handed to:
     yolo_cls_tracker.py  -> yolo_cls_predict.predict_ripeness()  (pure YOLOv8-cls)
 
 Detection/tracking still comes from the stock COCO yolov8n.pt model, same
-weights file svm_yolo_tracker.py uses (trained_models/svm_yolo/yolov8n.pt).
+weights file svm_yolo_tracker.py uses. Both engines now read their
+detector/tracker settings (weights, imgsz, conf, iou, tracker choice) from
+the shared realtime/tracker_config.py (MUST-DO #4, item 5) instead of each
+hardcoding its own copy.
+
 This is intentional, not a shortcut: pipeline/pure_yolo's classification
 head has no bounding-box output of its own (whole-crop classification, see
 yolo_cls_predict.py's own docstring) -- your dataset has no bbox
@@ -39,17 +43,21 @@ from member_apps.member_1_ab.m1_preprocessing import clean as m1_clean
 from member_apps.member_1_ab.m1_detection import detect as m1_detect
 
 from database.history_db import log_result
+from .tracker_config import (
+    YOLO_WEIGHTS_PATH,
+    YOLO_IMGSZ,
+    YOLO_CONF_THRESHOLD,
+    YOLO_IOU_THRESHOLD,
+    TRACKER_CONFIG,
+    FPS_LOG_EVERY_N_FRAMES,
+)
 
 OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "outputs"))
 SNAPSHOT_DIR = os.path.join(OUTPUTS_DIR, "realtime_snapshots")
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-# Same anchored weights path svm_yolo_tracker.py fixed -- shared, not
-# duplicated. This is a COCO-pretrained detector used for localization
-# only; it has nothing to do with the fine-tuned {fruit}_cls.pt models.
-YOLO_WEIGHTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "trained_models", "svm_yolo"))
-os.makedirs(YOLO_WEIGHTS_DIR, exist_ok=True)
-YOLO_WEIGHTS_PATH = os.path.join(YOLO_WEIGHTS_DIR, "yolov8n.pt")
+# Weights dir must exist before YOLO() tries to download/save into it.
+os.makedirs(os.path.dirname(YOLO_WEIGHTS_PATH), exist_ok=True)
 
 _yolo_detector = YOLO(YOLO_WEIGHTS_PATH)
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
@@ -65,6 +73,19 @@ CROP_PAD = 15
 _track_state = {}
 _mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []  # every *committed* (post-smoothing) classification made during the current session
+
+# --- MUST-DO #4 step 1: baseline FPS benchmarking, mirrors svm_yolo_tracker.py
+_frame_times = deque(maxlen=FPS_LOG_EVERY_N_FRAMES)
+
+
+def _log_fps(elapsed_seconds):
+    _frame_times.append(elapsed_seconds)
+    if len(_frame_times) == FPS_LOG_EVERY_N_FRAMES:
+        avg_fps = 1.0 / (sum(_frame_times) / len(_frame_times))
+        print(f"[bench][yolo_cls_tracker] avg FPS over last {FPS_LOG_EVERY_N_FRAMES} frames: "
+              f"{avg_fps:.1f} (imgsz={YOLO_IMGSZ}, conf={YOLO_CONF_THRESHOLD}, "
+              f"iou={YOLO_IOU_THRESHOLD}, model={os.path.basename(YOLO_WEIGHTS_PATH)}, "
+              f"tracker={TRACKER_CONFIG})")
 
 
 def get_session_log():
@@ -148,23 +169,18 @@ def _classify_crop(crop, fruit_type):
     also re-runs clean()+detect() per member internally. Kept consistent
     rather than special-casing this one predictor.
     """
-    # try:
-    #     label, confidence, _bbox, _cleaned, _proba = yolo_cls_predict_ripeness(crop, fruit_type)
-    #     return label, float(confidence)
-    # except NotAFruitError:
-    #     return None, None
-    # except Exception:
-    #     # No trained {fruit}_cls.pt yet, bad crop, etc. -- same
-    #     # tolerate-and-skip behaviour svm_yolo_tracker.py uses around
-    #     # predict_ensemble().
-    #     return None, None
     try:
         label, confidence, _bbox, _cleaned, _proba = yolo_cls_predict_ripeness(crop, fruit_type)
         return label, float(confidence)
     except NotAFruitError:
         return None, None
-    except Exception as e:
-        print(f"[debug] yolo_cls classify failed: {e}")  # TEMP
+    except Exception:
+        # No trained {fruit}_cls.pt yet, bad crop, etc. -- same
+        # tolerate-and-skip behaviour svm_yolo_tracker.py uses around
+        # predict_ensemble(). The temp debug print that used to live here
+        # (added to chase the apple_cls.pt missing-model-path bug) has been
+        # removed now that the root cause is confirmed fixed -- re-add it
+        # if a similar silent-failure needs diagnosing again.
         return None, None
 
 
@@ -198,12 +214,21 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
 
 
 def process_frame(frame, fruit_type, frame_idx):
+    _frame_start = time.time()
     detected_any = False
 
     if fruit_type == "mango":
         frame, detected_any = _process_mango_fallback(frame, fruit_type, frame_idx)
     else:
-        results = _yolo_detector.track(frame, persist=True, verbose=False, tracker="botsort.yaml")[0]
+        results = _yolo_detector.track(
+            frame,
+            persist=True,
+            verbose=False,
+            tracker=TRACKER_CONFIG,
+            conf=YOLO_CONF_THRESHOLD,
+            iou=YOLO_IOU_THRESHOLD,
+            imgsz=YOLO_IMGSZ,
+        )[0]
         if results.boxes.id is not None:
             for box, track_id, cls_id in zip(results.boxes.xyxy, results.boxes.id, results.boxes.cls):
                 class_name = _yolo_detector.names[int(cls_id)]
@@ -215,6 +240,8 @@ def process_frame(frame, fruit_type, frame_idx):
     status = "Tracking fruit... (pure-YOLO cls)" if detected_any else "No fruit detected"
     colour = (0, 200, 0) if detected_any else (0, 0, 220)
     cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, colour, 2)
+
+    _log_fps(time.time() - _frame_start)
     return frame
 
 

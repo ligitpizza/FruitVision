@@ -12,15 +12,22 @@ from member_apps.member_1_ab.m1_preprocessing import clean
 from member_apps.member_1_ab.m1_detection import detect as classical_detect
 
 from database.history_db import log_result
+from .tracker_config import (
+    YOLO_WEIGHTS_PATH,
+    YOLO_IMGSZ,
+    YOLO_CONF_THRESHOLD,
+    YOLO_IOU_THRESHOLD,
+    TRACKER_CONFIG,
+    FPS_LOG_EVERY_N_FRAMES,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "outputs"))
 SNAPSHOT_DIR = os.path.join(OUTPUTS_DIR, "realtime_snapshots")
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-YOLO_WEIGHTS_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "trained_models", "svm_yolo"))
-os.makedirs(YOLO_WEIGHTS_DIR, exist_ok=True)
-YOLO_WEIGHTS_PATH = os.path.join(YOLO_WEIGHTS_DIR, "yolov8n.pt")
+# Weights dir must exist before YOLO() tries to download/save into it.
+os.makedirs(os.path.dirname(YOLO_WEIGHTS_PATH), exist_ok=True)
 
 _yolo = YOLO(YOLO_WEIGHTS_PATH)
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
@@ -44,6 +51,23 @@ CROP_PAD = 15
 _track_state = {}
 _mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []  # every *committed* (post-smoothing) classification made during the current session
+
+# --- MUST-DO #4 step 1: baseline FPS benchmarking ---------------------------
+# Rolling per-frame timing so a baseline number exists BEFORE any tuning
+# (model size / imgsz / conf / iou) is changed. Prints avg FPS over the last
+# FPS_LOG_EVERY_N_FRAMES frames, not every single frame, so it stays usable
+# during an actual demo run instead of spamming the console.
+_frame_times = deque(maxlen=FPS_LOG_EVERY_N_FRAMES)
+
+
+def _log_fps(elapsed_seconds):
+    _frame_times.append(elapsed_seconds)
+    if len(_frame_times) == FPS_LOG_EVERY_N_FRAMES:
+        avg_fps = 1.0 / (sum(_frame_times) / len(_frame_times))
+        print(f"[bench][svm_yolo_tracker] avg FPS over last {FPS_LOG_EVERY_N_FRAMES} frames: "
+              f"{avg_fps:.1f} (imgsz={YOLO_IMGSZ}, conf={YOLO_CONF_THRESHOLD}, "
+              f"iou={YOLO_IOU_THRESHOLD}, model={os.path.basename(YOLO_WEIGHTS_PATH)}, "
+              f"tracker={TRACKER_CONFIG})")
 
 
 def get_session_log():
@@ -155,12 +179,21 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
 
 
 def process_frame(frame, fruit_type, frame_idx):
+    _frame_start = time.time()
     detected_any = False
 
     if fruit_type == "mango":
         frame, detected_any = _process_mango_fallback(frame, fruit_type, frame_idx)
     else:
-        results = _yolo.track(frame, persist=True, verbose=False, tracker="botsort.yaml")[0]
+        results = _yolo.track(
+            frame,
+            persist=True,
+            verbose=False,
+            tracker=TRACKER_CONFIG,
+            conf=YOLO_CONF_THRESHOLD,
+            iou=YOLO_IOU_THRESHOLD,
+            imgsz=YOLO_IMGSZ,
+        )[0]
         if results.boxes.id is not None:
             for box, track_id, cls_id in zip(results.boxes.xyxy, results.boxes.id, results.boxes.cls):
                 class_name = _yolo.names[int(cls_id)]
@@ -172,6 +205,8 @@ def process_frame(frame, fruit_type, frame_idx):
     status = "Tracking fruit..." if detected_any else "No fruit detected"
     colour = (0, 200, 0) if detected_any else (0, 0, 220)
     cv2.putText(frame, status, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, colour, 2)
+
+    _log_fps(time.time() - _frame_start)
     return frame
 
 
@@ -187,13 +222,6 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
         "label": None, "confidence": None, "last_frame": -999,
     })
 
-    # frame_label, frame_confidence = None, None
-    # if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
-    #     try:
-    #         frame_label, frame_confidence, _, _ = predict_ensemble(crop, fruit_type)
-    #     except Exception:
-    #         pass
-    #     state["last_frame"] = frame_idx
     frame_label, frame_confidence, per_member, _ = None, None, None, None
     if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
         try:

@@ -12,6 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from collections import Counter
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAINING_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "outputs", "training", "ab"))
@@ -107,3 +108,38 @@ def format_duration(seconds):
     if minutes >= 1:
         return f"{int(minutes)}m {secs:.1f}s"
     return f"{secs:.1f}s"
+
+
+def save_classification_report(y_true, y_pred, classes, fruit):
+    """
+    Saves precision/recall/f1/support per class (plus the raw confusion
+    matrix as numbers, not just the PNG) to JSON, so per-member per-fruit
+    per-class performance can be read programmatically later -- e.g. by
+    analyze_member_performance.py for weighted soft-voting weights.
+    """
+    out_dir = _ensure_out_dir()
+    report_dict = classification_report(
+        y_true, y_pred, labels=classes, output_dict=True, zero_division=0
+    )
+    cm = confusion_matrix(y_true, y_pred, labels=classes)
+
+    payload = {
+        "fruit": fruit,
+        "classes": classes,
+        "confusion_matrix": cm.tolist(),
+        "accuracy": report_dict["accuracy"],
+        "per_class": {
+            cls: {
+                "precision": report_dict[cls]["precision"],
+                "recall": report_dict[cls]["recall"],
+                "f1_score": report_dict[cls]["f1-score"],
+                "support": report_dict[cls]["support"],
+            }
+            for cls in classes
+        },
+    }
+
+    out_path = os.path.join(out_dir, f"{fruit}_classification_report.json")
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return out_path

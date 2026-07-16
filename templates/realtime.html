@@ -25,6 +25,10 @@
       <label for="engine-select">Ripeness classifier</label>
       <select id="engine-select" onchange="stopFeed()">
         <option value="svm">SVM Ensemble (4-member soft vote)</option>
+        <option value="ensemble_ab">Ensemble AB only (Colour + Shape)</option>
+        <option value="ensemble_bc">Ensemble BC only (Shape + Texture)</option>
+        <option value="ensemble_cd">Ensemble CD only (Texture + Gabor)</option>
+        <option value="ensemble_da">Ensemble DA only (Gabor + Colour)</option>
         <option value="yolo_cls">Pure YOLO (YOLOv8-cls, no SVM)</option>
       </select>
     </div>
@@ -62,7 +66,14 @@
     // Keeps the history link in sync with whichever classifier is
     // selected, since each engine logs under a different `member` tag
     // (realtime_yolo vs yolo_pure_realtime).
-    const HISTORY_MEMBER_TAG = { svm: "realtime_yolo", yolo_cls: "yolo_pure_realtime" };
+    const HISTORY_MEMBER_TAG = { 
+      svm: "realtime_yolo",
+      yolo_cls: "yolo_pure_realtime",
+      "ensemble_ab_realtime": "Real-Time YOLO Tracking + Ensemble AB (Colour + Shape)",
+      "ensemble_bc_realtime": "Real-Time YOLO Tracking + Ensemble BC (Shape + Texture)",
+      "ensemble_cd_realtime": "Real-Time YOLO Tracking + Ensemble CD (Texture + Gabor)",
+      "ensemble_da_realtime": "Real-Time YOLO Tracking + Ensemble DA (Gabor + Colour)",
+    };
 
     function switchTab(name) {
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));

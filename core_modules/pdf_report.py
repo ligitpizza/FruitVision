@@ -24,6 +24,10 @@ MODEL_LABELS = {
     "all_four": "Ensemble (All 4 members, soft-voted)",
     "realtime_yolo": "Real-Time YOLO Tracking + Ensemble",
     "yolo_pure_realtime": "Real-Time YOLO Tracking + Pure-YOLO Classification",
+    "ensemble_ab_realtime": "Real-Time YOLO Tracking + Ensemble AB (Colour + Shape)",
+    "ensemble_bc_realtime": "Real-Time YOLO Tracking + Ensemble BC (Shape + Texture)",
+    "ensemble_cd_realtime": "Real-Time YOLO Tracking + Ensemble CD (Texture + Gabor)",
+    "ensemble_da_realtime": "Real-Time YOLO Tracking + Ensemble DA (Gabor + Colour)",
 }
 
 

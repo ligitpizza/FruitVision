@@ -16,7 +16,7 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
   warnings.warn(
 
 Building feature dataset for apple (C: texture + D: gabor)...
-Loaded 5969 samples for apple across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 5969 samples for apple across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
@@ -29,10 +29,14 @@ Test set performance for apple:
 weighted avg       0.66      0.66      0.64      1194
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\apple_ensemble_cd.pkl
+<<<<<<< HEAD
 [time] apple took 7m 47.0s
+=======
+[time] apple took 8m 2.8s
+>>>>>>> refactor
 
 Building feature dataset for banana (C: texture + D: gabor)...
-Loaded 5902 samples for banana across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 5902 samples for banana across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for banana:
               precision    recall  f1-score   support
 
@@ -45,10 +49,14 @@ Test set performance for banana:
 weighted avg       0.83      0.82      0.82      1181
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\banana_ensemble_cd.pkl
+<<<<<<< HEAD
 [time] banana took 8m 58.5s
+=======
+[time] banana took 10m 34.9s
+>>>>>>> refactor
 
 Building feature dataset for orange (C: texture + D: gabor)...
-Loaded 4346 samples for orange across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 4346 samples for orange across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
@@ -61,10 +69,14 @@ Test set performance for orange:
 weighted avg       0.78      0.77      0.77       870
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\orange_ensemble_cd.pkl
+<<<<<<< HEAD
 [time] orange took 6m 5.7s
+=======
+[time] orange took 6m 28.6s
+>>>>>>> refactor
 
 Building feature dataset for mango (C: texture + D: gabor)...
-Loaded 1240 samples for mango across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 1240 samples for mango across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
@@ -77,9 +89,15 @@ Test set performance for mango:
 weighted avg       0.74      0.67      0.69       248
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\mango_ensemble_cd.pkl
+<<<<<<< HEAD
 [time] mango took 34.4s
 
 [time] Total training run took 23m 25.5s
+=======
+[time] mango took 1m 55.1s
+
+[time] Total training run took 27m 1.3s
+>>>>>>> refactor
 
 All graphs saved to outputs/training/cd/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\cd\accuracy_summary.png

@@ -1,5 +1,25 @@
 from flask import Blueprint, Response, request, render_template, send_from_directory
 import cv2, os
+from .ensemble_ab_tracker import (
+    process_frame as ab_process_frame,
+    get_session_log as ab_get_session_log,
+    clear_session_log as ab_clear_session_log,
+)
+from .ensemble_bc_tracker import (
+    process_frame as bc_process_frame,
+    get_session_log as bc_get_session_log,
+    clear_session_log as bc_clear_session_log,
+)
+from .ensemble_cd_tracker import (
+    process_frame as cd_process_frame,
+    get_session_log as cd_get_session_log,
+    clear_session_log as cd_clear_session_log,
+)
+from .ensemble_da_tracker import (
+    process_frame as da_process_frame,
+    get_session_log as da_get_session_log,
+    clear_session_log as da_clear_session_log,
+)
 from .svm_yolo_tracker import (
     process_frame as svm_process_frame,
     get_session_log as svm_get_session_log,
@@ -26,6 +46,10 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 _ENGINES = {
     "svm": (svm_process_frame, svm_get_session_log, svm_clear_session_log, "realtime_yolo"),
     "yolo_cls": (yolo_cls_process_frame, yolo_cls_get_session_log, yolo_cls_clear_session_log, "yolo_pure_realtime"),
+    "ensemble_ab": (ab_process_frame, ab_get_session_log, ab_clear_session_log, "ensemble_ab_realtime"),
+    "ensemble_bc": (bc_process_frame, bc_get_session_log, bc_clear_session_log, "ensemble_bc_realtime"),
+    "ensemble_cd": (cd_process_frame, cd_get_session_log, cd_clear_session_log, "ensemble_cd_realtime"),
+    "ensemble_da": (da_process_frame, da_get_session_log, da_clear_session_log, "ensemble_da_realtime"),
 }
 
 

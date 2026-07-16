@@ -29,7 +29,7 @@ Test set performance for apple:
 weighted avg       0.78      0.76      0.76      1194
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_bc\apple_ensemble_bc.pkl
-[time] apple took 3m 15.8s
+[time] apple took 1m 59.6s
 
 Building feature dataset for banana (B: shape + C: texture)...
 Loaded 5902 samples for banana across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
@@ -45,7 +45,7 @@ Test set performance for banana:
 weighted avg       0.80      0.80      0.80      1181
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_bc\banana_ensemble_bc.pkl
-[time] banana took 2m 57.4s
+[time] banana took 2m 19.6s
 
 Building feature dataset for orange (B: shape + C: texture)...
 Loaded 4346 samples for orange across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
@@ -61,7 +61,7 @@ Test set performance for orange:
 weighted avg       0.78      0.77      0.77       870
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_bc\orange_ensemble_bc.pkl
-[time] orange took 25.2s
+[time] orange took 1m 24.0s
 
 Building feature dataset for mango (B: shape + C: texture)...
 Loaded 1240 samples for mango across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
@@ -77,9 +77,9 @@ Test set performance for mango:
 weighted avg       0.80      0.76      0.77       248
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_bc\mango_ensemble_bc.pkl
-[time] mango took 5.7s
+[time] mango took 20.8s
 
-[time] Total training run took 6m 44.1s
+[time] Total training run took 6m 4.1s
 
 All graphs saved to outputs/training/bc/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\bc\accuracy_summary.png

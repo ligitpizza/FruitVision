@@ -29,7 +29,7 @@ Test set performance for apple:
 weighted avg       0.90      0.90      0.90      1194
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\apple_ensemble_ab.pkl
-[time] apple took 3m 8.5s
+[time] apple took 1m 33.5s
 
 Building feature dataset for banana...
 Loaded 5902 samples for banana across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
@@ -45,7 +45,7 @@ Test set performance for banana:
 weighted avg       0.89      0.88      0.88      1181
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\banana_ensemble_ab.pkl
-[time] banana took 3m 41.4s
+[time] banana took 2m 47.4s
 
 Building feature dataset for orange...
 Loaded 4346 samples for orange across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
@@ -61,7 +61,7 @@ Test set performance for orange:
 weighted avg       0.92      0.92      0.92       870
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\orange_ensemble_ab.pkl
-[time] orange took 2m 48.5s
+[time] orange took 2m 16.0s
 
 Building feature dataset for mango...
 Loaded 1240 samples for mango across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
@@ -77,9 +77,9 @@ Test set performance for mango:
 weighted avg       0.84      0.80      0.81       248
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\mango_ensemble_ab.pkl
-[time] mango took 1m 7.4s
+[time] mango took 37.5s
 
-[time] Total training run took 10m 45.7s
+[time] Total training run took 7m 14.4s
 
 All graphs saved to outputs/training/ab/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\ab\accuracy_summary.png

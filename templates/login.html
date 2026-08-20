@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log in — FruitVision</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="logo">FV</div>
+      <h1>FruitVision</h1>
+      <p class="tagline">Fruit ripeness detection &amp; analytics.</p>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" placeholder="operator@fruitvision.local" required autofocus>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="••••••••" required>
+
+        <button type="submit">Access Dashboard →</button>
+      </form>
+
+      {% if show_seed_hint %}
+      <div class="seed-hint">
+        First run — default accounts:<br>
+        admin@fruitvision.local / admin123 (Admin)<br>
+        farmer@fruitvision.local / farmer123 (Farmer)<br>
+        Change these from Settings after logging in.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

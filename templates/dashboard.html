@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Live overview across every model's predictions.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/analytics">View full analytics →</a>
+    <a class="btn" href="/classify">+ New Classification</a>
+  </div>
+</div>
+
+{% if stats.total == 0 %}
+  <div class="card" style="margin-top:20px;">
+    <p class="empty">No predictions logged yet. <a href="/classify">Classify a fruit</a> to get started.</p>
+  </div>
+{% else %}
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Scans (Last 24h)</div>
+    <div class="value">{{ stats_today.total }}</div>
+    <div class="delta">{{ stats.total }} all-time</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Avg Confidence</div>
+    <div class="value">{{ stats.avg_confidence }}%</div>
+    <div class="delta">{{ stats_today.avg_confidence }}% last 24h</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Avg Inference Time</div>
+    <div class="value">{{ stats.avg_latency_ms if stats.avg_latency_ms is not none else '—' }}{{ 'ms' if stats.avg_latency_ms is not none }}</div>
+    <div class="delta">across all models</div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:18px; align-items: start;">
+  <div class="card">
+    <div class="row-between">
+      <h3 style="margin:0;">Ripeness Data</h3>
+      <div class="tabs" style="margin:0;">
+        <button type="button" class="tab-btn active" onclick="dashSwitchView('charts')">Charts</button>
+        <button type="button" class="tab-btn" onclick="dashSwitchView('table')">Table</button>
+      </div>
+    </div>
+
+    <div id="dash-view-charts" class="tab-panel active" style="border:none; padding:0; margin-top:14px;">
+      {% if fruit_chart or history_chart or confidence_chart %}
+        <div class="charts">
+          {% if fruit_chart %}
+            <img src="/outputs/reports/fruit_breakdown_chart_{{ chart_tag }}.png" alt="Fruit breakdown">
+          {% endif %}
+          {% if history_chart %}
+            <img src="/outputs/reports/history_chart_{{ chart_tag }}.png" alt="Ripeness distribution">
+          {% endif %}
+          {% if confidence_chart %}
+            <img src="/outputs/reports/confidence_trend_chart_{{ chart_tag }}.png" alt="Confidence trend">
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="empty">Not enough data yet.</p>
+      {% endif %}
+    </div>
+
+    <div id="dash-view-table" class="tab-panel" style="border:none; padding:0; margin-top:14px;">
+      <table>
+        <tr><th>Fruit</th><th>Count</th><th>Avg Confidence</th></tr>
+        {% for fruit, count in stats.by_fruit.items() %}
+        <tr>
+          <td>{{ fruit.capitalize() }}</td>
+          <td>{{ count }}</td>
+          <td>{{ stats.avg_confidence_by_fruit.get(fruit, '—') }}%</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <table style="margin-top:16px;">
+        <tr><th>Ripeness</th><th>Count</th></tr>
+        {% for label, count in stats.by_label.items() %}
+        <tr><td><span class="badge {{ label }}">{{ label.upper() }}</span></td><td>{{ count }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Recent Scans</h3>
+    <div class="stack-sm" style="margin-top:12px;">
+      {% for r in recent %}
+      <div class="row-between" style="border-bottom:1px solid var(--border); padding-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          {% if r.annotated_path %}
+            <img class="thumb" src="/outputs/{{ r.annotated_path }}" alt="">
+          {% endif %}
+          <div>
+            <div style="font-weight:700; font-size:0.88rem;">{{ r.fruit.capitalize() }}</div>
+            <div style="font-size:0.75rem; color:var(--ink-faint);">{{ r.member.replace('ensemble_', '')|upper }} · {{ r.created_at }}</div>
+          </div>
+        </div>
+        <span class="badge {{ r.label }}">{{ r.confidence }}%</span>
+      </div>
+      {% else %}
+      <p class="empty">Nothing yet.</p>
+      {% endfor %}
+    </div>
+    <a class="btn btn-outline btn-sm" href="/history" style="margin-top:14px;">View all →</a>
+  </div>
+</div>
+
+{% endif %}
+
+<script>
+  function dashSwitchView(name) {
+    document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('dash-view-charts').classList.toggle('active', name === 'charts');
+    document.getElementById('dash-view-table').classList.toggle('active', name === 'table');
+  }
+</script>
+{% endblock %}

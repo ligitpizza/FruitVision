@@ -13,8 +13,15 @@ import os
 import sys
 import json
 import math
+import time
+import csv
+import io
+from functools import wraps
 import cv2
-from flask import Flask, request, render_template, send_from_directory, redirect, url_for, flash
+from flask import (
+    Flask, request, render_template, send_from_directory, redirect, url_for,
+    flash, session, g, Response,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MEMBER_APPS_DIR = os.path.join(BASE_DIR, "member_apps")
@@ -51,11 +58,14 @@ from database.history_db import (
     log_result,
     get_recent,
     get_paginated,
+    get_all as get_all_results,
     get_by_id,
     update_result,
     delete_result,
     get_stats,
+    get_stats_since,
 )
+from database import auth_db
 
 FRUITS = ["apple", "banana", "orange", "mango"]
 RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
@@ -71,6 +81,65 @@ TRAINING_DIR = os.path.join(OUTPUTS_DIR, "training")
 
 from realtime.stream_routes import realtime_bp
 app.register_blueprint(realtime_bp)
+
+# --------------------------------------------------------------------------
+# Auth: session-based login, gating every route except /login and static
+# assets. g.user is loaded on every request so templates/route code can
+# read it without an extra query.
+# --------------------------------------------------------------------------
+PUBLIC_PATHS = {"/login"}
+
+
+@app.before_request
+def load_logged_in_user():
+    user_id = session.get("user_id")
+    g.user = auth_db.get_user_by_id(user_id) if user_id else None
+
+    if request.path.startswith("/static/") or request.path.startswith("/outputs/"):
+        return
+    if request.path in PUBLIC_PATHS:
+        return
+    if g.user is None:
+        return redirect(url_for("login"))
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not g.user or g.user["role"] != "admin":
+            flash("Admin access required.")
+            return redirect(url_for("dashboard_home"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if g.user:
+        return redirect(url_for("dashboard_home"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        user = auth_db.verify_login(email, password)
+        if user:
+            session["user_id"] = user["id"]
+            auth_db.touch_last_active(user["id"])
+            auth_db.log_activity(user["id"], "login")
+            return redirect(url_for("dashboard_home"))
+        flash("Invalid email or password.")
+
+    show_seed_hint = len(auth_db.list_users()) == 2
+    return render_template("login.html", show_seed_hint=show_seed_hint)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    if g.user:
+        auth_db.log_activity(g.user["id"], "logout")
+    session.clear()
+    return redirect(url_for("login"))
+
 
 # --------------------------------------------------------------------------
 # Unified model registry: every selectable option across every route maps
@@ -130,13 +199,48 @@ def outputs_file(filename):
 
 
 # --------------------------------------------------------------------------
-# Home
+# Dashboard (overview) + Fruit Classification (was "/")
 # --------------------------------------------------------------------------
 @app.route("/", methods=["GET"])
-def index():
+def dashboard_home():
+    stats = get_stats()
+    stats_today = get_stats_since(hours=24)
+    recent = get_recent(limit=5)
+
+    fruit_chart = generate_fruit_breakdown_chart(None, file_tag="all")
+    history_chart = generate_history_chart(None, file_tag="all")
+    confidence_chart = generate_confidence_trend_chart(None, file_tag="all")
+
     return render_template(
-        "index.html", fruits=FRUITS, models=MODEL_CHOICES, predictors=PREDICTORS
+        "dashboard.html",
+        stats=stats,
+        stats_today=stats_today,
+        recent=recent,
+        fruit_chart=fruit_chart is not None,
+        history_chart=history_chart is not None,
+        confidence_chart=confidence_chart is not None,
+        chart_tag="all",
+        active_page="dashboard",
     )
+
+
+@app.route("/classify", methods=["GET"])
+def classify():
+    default_model = auth_db.get_setting("default_model", "ab")
+    return render_template(
+        "classify.html", fruits=FRUITS, models=MODEL_CHOICES, predictors=PREDICTORS,
+        default_model=default_model, active_page="classify",
+    )
+
+
+def _is_flagged(confidence_pct):
+    """True if confidence falls below the admin-configured review threshold
+    (Settings > Vision Model Configuration). Threshold of 0 disables flagging."""
+    try:
+        threshold = float(auth_db.get_setting("confidence_threshold", "0"))
+    except (TypeError, ValueError):
+        threshold = 0
+    return threshold > 0 and confidence_pct < threshold
 
 
 def _save_annotated(img, bbox, filename):
@@ -174,21 +278,27 @@ def predict():
         f.save(path)
         img = cv2.imread(path)
 
+        t0 = time.perf_counter()
         try:
             label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
         except entry["not_fruit_err"] as e:
             return {"error": str(e), "filename": f.filename}, 422
+        latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
+        confidence_pct = round(confidence * 100, 1)
 
         log_result(
             member=_member_tag("ab"),
             fruit=fruit_type,
             label=label,
-            confidence=round(confidence * 100, 1),
+            confidence=confidence_pct,
             filename=f.filename,
             annotated_path=annotated_rel,
             source="predict",
+            user_id=g.user["id"] if g.user else None,
+            latency_ms=latency_ms,
+            flagged=_is_flagged(confidence_pct),
         )
 
         results.append({
@@ -222,10 +332,12 @@ def predict_unified():
     img = cv2.imread(path)
 
     if model_choice == "all_four":
+        t0 = time.perf_counter()
         try:
             label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
         except RuntimeError as e:
             return {"error": str(e), "filename": f.filename}, 422
+        latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
 
@@ -237,6 +349,9 @@ def predict_unified():
             filename=f.filename,
             annotated_path=annotated_rel,
             source="predict_unified",
+            user_id=g.user["id"] if g.user else None,
+            latency_ms=latency_ms,
+            flagged=_is_flagged(confidence),
         )
 
         return {
@@ -251,28 +366,34 @@ def predict_unified():
     if not entry:
         return {"error": f"Unknown model '{model_choice}'"}, 400
 
+    t0 = time.perf_counter()
     try:
         label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
     except entry["not_fruit_err"] as e:
         return {"error": str(e), "filename": f.filename}, 422
+    latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
     annotated_rel = _save_annotated(img, bbox, f.filename)
+    confidence_pct = round(confidence * 100, 1)
 
     log_result(
         member=_member_tag(model_choice),
         fruit=fruit_type,
         label=label,
-        confidence=round(confidence * 100, 1),
+        confidence=confidence_pct,
         filename=f.filename,
         annotated_path=annotated_rel,
         source="predict_unified",
+        user_id=g.user["id"] if g.user else None,
+        latency_ms=latency_ms,
+        flagged=_is_flagged(confidence_pct),
     )
 
     return {
         "model": model_choice,
         "fruit": fruit_type,
         "ripeness": label,
-        "confidence": round(confidence * 100, 1),
+        "confidence": confidence_pct,
         "per_member": None,
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
     }
@@ -292,7 +413,7 @@ def dashboard(model_key):
         entry = PREDICTORS.get(model_key)
         if not entry:
             flash(f"Unknown model '{model_key}'.")
-            return redirect(url_for("index"))
+            return redirect(url_for("classify"))
         member_filter = _member_tag(model_key)
         model_label = entry["label"]
 
@@ -309,6 +430,7 @@ def dashboard(model_key):
         history_member_tag=member_filter,
         predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
+        active_page="classify",
     )
 
 ALL_FOUR_LABEL = "Ensemble (All 4 members, soft-voted)"
@@ -339,11 +461,13 @@ def analyse():
             f.save(path)
             img = cv2.imread(path)
 
+            t0 = time.perf_counter()
             try:
                 label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
             except RuntimeError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
 
@@ -355,6 +479,9 @@ def analyse():
                 filename=f.filename,
                 annotated_path=annotated_rel,
                 source="analyse",
+                user_id=g.user["id"] if g.user else None,
+                latency_ms=latency_ms,
+                flagged=_is_flagged(confidence),
             )
 
             results.append({
@@ -368,7 +495,7 @@ def analyse():
         entry = PREDICTORS.get(model_choice)
         if not entry:
             flash(f"Unknown model '{model_choice}'.")
-            return redirect(url_for("index"))
+            return redirect(url_for("classify"))
 
         member_tag = _member_tag(model_choice)
         model_label = entry["label"]
@@ -379,28 +506,34 @@ def analyse():
             f.save(path)
             img = cv2.imread(path)
 
+            t0 = time.perf_counter()
             try:
                 label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
             except entry["not_fruit_err"] as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
+            latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
+            confidence_pct = round(confidence * 100, 1)
 
             log_result(
                 member=member_tag,
                 fruit=fruit_type,
                 label=label,
-                confidence=round(confidence * 100, 1),
+                confidence=confidence_pct,
                 filename=f.filename,
                 annotated_path=annotated_rel,
                 source="analyse",
+                user_id=g.user["id"] if g.user else None,
+                latency_ms=latency_ms,
+                flagged=_is_flagged(confidence_pct),
             )
 
             results.append({
                 "filename": f.filename,
                 "label": label,
-                "confidence": round(confidence * 100, 1),
+                "confidence": confidence_pct,
                 "annotated_path": annotated_rel,
             })
 
@@ -429,6 +562,7 @@ def analyse():
         predictors=PREDICTORS_WITH_ENSEMBLE,
         fruits=FRUITS,
         OUTPUTS_DIR=OUTPUTS_DIR,
+        active_page="classify",
     )
 
 
@@ -476,9 +610,11 @@ def history():
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
     page = min(page, total_pages)
 
-    # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove 
+    # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"] do not remove
     member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo", "yolo_pure_realtime"]
+
+    stats = get_stats(member=member_filter, fruit=fruit_filter)
 
     return render_template(
         "history.html",
@@ -490,6 +626,36 @@ def history():
         page=page,
         total_pages=total_pages,
         total=total,
+        stats=stats,
+        active_page="history",
+    )
+
+
+@app.route("/history/export.csv")
+def history_export_csv():
+    fruit_filter = request.args.get("fruit") or None
+    member_filter = request.args.get("member") or None
+    rows = get_all_results(member=member_filter, fruit=fruit_filter)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "id", "created_at", "member", "fruit", "label", "confidence",
+        "source", "flagged", "latency_ms", "filename",
+    ])
+    for r in rows:
+        writer.writerow([
+            r["id"], r["created_at"], r["member"], r["fruit"], r["label"], r["confidence"],
+            r["source"], r.get("flagged", 0), r.get("latency_ms", ""), r["filename"] or "",
+        ])
+
+    if g.user:
+        auth_db.log_activity(g.user["id"], "export_csv", detail=f"{len(rows)} records")
+
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=harvest_records.csv"},
     )
 
 
@@ -512,7 +678,8 @@ def history_edit(record_id):
         return redirect(url_for("history"))
 
     return render_template(
-        "history_edit.html", record=record, fruits=FRUITS, classes=RIPENESS_CLASSES
+        "history_edit.html", record=record, fruits=FRUITS, classes=RIPENESS_CLASSES,
+        active_page="history",
     )
 
 
@@ -539,6 +706,7 @@ def analytics():
         fruit_chart=fruit_chart is not None,
         confidence_chart=confidence_chart is not None,
         history_chart=history_chart is not None,
+        active_page="dashboard",
     )
 
 
@@ -551,7 +719,7 @@ def training_report(model_key):
     entry = PREDICTORS.get(model_key)
     if not entry:
         flash(f"Unknown model '{model_key}'.")
-        return redirect(url_for("index"))
+        return redirect(url_for("classify"))
 
     model_training_dir = os.path.join(TRAINING_DIR, model_key)
     graphs = []
@@ -591,6 +759,144 @@ def training_report(model_key):
         model_key=model_key,
         model_label=entry["label"],
         predictors=PREDICTORS,
+        active_page="classify",
+    )
+
+
+# --------------------------------------------------------------------------
+# Admin Panel (admin-only): model registry, personnel access, activity log.
+# --------------------------------------------------------------------------
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    stats_24h = get_stats_since(hours=24)
+
+    registry = {}
+    for key, entry in PREDICTORS.items():
+        registry[key] = {**entry, "stats": get_stats(member=_member_tag(key))}
+
+    return render_template(
+        "admin.html",
+        stats_24h=stats_24h,
+        predictors=registry,
+        users=auth_db.list_users(),
+        activity=auth_db.get_recent_activity(limit=12),
+        active_page="admin",
+    )
+
+
+@app.route("/admin/users/invite", methods=["POST"])
+@admin_required
+def admin_invite_user():
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    role = request.form.get("role", "farmer")
+
+    if not name or not email:
+        flash("Name and email are required.")
+        return redirect(url_for("admin_panel"))
+
+    temp_password = auth_db.generate_temp_password()
+    try:
+        auth_db.create_user(name, email, temp_password, role=role)
+    except Exception:
+        flash(f"Could not invite {email} — that email may already be in use.")
+        return redirect(url_for("admin_panel"))
+
+    auth_db.log_activity(g.user["id"], "invite_user", detail=email)
+    flash(f"Invited {name} ({email}). Temporary password: {temp_password}")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/users/<int:user_id>/role", methods=["POST"])
+@admin_required
+def admin_update_role(user_id):
+    role = request.form.get("role", "farmer")
+    if user_id == g.user["id"] and role != "admin" and auth_db.admin_count() <= 1:
+        flash("Can't demote the only remaining admin.")
+        return redirect(url_for("admin_panel"))
+
+    auth_db.update_user_role(user_id, role)
+    auth_db.log_activity(g.user["id"], "change_role", detail=f"user {user_id} -> {role}")
+    flash("Role updated.")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/users/<int:user_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == g.user["id"]:
+        flash("You can't remove your own account.")
+        return redirect(url_for("admin_panel"))
+
+    target = auth_db.get_user_by_id(user_id)
+    if target and target["role"] == "admin" and auth_db.admin_count() <= 1:
+        flash("Can't remove the only remaining admin.")
+        return redirect(url_for("admin_panel"))
+
+    auth_db.delete_user(user_id)
+    auth_db.log_activity(g.user["id"], "remove_user", detail=target["email"] if target else str(user_id))
+    flash("User removed.")
+    return redirect(url_for("admin_panel"))
+
+
+# --------------------------------------------------------------------------
+# Settings: default model + confidence threshold, account security.
+# --------------------------------------------------------------------------
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    if request.method == "POST":
+        form = request.form.get("form")
+
+        if form == "model_config":
+            auth_db.set_setting("default_model", request.form.get("default_model", "ab"))
+            auth_db.set_setting("confidence_threshold", request.form.get("confidence_threshold", "0"))
+            auth_db.log_activity(g.user["id"], "update_settings")
+            flash("Configuration saved.")
+
+        elif form == "password":
+            current = request.form.get("current_password", "")
+            new = request.form.get("new_password", "")
+            if not auth_db.verify_login(g.user["email"], current):
+                flash("Current password is incorrect.")
+            elif len(new) < 6:
+                flash("New password must be at least 6 characters.")
+            else:
+                auth_db.set_password(g.user["id"], new)
+                auth_db.log_activity(g.user["id"], "change_password")
+                flash("Password updated.")
+
+        return redirect(url_for("settings"))
+
+    return render_template(
+        "settings.html",
+        predictors=PREDICTORS,
+        settings=auth_db.get_all_settings(),
+        active_page="settings",
+    )
+
+
+# --------------------------------------------------------------------------
+# Profile: current user's own info, stats, and recent activity.
+# --------------------------------------------------------------------------
+@app.route("/profile", methods=["GET", "POST"])
+def profile():
+    if request.method == "POST" and request.form.get("form") == "name":
+        name = request.form.get("name", "").strip()
+        if name:
+            auth_db.update_user_name(g.user["id"], name)
+            auth_db.log_activity(g.user["id"], "update_profile")
+            flash("Profile updated.")
+        return redirect(url_for("profile"))
+
+    my_stats = get_stats(user_id=g.user["id"])
+    my_activity = auth_db.get_recent_activity(limit=8, user_id=g.user["id"])
+
+    return render_template(
+        "profile.html",
+        my_stats=my_stats,
+        my_activity=my_activity,
+        active_page="profile",
     )
 
 

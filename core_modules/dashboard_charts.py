@@ -58,13 +58,13 @@ def generate_trend_chart(results, file_tag="ab"):
     return out_path
 
 
-def generate_history_chart(member_filter=None, file_tag="all", limit=500):
+def generate_history_chart(member_filter=None, file_tag="all", limit=500, user_id=None):
     """
     Pulls logged predictions (filtered by `member_filter`, e.g.
-    "ensemble_bc", or None for every member) and generates a pie chart of
-    the overall ripeness distribution to date.
+    "ensemble_bc", or None for every member, and optionally by `user_id`)
+    and generates a pie chart of the overall ripeness distribution to date.
     """
-    rows = get_recent(member=member_filter, limit=limit)
+    rows = get_recent(member=member_filter, user_id=user_id, limit=limit)
     labels = [r["label"] for r in rows if r.get("label")]
     if not labels:
         return None
@@ -90,12 +90,12 @@ def generate_history_chart(member_filter=None, file_tag="all", limit=500):
     return out_path
 
 
-def generate_fruit_breakdown_chart(member_filter=None, file_tag="all", limit=500):
+def generate_fruit_breakdown_chart(member_filter=None, file_tag="all", limit=500, user_id=None):
     """
     Grouped bar chart: for each fruit, how many ripe/unripe/rotten predictions
     have been logged (all-time), so you can compare label distribution across fruits.
     """
-    rows = get_recent(member=member_filter, limit=limit)
+    rows = get_recent(member=member_filter, user_id=user_id, limit=limit)
     if not rows:
         return None
 
@@ -128,13 +128,13 @@ def generate_fruit_breakdown_chart(member_filter=None, file_tag="all", limit=500
     return out_path
 
 
-def generate_confidence_trend_chart(member_filter=None, file_tag="all", limit=500):
+def generate_confidence_trend_chart(member_filter=None, file_tag="all", limit=500, user_id=None):
     """
     Line chart of prediction confidence over time (most recent `limit`
     predictions, in chronological order), so you can see whether confidence
     is drifting.
     """
-    rows = get_recent(member=member_filter, limit=limit)
+    rows = get_recent(member=member_filter, user_id=user_id, limit=limit)
     rows = [r for r in rows if r.get("confidence") is not None]
     if not rows:
         return None

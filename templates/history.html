@@ -1,21 +1,35 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>History — FruitVision</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='layout.css') }}">
-</head>
-<body id="page-history">
-  <h1>🍎 Prediction History</h1>
-  <p>Across every member's model — filter by fruit or by which model produced the prediction.</p>
+{% extends "base.html" %}
+{% block title %}Harvest Records — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">HISTORICAL DATA LEDGER</p>
+    <h1>Harvest Records</h1>
+    <p>Every prediction logged across every model — filter by fruit or by which model produced it.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/history/export.csv{{ '?fruit=' ~ fruit_filter if fruit_filter }}{{ ('&' if fruit_filter else '?') ~ 'member=' ~ member_filter if member_filter }}">Export CSV</a>
+  </div>
+</div>
 
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
-    {% endif %}
-  {% endwith %}
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Total Records</div>
+    <div class="value">{{ stats.total }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Avg Confidence</div>
+    <div class="value">{{ stats.avg_confidence }}%</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Ripe / Unripe / Rotten</div>
+    <div class="value" style="font-size:1.2rem;">
+      {{ stats.by_label.get('ripe', 0) }} / {{ stats.by_label.get('unripe', 0) }} / {{ stats.by_label.get('rotten', 0) }}
+    </div>
+  </div>
+</div>
 
+<div class="card" style="margin-top:20px;">
   <div class="filters">
     <div class="group">
       Fruit:
@@ -57,7 +71,10 @@
       </td>
       <td>{{ r.member.replace('ensemble_', '')|upper }}</td>
       <td>{{ r.fruit.capitalize() }}</td>
-      <td class="{{ r.label }}">{{ r.label.upper() }}</td>
+      <td>
+        <span class="badge {{ r.label }}">{{ r.label.upper() }}</span>
+        {% if r.flagged %}<span class="badge flagged">FLAGGED</span>{% endif %}
+      </td>
       <td>{{ r.confidence }}%</td>
       <td>{{ r.source }}</td>
       <td class="actions">
@@ -65,7 +82,7 @@
         <form action="/history/{{ r.id }}/delete" method="post" style="display:inline;"
               onsubmit="return confirm('Delete this record? This cannot be undone.');">
           <input type="hidden" name="page" value="{{ page }}">
-          <button type="submit" class="danger">Delete</button>
+          <button type="submit" class="btn-danger btn-sm">Delete</button>
         </form>
       </td>
     </tr>
@@ -95,9 +112,9 @@
   </div>
 
   {% else %}
-  <p>No predictions logged yet. Go make one!</p>
+  <p class="empty">No predictions logged yet. Go make one!</p>
   {% endif %}
+</div>
 
-  <p style="margin-top:20px;"><a href="/">← Back to upload</a> · <a href="/analytics">View analytics dashboard →</a></p>
-</body>
-</html>
+<p style="margin-top:20px;"><a href="/classify">← Back to classification</a> · <a href="/analytics">View analytics dashboard →</a></p>
+{% endblock %}

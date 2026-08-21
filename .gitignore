@@ -5,6 +5,11 @@ datasets/yolo_cls/
 
 __pycache__/
 
+# Local Python virtual environments (installed dependencies)
+.venv/
+venv/
+env/
+
 member_apps/member_1_ab/uploads/
 member_apps/member_2_bc/uploads/
 member_apps/member_3_cd/uploads/
@@ -16,6 +21,7 @@ outputs/annotated/
 outputs/reports/
 outputs/training/
 outputs/realtime_snapshots/
+outputs/surface/
 
 uploads/
 

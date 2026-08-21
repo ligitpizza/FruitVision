@@ -72,7 +72,8 @@ def main():
     print("=" * 50)
     failed = [r for r in results if not r[1]]
     for folder, success, elapsed in results:
-        mark = "✓" if success else "✗"
+        # ASCII keeps the summary printable in Windows consoles using cp1252.
+        mark = "[OK]" if success else "[FAIL]"
         print(f"  {mark} {folder:16s} {elapsed:6.1f}s")
 
     total = sum(r[2] for r in results)

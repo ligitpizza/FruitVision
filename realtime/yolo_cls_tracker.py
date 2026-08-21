@@ -43,6 +43,7 @@ from member_apps.member_1_ab.m1_preprocessing import clean as m1_clean
 from member_apps.member_1_ab.m1_detection import detect as m1_detect
 
 from database.history_db import log_result
+from core_modules.blemish_analysis import analyze_surface
 from .tracker_config import (
     YOLO_WEIGHTS_PATH,
     YOLO_IMGSZ,
@@ -135,6 +136,11 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
 
     snapshot_path = _save_snapshot(crop, tag)
     confidence_pct = round(confidence * 100, 1) if confidence <= 1.0 else round(confidence, 1)
+    surface = analyze_surface(crop, bbox=(0, 0, crop.shape[1], crop.shape[0]))
+    surface_path = None
+    if surface["surface_overlay"] is not None:
+        surface_path = os.path.join(SNAPSHOT_DIR, f"{tag}_{int(time.time() * 1000)}_surface.jpg")
+        cv2.imwrite(surface_path, surface["surface_overlay"])
 
     log_result(
         member="yolo_pure_realtime",
@@ -144,6 +150,11 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         filename=os.path.basename(snapshot_path),
         annotated_path=os.path.relpath(snapshot_path, OUTPUTS_DIR),
         source="realtime_yolo_cls",
+        fruit_area_px=surface["fruit_area_px"] or None,
+        blemish_area_px=surface["blemish_area_px"] if surface["blemish_percentage"] is not None else None,
+        blemish_percentage=surface["blemish_percentage"],
+        quality_grade=surface["quality_grade"] if surface["blemish_percentage"] is not None else None,
+        surface_path=os.path.relpath(surface_path, OUTPUTS_DIR) if surface_path else None,
     )
 
     _session_log.append({
@@ -152,6 +163,11 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         "label": label,
         "confidence": confidence_pct,
         "image_path": snapshot_path,
+        "surface_image_path": surface_path,
+        "fruit_area_px": surface["fruit_area_px"],
+        "blemish_area_px": surface["blemish_area_px"],
+        "blemish_percentage": surface["blemish_percentage"],
+        "quality_grade": surface["quality_grade"],
     })
 
 

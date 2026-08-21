@@ -1,22 +1,22 @@
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
 
 Building feature dataset for apple...
-Loaded 5969 samples for apple across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
+Loaded 5969 samples for apple across classes: {np.str_('ripe'), np.str_('unripe'), np.str_('rotten')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
@@ -28,11 +28,11 @@ Test set performance for apple:
    macro avg       0.90      0.90      0.90      1194
 weighted avg       0.90      0.90      0.90      1194
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\apple_ensemble_ab.pkl
-[time] apple took 3m 8.5s
+Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_ab\apple_ensemble_ab.pkl
+[time] apple took 21.6s
 
 Building feature dataset for banana...
-Loaded 5902 samples for banana across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
+Loaded 5902 samples for banana across classes: {np.str_('ripe'), np.str_('unripe'), np.str_('rotten')}
 Test set performance for banana:
               precision    recall  f1-score   support
 
@@ -44,11 +44,11 @@ Test set performance for banana:
    macro avg       0.88      0.89      0.88      1181
 weighted avg       0.89      0.88      0.88      1181
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\banana_ensemble_ab.pkl
-[time] banana took 3m 41.4s
+Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_ab\banana_ensemble_ab.pkl
+[time] banana took 25.7s
 
 Building feature dataset for orange...
-Loaded 4346 samples for orange across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
+Loaded 4346 samples for orange across classes: {np.str_('ripe'), np.str_('unripe'), np.str_('rotten')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
@@ -60,11 +60,11 @@ Test set performance for orange:
    macro avg       0.92      0.92      0.92       870
 weighted avg       0.92      0.92      0.92       870
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\orange_ensemble_ab.pkl
-[time] orange took 2m 48.5s
+Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_ab\orange_ensemble_ab.pkl
+[time] orange took 17.7s
 
 Building feature dataset for mango...
-Loaded 1240 samples for mango across classes: {np.str_('rotten'), np.str_('ripe'), np.str_('unripe')}
+Loaded 1240 samples for mango across classes: {np.str_('ripe'), np.str_('unripe'), np.str_('rotten')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
@@ -76,10 +76,10 @@ Test set performance for mango:
    macro avg       0.75      0.79      0.75       248
 weighted avg       0.84      0.80      0.81       248
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_ab\mango_ensemble_ab.pkl
-[time] mango took 1m 7.4s
+Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_ab\mango_ensemble_ab.pkl
+[time] mango took 3.9s
 
-[time] Total training run took 10m 45.7s
+[time] Total training run took 1m 8.8s
 
 All graphs saved to outputs/training/ab/
-Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\ab\accuracy_summary.png
+Accuracy summary: C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\outputs\training\ab\accuracy_summary.png

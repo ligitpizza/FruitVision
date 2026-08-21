@@ -97,7 +97,17 @@ def realtime_export_pdf():
         return {"error": "No real-time classifications logged yet in this session."}, 400
 
     results_for_pdf = [
-        {"filename": r["tag"], "label": r["label"], "confidence": r["confidence"], "image_path": r["image_path"]}
+        {
+            "filename": r["tag"],
+            "label": r["label"],
+            "confidence": r["confidence"],
+            "image_path": r["image_path"],
+            "surface_image_path": r.get("surface_image_path"),
+            "fruit_area_px": r.get("fruit_area_px"),
+            "blemish_area_px": r.get("blemish_area_px"),
+            "blemish_percentage": r.get("blemish_percentage"),
+            "quality_grade": r.get("quality_grade", "Unknown"),
+        }
         for r in session_results
     ]
     out_path = generate_pdf_report_batch(results_for_pdf, model_tag=pdf_model_tag)

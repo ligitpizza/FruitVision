@@ -70,7 +70,11 @@ def update_result(result_id, **fields):
     Usage: update_result(5, label="ripe", confidence=92.3)
     Only whitelisted columns can be updated. Returns True if a row was updated.
     """
-    allowed = {"member", "filename", "fruit", "label", "confidence", "annotated_path", "source"}
+    allowed = {
+        "member", "filename", "fruit", "label", "confidence", "annotated_path",
+        "fruit_area_px", "blemish_area_px", "blemish_percentage",
+        "quality_grade", "surface_path", "source",
+    }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return False
@@ -131,6 +135,23 @@ def get_stats(member=None):
     ).fetchall()
     avg_confidence_by_fruit = {r["fruit"]: round(r["avg_conf"], 2) for r in avg_by_fruit_rows}
 
+    avg_blemish_row = conn.execute(
+        f"SELECT AVG(blemish_percentage) FROM results {where_sql}", params
+    ).fetchone()
+    avg_blemish_percentage = (
+        round(avg_blemish_row[0], 2) if avg_blemish_row[0] is not None else None
+    )
+
+    grade_rows = conn.execute(
+        f"SELECT quality_grade, COUNT(*) as cnt FROM results {where_sql} "
+        "AND quality_grade IS NOT NULL GROUP BY quality_grade"
+        if where_sql
+        else "SELECT quality_grade, COUNT(*) as cnt FROM results "
+             "WHERE quality_grade IS NOT NULL GROUP BY quality_grade",
+        params,
+    ).fetchall()
+    by_quality_grade = {r["quality_grade"]: r["cnt"] for r in grade_rows}
+
     conn.close()
     return {
         "total": total,
@@ -138,6 +159,8 @@ def get_stats(member=None):
         "by_label": by_label,
         "by_fruit": by_fruit,
         "avg_confidence_by_fruit": avg_confidence_by_fruit,
+        "avg_blemish_percentage": avg_blemish_percentage,
+        "by_quality_grade": by_quality_grade,
     }
 
 def init_db():
@@ -152,21 +175,63 @@ def init_db():
             label TEXT NOT NULL,
             confidence REAL NOT NULL,
             annotated_path TEXT,
+            fruit_area_px INTEGER,
+            blemish_area_px INTEGER,
+            blemish_percentage REAL,
+            quality_grade TEXT,
+            surface_path TEXT,
             source TEXT,
             created_at TEXT NOT NULL
         )
     """)
+    # Compatibility migration for databases created by earlier versions.
+    # SQLite's ADD COLUMN preserves every existing row and yields NULL for the
+    # new surface fields, which correctly means "not analysed" rather than 0%.
+    existing_columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(results)").fetchall()
+    }
+    migrations = {
+        "fruit_area_px": "INTEGER",
+        "blemish_area_px": "INTEGER",
+        "blemish_percentage": "REAL",
+        "quality_grade": "TEXT",
+        "surface_path": "TEXT",
+    }
+    for column, data_type in migrations.items():
+        if column not in existing_columns:
+            conn.execute(f"ALTER TABLE results ADD COLUMN {column} {data_type}")
     conn.commit()
     conn.close()
 
 
-def log_result(member, fruit, label, confidence, filename=None, annotated_path=None, source="predict"):
+def log_result(
+    member,
+    fruit,
+    label,
+    confidence,
+    filename=None,
+    annotated_path=None,
+    source="predict",
+    fruit_area_px=None,
+    blemish_area_px=None,
+    blemish_percentage=None,
+    quality_grade=None,
+    surface_path=None,
+):
     """Insert one prediction result. Call this right after predict_ripeness() returns."""
     conn = _connect()
     conn.execute(
-        """INSERT INTO results (member, filename, fruit, label, confidence, annotated_path, source, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (member, filename, fruit, label, confidence, annotated_path, source, datetime.now().isoformat(timespec="seconds")),
+        """INSERT INTO results (
+               member, filename, fruit, label, confidence, annotated_path,
+               fruit_area_px, blemish_area_px, blemish_percentage,
+               quality_grade, surface_path, source, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            member, filename, fruit, label, confidence, annotated_path,
+            fruit_area_px, blemish_area_px, blemish_percentage,
+            quality_grade, surface_path, source,
+            datetime.now().isoformat(timespec="seconds"),
+        ),
     )
     conn.commit()
     conn.close()

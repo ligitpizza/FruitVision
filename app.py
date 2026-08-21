@@ -15,6 +15,7 @@ import json
 import math
 import cv2
 from flask import Flask, request, render_template, send_from_directory, redirect, url_for, flash
+from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MEMBER_APPS_DIR = os.path.join(BASE_DIR, "member_apps")
@@ -34,13 +35,18 @@ from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ri
 from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
 from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
 from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
-from yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
+from pipeline.pure_yolo.yolo_cls_predict import (
+    predict_ripeness as yolo_pure_predict_ripeness,
+    NotAFruitError as YoloPureNotAFruitError,
+)
 
 # --- 4-member ensemble (soft-voting across all members) -----------------
 from member_apps.predict_ensemble import predict_ensemble
 
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
+from core_modules.blemish_analysis import analyze_surface
+from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.dashboard_charts import (
     generate_trend_chart,
     generate_history_chart,
@@ -154,6 +160,44 @@ def _save_annotated(img, bbox, filename):
     return f"annotated/{filename}"
 
 
+def _analyse_surface_and_save(img, bbox, filename):
+    """Run the shared post-prediction analysis once and save its overlay."""
+    result = analyze_surface(img, bbox=bbox)
+    result["surface_path"] = None
+    overlay = result.get("surface_overlay")
+    if overlay is not None:
+        safe_name = secure_filename(filename) or "fruit.jpg"
+        stem, extension = os.path.splitext(safe_name)
+        extension = extension if extension.lower() in {".jpg", ".jpeg", ".png"} else ".jpg"
+        surface_dir = os.path.join(OUTPUTS_DIR, "surface")
+        os.makedirs(surface_dir, exist_ok=True)
+        surface_name = f"{stem}_surface{extension}"
+        if cv2.imwrite(os.path.join(surface_dir, surface_name), overlay):
+            result["surface_path"] = f"surface/{surface_name}"
+    return result
+
+
+def _surface_db_fields(surface):
+    return {
+        "fruit_area_px": surface.get("fruit_area_px") or None,
+        "blemish_area_px": surface.get("blemish_area_px") if surface.get("blemish_percentage") is not None else None,
+        "blemish_percentage": surface.get("blemish_percentage"),
+        "quality_grade": surface.get("quality_grade") if surface.get("blemish_percentage") is not None else None,
+        "surface_path": surface.get("surface_path"),
+    }
+
+
+def _surface_payload(surface):
+    return {
+        "fruit_area_px": surface.get("fruit_area_px"),
+        "blemish_area_px": surface.get("blemish_area_px"),
+        "blemish_percentage": surface.get("blemish_percentage"),
+        "quality_grade": surface.get("quality_grade", "Unknown"),
+        "surface_path": surface.get("surface_path"),
+        "surface_analysis_error": surface.get("surface_analysis_error"),
+    }
+
+
 # --------------------------------------------------------------------------
 # Single-image prediction
 # --------------------------------------------------------------------------
@@ -173,6 +217,12 @@ def predict():
         path = os.path.join(UPLOAD_DIR, f.filename)
         f.save(path)
         img = cv2.imread(path)
+        if img is None:
+            return {"error": "Uploaded image could not be read", "filename": f.filename}, 400
+        try:
+            input_validation = validate_selected_fruit(img, fruit_type)
+        except FruitValidationError as e:
+            return {"error": str(e), "filename": f.filename}, 422
 
         try:
             label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
@@ -180,6 +230,7 @@ def predict():
             return {"error": str(e), "filename": f.filename}, 422
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
+        surface = _analyse_surface_and_save(img, bbox, f.filename)
 
         log_result(
             member=_member_tag("ab"),
@@ -189,6 +240,7 @@ def predict():
             filename=f.filename,
             annotated_path=annotated_rel,
             source="predict",
+            **_surface_db_fields(surface),
         )
 
         results.append({
@@ -196,6 +248,8 @@ def predict():
             "fruit": fruit_type,
             "ripeness": label,
             "confidence": round(confidence * 100, 1),
+            "input_validation": input_validation,
+            **_surface_payload(surface),
         })
 
     if len(results) == 1:
@@ -220,6 +274,12 @@ def predict_unified():
     path = os.path.join(UPLOAD_DIR, f.filename)
     f.save(path)
     img = cv2.imread(path)
+    if img is None:
+        return {"error": "Uploaded image could not be read", "filename": f.filename}, 400
+    try:
+        input_validation = validate_selected_fruit(img, fruit_type)
+    except FruitValidationError as e:
+        return {"error": str(e), "filename": f.filename}, 422
 
     if model_choice == "all_four":
         try:
@@ -228,6 +288,7 @@ def predict_unified():
             return {"error": str(e), "filename": f.filename}, 422
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
+        surface = _analyse_surface_and_save(img, bbox, f.filename)
 
         log_result(
             member="ensemble_all_four",
@@ -237,6 +298,7 @@ def predict_unified():
             filename=f.filename,
             annotated_path=annotated_rel,
             source="predict_unified",
+            **_surface_db_fields(surface),
         )
 
         return {
@@ -245,6 +307,8 @@ def predict_unified():
             "ripeness": label,
             "confidence": confidence,
             "per_member": per_member,
+            "input_validation": input_validation,
+            **_surface_payload(surface),
         }
 
     entry = PREDICTORS.get(model_choice)
@@ -257,6 +321,7 @@ def predict_unified():
         return {"error": str(e), "filename": f.filename}, 422
 
     annotated_rel = _save_annotated(img, bbox, f.filename)
+    surface = _analyse_surface_and_save(img, bbox, f.filename)
 
     log_result(
         member=_member_tag(model_choice),
@@ -266,6 +331,7 @@ def predict_unified():
         filename=f.filename,
         annotated_path=annotated_rel,
         source="predict_unified",
+        **_surface_db_fields(surface),
     )
 
     return {
@@ -275,6 +341,8 @@ def predict_unified():
         "confidence": round(confidence * 100, 1),
         "per_member": None,
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+        "input_validation": input_validation,
+        **_surface_payload(surface),
     }
 
 
@@ -338,6 +406,14 @@ def analyse():
             path = os.path.join(UPLOAD_DIR, f.filename)
             f.save(path)
             img = cv2.imread(path)
+            if img is None:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": "Uploaded image could not be read"})
+                continue
+            try:
+                input_validation = validate_selected_fruit(img, fruit_type)
+            except FruitValidationError as e:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
+                continue
 
             try:
                 label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
@@ -346,6 +422,7 @@ def analyse():
                 continue
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
+            surface = _analyse_surface_and_save(img, bbox, f.filename)
 
             log_result(
                 member=member_tag,
@@ -355,14 +432,18 @@ def analyse():
                 filename=f.filename,
                 annotated_path=annotated_rel,
                 source="analyse",
+                **_surface_db_fields(surface),
             )
 
             results.append({
                 "filename": f.filename,
+                "fruit": fruit_type,
                 "label": label,
                 "confidence": confidence,
                 "annotated_path": annotated_rel,
                 "per_member": per_member,
+                "input_validation": input_validation,
+                **_surface_payload(surface),
             })
     else:
         entry = PREDICTORS.get(model_choice)
@@ -378,6 +459,14 @@ def analyse():
             path = os.path.join(UPLOAD_DIR, f.filename)
             f.save(path)
             img = cv2.imread(path)
+            if img is None:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": "Uploaded image could not be read"})
+                continue
+            try:
+                input_validation = validate_selected_fruit(img, fruit_type)
+            except FruitValidationError as e:
+                results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
+                continue
 
             try:
                 label, confidence, bbox, cleaned, proba_dict = entry["fn"](img, fruit_type)
@@ -386,6 +475,7 @@ def analyse():
                 continue
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
+            surface = _analyse_surface_and_save(img, bbox, f.filename)
 
             log_result(
                 member=member_tag,
@@ -395,13 +485,17 @@ def analyse():
                 filename=f.filename,
                 annotated_path=annotated_rel,
                 source="analyse",
+                **_surface_db_fields(surface),
             )
 
             results.append({
                 "filename": f.filename,
+                "fruit": fruit_type,
                 "label": label,
                 "confidence": round(confidence * 100, 1),
                 "annotated_path": annotated_rel,
+                "input_validation": input_validation,
+                **_surface_payload(surface),
             })
 
     chart_path = generate_trend_chart(results, file_tag=model_choice) if results else None
@@ -410,9 +504,16 @@ def analyse():
     results_for_pdf = [
         {
             "filename": r.get("filename"),
+            "fruit": r.get("fruit"),
             "label": r.get("label"),
             "confidence": r.get("confidence"),
             "image_path": os.path.join(OUTPUTS_DIR, r["annotated_path"]) if r.get("annotated_path") else None,
+            "surface_image_path": os.path.join(OUTPUTS_DIR, r["surface_path"]) if r.get("surface_path") else None,
+            "fruit_area_px": r.get("fruit_area_px"),
+            "blemish_area_px": r.get("blemish_area_px"),
+            "blemish_percentage": r.get("blemish_percentage"),
+            "quality_grade": r.get("quality_grade", "Unknown"),
+            "surface_analysis_error": r.get("surface_analysis_error"),
         }
         for r in results
     ]
@@ -441,7 +542,17 @@ def extra_export_pdf():
     confidence = float(request.form["confidence"]) / 100
     image_path = request.form.get("image_path")
     model_tag = request.form.get("model_tag", "ab")
-    out_path = generate_pdf_report(image_path, label, confidence, model_tag=model_tag)
+    surface_data = {
+        "fruit": request.form.get("fruit"),
+        "surface_image_path": request.form.get("surface_image_path"),
+        "fruit_area_px": request.form.get("fruit_area_px", type=int),
+        "blemish_area_px": request.form.get("blemish_area_px", type=int),
+        "blemish_percentage": request.form.get("blemish_percentage", type=float),
+        "quality_grade": request.form.get("quality_grade") or "Unknown",
+    }
+    out_path = generate_pdf_report(
+        image_path, label, confidence, model_tag=model_tag, surface_data=surface_data
+    )
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 

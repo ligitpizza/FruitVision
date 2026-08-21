@@ -42,6 +42,8 @@
       <th>Fruit</th>
       <th>Result</th>
       <th>Confidence</th>
+      <th>Blemished Surface</th>
+      <th>Surface Quality</th>
       <th>Source</th>
       <th>Actions</th>
     </tr>
@@ -49,8 +51,10 @@
     <tr>
       <td>{{ r.created_at }}</td>
       <td>
-        {% if r.annotated_path %}
-          <img class="thumb" src="/outputs/{{ r.annotated_path }}" alt="">
+        {% if r.surface_path %}
+          <img class="thumb" src="/outputs/{{ r.surface_path }}" alt="Surface analysis overlay">
+        {% elif r.annotated_path %}
+          <img class="thumb" src="/outputs/{{ r.annotated_path }}" alt="Detected fruit">
         {% else %}
           {{ r.filename or '—' }}
         {% endif %}
@@ -59,6 +63,8 @@
       <td>{{ r.fruit.capitalize() }}</td>
       <td class="{{ r.label }}">{{ r.label.upper() }}</td>
       <td>{{ r.confidence }}%</td>
+      <td>{{ ('%.2f%%'|format(r.blemish_percentage)) if r.blemish_percentage is not none else 'Unknown' }}</td>
+      <td>{{ r.quality_grade or 'Unknown' }}</td>
       <td>{{ r.source }}</td>
       <td class="actions">
         <a href="/history/{{ r.id }}/edit">Edit</a>

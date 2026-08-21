@@ -19,6 +19,10 @@
       <div class="value">{{ stats.total }}</div>
       <div class="label">Total Predictions</div>
     </div>
+    <div class="card">
+      <div class="value">{{ ('%.2f%%'|format(stats.avg_blemish_percentage)) if stats.avg_blemish_percentage is not none else '—' }}</div>
+      <div class="label">Average Blemished Surface</div>
+    </div>
     {% for fruit, count in stats.by_fruit.items() %}
     <div class="card">
       <div class="value">{{ count }}</div>
@@ -55,6 +59,18 @@
     <tr><td>{{ fruit.capitalize() }}</td><td>{{ avg }}%</td></tr>
     {% endfor %}
   </table>
+
+  <h2>Surface Quality Breakdown</h2>
+  {% if stats.by_quality_grade %}
+  <table>
+    <tr><th>Project Grade</th><th>Count</th></tr>
+    {% for grade in ['Grade A', 'Grade B', 'Grade C'] %}
+    <tr><td>{{ grade }}</td><td>{{ stats.by_quality_grade.get(grade, 0) }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">No completed surface analyses yet.</p>
+  {% endif %}
 
   {% endif %}
 

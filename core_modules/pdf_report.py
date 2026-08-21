@@ -31,7 +31,26 @@ def _model_label(model_tag):
     return MODEL_LABELS.get(model_tag, f"Ensemble {model_tag.upper()}" if model_tag else "Unknown model")
 
 
-def generate_pdf_report(image_path, label, confidence, model_tag="ab", output_dir=None):
+def _write_surface_metrics(pdf, data):
+    """Write optional surface fields without presenting failed analysis as 0%."""
+    percentage = data.get("blemish_percentage") if data else None
+    if percentage is None:
+        pdf.cell(0, 10, "Surface quality: Unknown (analysis unavailable)", ln=True)
+        return
+    pdf.cell(0, 10, f"Visible fruit area: {data.get('fruit_area_px', 0):,} px", ln=True)
+    pdf.cell(0, 10, f"Detected blemish area: {data.get('blemish_area_px', 0):,} px", ln=True)
+    pdf.cell(0, 10, f"Blemished surface: {percentage:.2f}%", ln=True)
+    pdf.cell(0, 10, f"Surface quality: {data.get('quality_grade', 'Unknown')}", ln=True)
+
+
+def generate_pdf_report(
+    image_path,
+    label,
+    confidence,
+    model_tag="ab",
+    output_dir=None,
+    surface_data=None,
+):
     output_dir = output_dir or DEFAULT_OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -55,6 +74,17 @@ def generate_pdf_report(image_path, label, confidence, model_tag="ab", output_di
     pdf.set_font("Helvetica", "", 12)
     pdf.cell(0, 10, f"Confidence: {confidence * 100:.1f}%", ln=True)
     pdf.cell(0, 10, f"Model: {_model_label(model_tag)}", ln=True)
+    if surface_data and surface_data.get("fruit"):
+        pdf.cell(0, 10, f"Fruit: {surface_data['fruit'].capitalize()}", ln=True)
+
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 10, "Surface Analysis", ln=True)
+    pdf.set_font("Helvetica", "", 12)
+    _write_surface_metrics(pdf, surface_data or {})
+    surface_image_path = (surface_data or {}).get("surface_image_path")
+    if surface_image_path and os.path.exists(surface_image_path):
+        pdf.ln(2)
+        pdf.image(surface_image_path, w=100)
 
     pdf.output(out_path)
     return out_path
@@ -99,9 +129,17 @@ def generate_pdf_report_batch(results, model_tag="ab", output_dir=None):
             pdf.ln(4)
 
         pdf.set_font("Helvetica", "B", 13)
+        if r.get("fruit"):
+            pdf.cell(0, 10, f"Fruit: {r['fruit'].capitalize()}", ln=True)
         pdf.cell(0, 10, f"Ripeness: {r['label'].upper()}", ln=True)
         pdf.set_font("Helvetica", "", 12)
         pdf.cell(0, 10, f"Confidence: {r['confidence']:.1f}%", ln=True)
+        _write_surface_metrics(pdf, r)
+
+        surface_image_path = r.get("surface_image_path")
+        if surface_image_path and os.path.exists(surface_image_path):
+            pdf.ln(2)
+            pdf.image(surface_image_path, w=100)
 
     pdf.output(out_path)
     return out_path

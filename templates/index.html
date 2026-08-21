@@ -132,6 +132,20 @@
             <br>Confidence: ${data.confidence}%
             <br><small>Model: ${data.model}</small>
           `;
+          if (data.blemish_percentage !== null) {
+            html += `
+              <br>Blemished Surface: <strong>${data.blemish_percentage.toFixed(2)}%</strong>
+              <br>Surface Quality: <strong>${data.quality_grade}</strong>
+            `;
+            if (data.surface_path) {
+              html += `<div class="surface-preview"><img src="/outputs/${encodeURI(data.surface_path)}" alt="Surface analysis overlay"></div>`;
+            }
+          } else {
+            html += `<br>Surface Quality: <strong>Unknown</strong>`;
+            if (data.surface_analysis_error) {
+              html += `<br><small>${data.surface_analysis_error}</small>`;
+            }
+          }
           if (data.per_member) {
             html += `<div class="per-member"><strong>Per-model breakdown (soft-voted):</strong><table>`;
             for (const [member, r] of Object.entries(data.per_member)) {

@@ -37,15 +37,17 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, "member_4_da"))
 # --- Pure-YOLO pipeline (5th, independent predictor -- NOT part of the
 #     4-member soft-voted ensemble; see pipeline/pure_yolo/ for rationale) --
 sys.path.append(os.path.join(BASE_DIR, "pipeline", "pure_yolo"))
+# --- Merged 1+4 (feature-level fusion of member 1's colour+shape and
+#     member 4's gabor+colour into ONE SVM; see member_apps/merged_member_1_4) --
+sys.path.append(os.path.join(MEMBER_APPS_DIR, "merged_member_1_4"))
 
 from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
 from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
 from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ripeness, NotAFruitError as M3NotAFruitError
 from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
-from pipeline.pure_yolo.yolo_cls_predict import (
-    predict_ripeness as yolo_pure_predict_ripeness,
-    NotAFruitError as YoloPureNotAFruitError,
-)
+from member_apps.merged_member_1_4.m14_predict import predict_ripeness as m14_predict_ripeness, NotAFruitError as M14NotAFruitError
+
+from yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
 
 # --- 4-member ensemble (soft-voting across all members) -----------------
 from member_apps.predict_ensemble import predict_ensemble
@@ -189,13 +191,25 @@ PREDICTORS = {
         "not_fruit_err": YoloPureNotAFruitError,
         "label": "YOLOv8 Classification (pure CNN, no SVM)",
     },
+    "merged_1_4": {
+        "fn": m14_predict_ripeness,
+        "not_fruit_err": M14NotAFruitError,
+        "label": "Merged 1+4 (Colour + Shape + Gabor, single SVM)",
+    },
 }
 MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
+
+# Model keys that don't follow the "ensemble_<key>" DB/chart tag convention
+# (used by ab/bc/cd/da, the 4 members that make up the all_four soft-vote).
+_MEMBER_TAG_OVERRIDES = {
+    "yolo_pure": "yolo_pure",
+    "merged_1_4": "merged_1_4",
+}
 
 
 def _member_tag(model_key):
     """DB `member` column value + chart filename tag for a given model key."""
-    return f"ensemble_{model_key}" if model_key != "yolo_pure" else "yolo_pure"
+    return _MEMBER_TAG_OVERRIDES.get(model_key, f"ensemble_{model_key}")
 
 
 @app.route("/outputs/<path:filename>")

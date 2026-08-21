@@ -37,7 +37,7 @@
         {% for m in models %}
           <button type="button" class="model-btn {{ 'selected' if m == default_model }}"
                   data-model="{{ m }}" onclick="selectModel('{{ m }}')">
-            {% if m == 'all_four' %}Ensemble (All 4){% else %}Ensemble {{ m|upper }}{% endif %}
+            {% if m == 'all_four' %}Ensemble (All 4){% else %}{{ predictors[m].label }}{% endif %}
           </button>
         {% endfor %}
       </div>

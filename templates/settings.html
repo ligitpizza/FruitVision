@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Settings — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Manage default model, review threshold, and account security.</p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:20px; align-items:start;">
+  <div class="card">
+    <h3>Vision Model Configuration</h3>
+    <p class="field-hint">Applies app-wide — shared by every user, not just you.</p>
+    <form method="post" action="/settings">
+      <input type="hidden" name="form" value="model_config">
+      <label for="default_model">Default model (preselected on Fruit Classification)</label>
+      <select id="default_model" name="default_model">
+        {% for key, entry in predictors.items() %}
+        <option value="{{ key }}" {{ 'selected' if key == settings.default_model }}>{{ entry.label }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="confidence_threshold">Confidence threshold — {{ settings.confidence_threshold }}%</label>
+      <input type="range" id="confidence_threshold" name="confidence_threshold" min="0" max="100" step="5"
+             value="{{ settings.confidence_threshold }}"
+             oninput="document.getElementById('threshold-out').textContent = this.value">
+      <p class="field-hint">Predictions below <span id="threshold-out">{{ settings.confidence_threshold }}</span>% confidence are flagged for review in Harvest Records. Set to 0 to disable.</p>
+
+      <button type="submit" style="margin-top:16px;">Save Configuration</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Account Security</h3>
+    <p class="field-hint">Change the password for {{ g.user.email }}.</p>
+    <form method="post" action="/settings">
+      <input type="hidden" name="form" value="password">
+      <label for="current_password">Current password</label>
+      <input type="password" id="current_password" name="current_password" required>
+
+      <label for="new_password">New password</label>
+      <input type="password" id="new_password" name="new_password" required minlength="6">
+
+      <button type="submit" class="btn-outline" style="margin-top:16px;">Update Password</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

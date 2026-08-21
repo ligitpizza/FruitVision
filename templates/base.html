@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FruitVision{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="logo">FV</span> FruitVision</div>
+      <nav>
+        <a href="/" class="{{ 'active' if active_page == 'dashboard' }}">Dashboard</a>
+        <a href="/classify" class="{{ 'active' if active_page == 'classify' }}">Fruit Classification</a>
+        <a href="/history" class="{{ 'active' if active_page == 'history' }}">Harvest Records</a>
+        {% if g.user and g.user.role == 'admin' %}
+        <a href="/admin" class="{{ 'active' if active_page == 'admin' }}">Admin Panel</a>
+        {% endif %}
+        <a href="/settings" class="{{ 'active' if active_page == 'settings' }}">Settings</a>
+        <a href="/profile" class="{{ 'active' if active_page == 'profile' }}">Profile</a>
+      </nav>
+      <div class="status-chip">
+        <div class="row"><span class="dot"></span> SYSTEM ACTIVE</div>
+        <div class="node">Node: FRUITVISION-01</div>
+      </div>
+    </aside>
+
+    <div class="main-area">
+      <div class="topbar">
+        <div class="search"><span>Search predictions, models…</span></div>
+        <div class="right">
+          {% if g.user %}
+          {% set role_labels = {'admin': 'Admin', 'farmer': 'Farmer'} %}
+          <a class="user" href="/profile">
+            <span class="avatar">{{ g.user.name[:1]|upper }}</span>
+            <span class="who">
+              <span class="name">{{ g.user.name }}</span>
+              <span class="role">{{ role_labels.get(g.user.role, g.user.role|capitalize) }}</span>
+            </span>
+          </a>
+          <form class="logout-form" method="post" action="/logout">
+            <button type="submit" class="logout-btn">Log out</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="page">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

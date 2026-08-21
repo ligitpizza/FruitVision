@@ -9,7 +9,7 @@ dashboard, reads/writes through this single module + table.
 """
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DB_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(DB_DIR, "fruitvision.db")
@@ -20,11 +20,11 @@ def _connect():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_paginated(member=None, fruit=None, page=1, per_page=20):
+def get_paginated(member=None, fruit=None, user_id=None, page=1, per_page=20):
     """
-    Fetch a page of results, optionally filtered by member and/or fruit.
-    Returns (rows, total) where rows is a list of dicts for the requested
-    page and total is the count of all rows matching the filters.
+    Fetch a page of results, optionally filtered by member, fruit, and/or
+    owning user. Returns (rows, total) where rows is a list of dicts for the
+    requested page and total is the count of all rows matching the filters.
     """
     page = max(page, 1)
     per_page = max(per_page, 1)
@@ -40,6 +40,9 @@ def get_paginated(member=None, fruit=None, page=1, per_page=20):
     if fruit:
         where_clauses.append("fruit = ?")
         params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     total = conn.execute(
@@ -100,16 +103,32 @@ def delete_result(result_id):
     return deleted
 
 
-def get_stats(member=None):
+def get_stats(member=None, fruit=None, user_id=None, since_hours=None):
     """
-    Summary stats for a dashboard, optionally filtered by member.
-    Returns a dict: total count, counts per label, counts per fruit,
-    overall average confidence, and average confidence per fruit.
+    Summary stats for a dashboard, optionally filtered by member, fruit,
+    user, and/or a rolling time window (since_hours). Returns a dict: total
+    count, counts per label, counts per fruit, overall average confidence,
+    average confidence per fruit, and average inference latency.
     """
     conn = _connect()
 
-    where_sql = "WHERE member = ?" if member else ""
-    params = (member,) if member else ()
+    where_clauses = []
+    params = []
+    if member:
+        where_clauses.append("member = ?")
+        params.append(member)
+    if fruit:
+        where_clauses.append("fruit = ?")
+        params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    if since_hours is not None:
+        cutoff = (datetime.now() - timedelta(hours=since_hours)).isoformat(timespec="seconds")
+        where_clauses.append("created_at >= ?")
+        params.append(cutoff)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    params = tuple(params)
 
     total = conn.execute(
         f"SELECT COUNT(*) FROM results {where_sql}", params
@@ -119,6 +138,11 @@ def get_stats(member=None):
         f"SELECT AVG(confidence) FROM results {where_sql}", params
     ).fetchone()
     avg_confidence = round(avg_confidence_row[0], 2) if avg_confidence_row[0] is not None else 0
+
+    avg_latency_row = conn.execute(
+        f"SELECT AVG(latency_ms) FROM results {where_sql}", params
+    ).fetchone()
+    avg_latency_ms = round(avg_latency_row[0], 1) if avg_latency_row[0] is not None else None
 
     label_rows = conn.execute(
         f"SELECT label, COUNT(*) as cnt FROM results {where_sql} GROUP BY label", params
@@ -156,12 +180,18 @@ def get_stats(member=None):
     return {
         "total": total,
         "avg_confidence": avg_confidence,
+        "avg_latency_ms": avg_latency_ms,
         "by_label": by_label,
         "by_fruit": by_fruit,
         "avg_confidence_by_fruit": avg_confidence_by_fruit,
         "avg_blemish_percentage": avg_blemish_percentage,
         "by_quality_grade": by_quality_grade,
     }
+
+
+def get_stats_since(hours=24, member=None, user_id=None):
+    """Convenience wrapper: stats for the rolling window, e.g. 'last 24h'."""
+    return get_stats(member=member, user_id=user_id, since_hours=hours)
 
 def init_db():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -181,7 +211,10 @@ def init_db():
             quality_grade TEXT,
             surface_path TEXT,
             source TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            user_id INTEGER,
+            latency_ms REAL,
+            flagged INTEGER DEFAULT 0
         )
     """)
     # Compatibility migration for databases created by earlier versions.
@@ -196,6 +229,9 @@ def init_db():
         "blemish_percentage": "REAL",
         "quality_grade": "TEXT",
         "surface_path": "TEXT",
+        "user_id": "INTEGER",
+        "latency_ms": "REAL",
+        "flagged": "INTEGER DEFAULT 0",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:
@@ -217,6 +253,9 @@ def log_result(
     blemish_percentage=None,
     quality_grade=None,
     surface_path=None,
+    user_id=None,
+    latency_ms=None,
+    flagged=0,
 ):
     """Insert one prediction result. Call this right after predict_ripeness() returns."""
     conn = _connect()
@@ -224,31 +263,58 @@ def log_result(
         """INSERT INTO results (
                member, filename, fruit, label, confidence, annotated_path,
                fruit_area_px, blemish_area_px, blemish_percentage,
-               quality_grade, surface_path, source, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               quality_grade, surface_path, source, created_at,
+               user_id, latency_ms, flagged
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             member, filename, fruit, label, confidence, annotated_path,
             fruit_area_px, blemish_area_px, blemish_percentage,
             quality_grade, surface_path, source,
             datetime.now().isoformat(timespec="seconds"),
+            user_id, latency_ms, int(bool(flagged)),
         ),
     )
     conn.commit()
     conn.close()
 
 
-def get_recent(member=None, limit=50):
-    """Fetch most recent results, optionally filtered by member (e.g. 'ensemble_ab')."""
+def get_all(member=None, fruit=None, user_id=None):
+    """Unpaginated fetch, for CSV export. Same filters as get_paginated."""
     conn = _connect()
+    where_clauses = []
+    params = []
     if member:
-        rows = conn.execute(
-            "SELECT * FROM results WHERE member = ? ORDER BY id DESC LIMIT ?",
-            (member, limit),
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM results ORDER BY id DESC LIMIT ?", (limit,)
-        ).fetchall()
+        where_clauses.append("member = ?")
+        params.append(member)
+    if fruit:
+        where_clauses.append("fruit = ?")
+        params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM results {where_sql} ORDER BY id DESC", params
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_recent(member=None, user_id=None, limit=50):
+    """Fetch most recent results, optionally filtered by member (e.g. 'ensemble_ab') and/or owning user."""
+    conn = _connect()
+    where_clauses = []
+    params = []
+    if member:
+        where_clauses.append("member = ?")
+        params.append(member)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM results {where_sql} ORDER BY id DESC LIMIT ?", (*params, limit)
+    ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 

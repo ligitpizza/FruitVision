@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Fruit Classification — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Fruit Classification</h1>
+    <p>Upload a photo for immediate ripeness evaluation, or run a batch.</p>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:20px; align-items:start;">
+  <div class="card">
+    <h3>Single Fruit Analysis</h3>
+    <p class="field-hint">Upload a fruit photo to check its ripeness.</p>
+
+    <label for="fruit">Select Fruit</label>
+    <select id="fruit">
+      {% for fruit in fruits %}
+      <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="imageInput">Upload Image</label>
+    <input type="file" id="imageInput" accept="image/*">
+    <img id="preview" style="max-width:100%; margin-top:14px; border-radius:10px; display:none;">
+
+    <button onclick="submitImage()" style="margin-top:16px;">Check Ripeness</button>
+
+    <div id="result" style="margin-top:18px; padding:16px; border-radius:10px; font-size:1rem; display:none;"></div>
+  </div>
+
+  <div class="stack-sm">
+    <div class="card">
+      <h3>Model Ensemble</h3>
+      <p class="field-hint">Pick which predictor runs the single-image check above.</p>
+      <div style="margin-top:12px;">
+        {% for m in models %}
+          <button type="button" class="model-btn {{ 'selected' if m == default_model }}"
+                  data-model="{{ m }}" onclick="selectModel('{{ m }}')">
+            {% if m == 'all_four' %}Ensemble (All 4){% else %}Ensemble {{ m|upper }}{% endif %}
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+    <a class="card" href="/realtime" style="display:block; text-decoration:none;">
+      <div class="row-between">
+        <div>
+          <h3 style="margin:0;">Real-time Block Analysis</h3>
+          <p class="field-hint">Live webcam / video tracking demo →</p>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<h2>Batch Analysis</h2>
+<p>Upload multiple photos of the same fruit to see a distribution chart and export a PDF report.</p>
+<div class="card">
+  <form action="/analyse" method="post" enctype="multipart/form-data">
+    <div class="grid grid-3" style="align-items:end;">
+      <div>
+        <label for="fruit_type">Select Fruit</label>
+        <select name="fruit_type" id="fruit_type">
+          {% for fruit in fruits %}
+          <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="model">Select Model</label>
+        <select name="model" id="model">
+          {% for key, entry in predictors.items() %}
+          <option value="{{ key }}" {{ 'selected' if key == default_model }}>{{ entry.label }}</option>
+          {% endfor %}
+          <option value="all_four">Ensemble (All 4 members, soft-voted)</option>
+        </select>
+      </div>
+      <div>
+        <label for="images">Upload Images (multiple)</label>
+        <input type="file" id="images" name="images" accept="image/*" multiple required>
+      </div>
+    </div>
+    <button type="submit" style="margin-top:16px;">Analyse Batch</button>
+  </form>
+</div>
+
+<h2>Per-Member Dashboards</h2>
+<p class="dashboard-links">
+  {% for key, entry in predictors.items() %}
+    <a href="/dashboard/{{ key }}">{{ entry.label }} — Dashboard</a>
+    <a href="/training-report/{{ key }}">{{ key|upper }} — Training Report</a>
+  {% endfor %}
+  <a href="/dashboard/all_four">Ensemble (All 4) — Dashboard</a>
+</p>
+
+<script>
+  let selectedModel = "{{ default_model }}";
+
+  function selectModel(model) {
+    selectedModel = model;
+    document.querySelectorAll(".model-btn").forEach(btn => {
+      btn.classList.toggle("selected", btn.dataset.model === model);
+    });
+  }
+
+  document.getElementById("imageInput").addEventListener("change", function () {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const preview = document.getElementById("preview");
+      preview.src = e.target.result;
+      preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  async function submitImage() {
+    const fruit = document.getElementById("fruit").value;
+    const file = document.getElementById("imageInput").files[0];
+    const resultDiv = document.getElementById("result");
+
+    if (!file) { alert("Please select an image first."); return; }
+
+    const formData = new FormData();
+    formData.append("fruit", fruit);
+    formData.append("model", selectedModel);
+    formData.append("image", file);
+
+    resultDiv.style.display = "none";
+    resultDiv.className = "";
+    resultDiv.textContent = "Analysing...";
+    resultDiv.style.display = "block";
+
+    try {
+      const res = await fetch("/predict_unified", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.error) {
+        resultDiv.className = "";
+        resultDiv.textContent = `Error: ${data.error}`;
+      } else {
+        resultDiv.className = data.ripeness + "-bg";
+        resultDiv.style.background = data.ripeness === "ripe" ? "var(--ripe-bg)" : data.ripeness === "unripe" ? "var(--unripe-bg)" : "var(--rotten-bg)";
+        resultDiv.style.color = data.ripeness === "ripe" ? "var(--ripe)" : data.ripeness === "unripe" ? "var(--unripe)" : "var(--rotten)";
+        let html = `
+          <strong>${data.fruit.charAt(0).toUpperCase() + data.fruit.slice(1)}</strong> is
+          <strong>${data.ripeness.toUpperCase()}</strong>
+          <br>Confidence: ${data.confidence}%
+          <br><small>Model: ${data.model}</small>
+        `;
+        if (data.per_member) {
+          html += `<div class="per-member"><strong>Per-model breakdown (soft-voted):</strong><table>`;
+          for (const [member, r] of Object.entries(data.per_member)) {
+            if (r.error) {
+              html += `<tr><td>${member}</td><td colspan="2">skipped — ${r.error}</td></tr>`;
+            } else {
+              html += `<tr><td>${member}</td><td>${r.label}</td><td>${r.confidence}%</td></tr>`;
+            }
+          }
+          html += `</table></div>`;
+        } else if (data.proba) {
+          html += `<div class="per-member"><strong>Class probabilities:</strong><table>`;
+          for (const [cls, p] of Object.entries(data.proba)) {
+            html += `<tr><td>${cls}</td><td>${p}%</td></tr>`;
+          }
+          html += `</table></div>`;
+        }
+        if (data.blemish_percentage !== null && data.blemish_percentage !== undefined) {
+          html += `
+            <br>Blemished Surface: <strong>${Number(data.blemish_percentage).toFixed(2)}%</strong>
+            <br>Surface Quality: <strong>${data.quality_grade}</strong>
+          `;
+          if (data.surface_path) {
+            html += `<div class="surface-preview"><img src="/outputs/${encodeURI(data.surface_path)}" alt="Surface analysis overlay" style="max-width:100%; margin-top:12px; border-radius:10px;"></div>`;
+          }
+        } else {
+          html += `<br>Surface Quality: <strong>Unknown</strong>`;
+          if (data.surface_analysis_error) {
+            html += `<br><small>${data.surface_analysis_error}</small>`;
+          }
+        }
+        resultDiv.innerHTML = html;
+      }
+    } catch (err) {
+      resultDiv.textContent = "Server error. Is Flask running?";
+    }
+  }
+</script>
+{% endblock %}

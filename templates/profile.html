@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Profile — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow" style="margin-bottom:6px;">ID: U-{{ '%03d'|format(g.user.id) }}</p>
+    <h1>{{ g.user.name }}</h1>
+  </div>
+</div>
+
+<div class="grid grid-2" style="margin-top:20px; align-items:start;">
+  <div class="stack-sm">
+    <div class="card" style="text-align:center;">
+      <div style="width:64px; height:64px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.4rem; margin:0 auto 10px;">
+        {{ g.user.name[:1]|upper }}
+      </div>
+      <div style="font-weight:800; font-size:1.05rem;">{{ g.user.name }}</div>
+      <div style="color:var(--ink-faint); font-size:0.85rem;">{{ g.user.email }}</div>
+      {% set role_labels = {'admin': 'Admin', 'farmer': 'Farmer'} %}
+      <div style="margin-top:10px;">
+        <span class="badge {{ 'admin' if g.user.role == 'admin' else 'neutral' }}">{{ role_labels.get(g.user.role, g.user.role|capitalize) }}</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Edit Profile</h3>
+      <form method="post" action="/profile">
+        <input type="hidden" name="form" value="name">
+        <label for="name">Display name</label>
+        <input type="text" id="name" name="name" value="{{ g.user.name }}" required>
+        <button type="submit" class="btn-outline" style="margin-top:14px;">Save Changes</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Change Password</h3>
+      <form method="post" action="/settings">
+        <input type="hidden" name="form" value="password">
+        <label for="current_password">Current password</label>
+        <input type="password" id="current_password" name="current_password" required>
+        <label for="new_password">New password</label>
+        <input type="password" id="new_password" name="new_password" required minlength="6">
+        <button type="submit" class="btn-outline" style="margin-top:14px;">Update Password</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="stack-sm">
+    <div class="card">
+      <h3>My Stats</h3>
+      <div class="grid grid-3" style="margin-top:12px;">
+        <div>
+          <div class="eyebrow">Predictions run</div>
+          <div style="font-size:1.4rem; font-weight:800;">{{ my_stats.total }}</div>
+        </div>
+        <div>
+          <div class="eyebrow">Avg confidence</div>
+          <div style="font-size:1.4rem; font-weight:800;">{{ my_stats.avg_confidence }}%</div>
+        </div>
+        <div>
+          <div class="eyebrow">Member since</div>
+          <div style="font-size:1.4rem; font-weight:800;">{{ g.user.created_at[:10] }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Recent Activity</h3>
+      <div class="stack-sm" style="margin-top:12px;">
+        {% for entry in my_activity %}
+        <div style="border-bottom:1px solid var(--border); padding-bottom:8px;">
+          <div style="font-size:0.85rem;">{{ entry.action }}{% if entry.detail %} <span style="color:var(--ink-faint);">({{ entry.detail }})</span>{% endif %}</div>
+          <div style="font-size:0.72rem; color:var(--ink-faint); font-family:var(--font-mono);">{{ entry.created_at }}</div>
+        </div>
+        {% else %}
+        <p class="empty">No activity yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -13,6 +13,7 @@ from m4_train_report import (
     plot_confusion_matrix,
     plot_class_distribution,
     plot_accuracy_summary,
+    save_classification_report,
     save_training_time,
     format_duration,
 )
@@ -94,6 +95,7 @@ if __name__ == "__main__":
 
         accuracies[fruit] = accuracy_score(y_test, y_pred)
         plot_confusion_matrix(y_test, y_pred, classes=CLASSES, fruit=fruit)
+        save_classification_report(y_test, y_pred, classes=CLASSES, fruit=fruit)
 
         clf.fit(X_scaled, y)
 

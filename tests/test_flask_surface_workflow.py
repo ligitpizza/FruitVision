@@ -69,10 +69,12 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                 log_result=lambda **kwargs: logged.append(kwargs),
                 get_recent=lambda *args, **kwargs: [],
                 get_paginated=lambda *args, **kwargs: ([], 0),
+                get_all=lambda *args, **kwargs: [],
                 get_by_id=lambda *args, **kwargs: None,
                 update_result=lambda *args, **kwargs: False,
                 delete_result=lambda *args, **kwargs: False,
                 get_stats=lambda *args, **kwargs: {},
+                get_stats_since=lambda *args, **kwargs: {},
             ),
         }
         realtime_module = _module(realtime_bp=Blueprint("realtime_test", __name__))
@@ -84,6 +86,10 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             )
             app_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(app_module)
+
+        # Authentication is covered separately; this test isolates the
+        # classification, surface-analysis, and persistence workflow.
+        app_module.PUBLIC_PATHS.add("/predict_unified")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             app_module.UPLOAD_DIR = os.path.join(temp_dir, "uploads")

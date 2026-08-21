@@ -294,3 +294,25 @@ table.time-table th, table.time-table td { padding: 6px 14px; }
 }
 .controls { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
 .control-group { flex: 1; min-width: 200px; }
+
+/* ---------- Dark mode (realtime page only) ----------
+   A bright white page next to/behind a webcam during live detection can
+   throw off exposure/white-balance and reflect onto the fruit. Toggled via
+   body.dark-mode (see realtime.html); overriding these 4 variables is
+   enough since every rule above already reads colour through them. */
+body.dark-mode {
+  --ink: #e7ede8;
+  --ink-dim: #a7b6ac;
+  --ink-faint: #78877e;
+  --paper: #11150f;
+  --card: #1a1f18;
+  --border: #2c332a;
+}
+body.dark-mode .charts img, body.dark-mode .graph-row img { background: #1a1f18; }
+
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+  border: 1px solid var(--border); background: var(--card); color: var(--ink);
+  border-radius: 999px; cursor: pointer; font-size: 0.85rem; font-weight: 600;
+}
+.theme-toggle:hover { background: var(--paper); }

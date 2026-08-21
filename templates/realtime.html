@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Real-Time Tracking — FruitVision{% endblock %}
 {% block content %}
-<h1>Real-Time Fruit Tracking</h1>
-<p class="subtitle">YOLO detection + tracking, feeding crops into a ripeness classifier. Standalone demo — separate from the graded per-member pipeline.</p>
+<div class="page-head">
+  <div>
+    <h1>Real-Time Fruit Tracking</h1>
+    <p class="subtitle">YOLO detection + tracking, feeding crops into a ripeness classifier. Standalone demo — separate from the graded per-member pipeline.</p>
+  </div>
+  <button type="button" id="theme-toggle" class="theme-toggle" onclick="toggleDarkMode()">🌙 Dark mode</button>
+</div>
+<p class="field-hint">A bright page background can reflect onto the fruit or throw off your webcam's exposure/white balance — toggle dark mode to reduce that while detecting.</p>
 
 <div class="card">
   <div class="controls">
@@ -24,6 +30,7 @@
         <option value="ensemble_bc">Ensemble BC only (Shape + Texture)</option>
         <option value="ensemble_cd">Ensemble CD only (Texture + Gabor)</option>
         <option value="ensemble_da">Ensemble DA only (Gabor + Colour)</option>
+        <option value="merged_1_4">Merged 1+4 (Colour + Shape + Gabor, single SVM)</option>
         <option value="yolo_cls">Pure YOLO (YOLOv8-cls, no SVM)</option>
       </select>
     </div>
@@ -65,11 +72,27 @@
   const HISTORY_MEMBER_TAG = {
     svm: "realtime_yolo",
     yolo_cls: "yolo_pure_realtime",
-    "ensemble_ab_realtime": "Real-Time YOLO Tracking + Ensemble AB (Colour + Shape)",
-    "ensemble_bc_realtime": "Real-Time YOLO Tracking + Ensemble BC (Shape + Texture)",
-    "ensemble_cd_realtime": "Real-Time YOLO Tracking + Ensemble CD (Texture + Gabor)",
-    "ensemble_da_realtime": "Real-Time YOLO Tracking + Ensemble DA (Gabor + Colour)",
+    ensemble_ab: "ensemble_ab_realtime",
+    ensemble_bc: "ensemble_bc_realtime",
+    ensemble_cd: "ensemble_cd_realtime",
+    ensemble_da: "ensemble_da_realtime",
+    merged_1_4: "merged_1_4_realtime",
   };
+
+  const THEME_KEY = "fruitvision_realtime_theme";
+
+  function applyTheme(theme) {
+    document.body.classList.toggle("dark-mode", theme === "dark");
+    document.getElementById("theme-toggle").textContent = theme === "dark" ? "☀️ Light mode" : "🌙 Dark mode";
+  }
+
+  function toggleDarkMode() {
+    const next = document.body.classList.contains("dark-mode") ? "light" : "dark";
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  }
+
+  applyTheme(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
 
   function switchTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));

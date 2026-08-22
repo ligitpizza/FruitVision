@@ -6,11 +6,13 @@ in mX_train_report.py) into one side-by-side comparison.
 Place this file at the PROJECT ROOT (same level as train_all.py).
 
 Run this AFTER train_all.py, once every member's *_classification_report.json
-exists under outputs/training/{ab,bc,cd,da}/.
+exists under outputs/training/{ab,bc,cd,da,merged_1_4}/.
 
-Scope: the 4-member SVM ensemble only (ab/bc/cd/da). The pure-YOLOv8-cls
-pipeline is intentionally excluded -- it's a fully independent 5th predictor,
-not part of the soft-voted ensemble this data is meant to support.
+Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus merged_1_4 (the
+feature-level fusion of member 1 + member 4 into one SVM). The
+pure-YOLOv8-cls pipeline is intentionally excluded -- it's a fully
+independent 5th predictor, not part of the soft-voted ensemble this data
+is meant to support.
 
 Usage:
     python analyze_member_performance.py
@@ -22,21 +24,27 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 TRAINING_DIR = PROJECT_ROOT / "outputs" / "training"
 
-MEMBER_TAGS = ["ab", "bc", "cd", "da"]
+MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4"]
 MEMBER_LABELS = {
     "ab": "M1 (colour+shape)",
     "bc": "M2 (shape+texture)",
     "cd": "M3 (texture+gabor)",
     "da": "M4 (gabor+colour)",
+    "merged_1_4": "M1+4 (colour+shape+gabor)",
 }
 MEMBER_FOLDER = {
     "ab": "member_1_ab", "bc": "member_2_bc",
     "cd": "member_3_cd", "da": "member_4_da",
+    "merged_1_4": "merged_member_1_4",
 }
 MEMBER_SCRIPT = {
     "ab": "m1_train.py", "bc": "m2_train.py",
     "cd": "m3_train.py", "da": "m4_train.py",
+    "merged_1_4": "m14_train.py",
 }
+# Column width derived from the longest label instead of a hardcoded 22, so
+# merged_1_4's longer label doesn't misalign the console tables.
+COL_WIDTH = max(22, max(len(l) for l in MEMBER_LABELS.values()) + 3)
 FRUITS = ["apple", "banana", "orange", "mango"]
 CLASSES = ["ripe", "rotten", "unripe"]  # matches CLASSES in every mX_train.py
 
@@ -69,28 +77,28 @@ def main():
                 if cls in report["per_class"]:
                     consolidated[fruit][cls][tag] = report["per_class"][cls]
 
-    # --- console table: overall accuracy, all 4 members side by side ---
+    # --- console table: overall accuracy, all members side by side ---
     print("\n=== Overall accuracy by member, per fruit ===")
-    header = f"{'Fruit':<10}" + "".join(f"{MEMBER_LABELS[t]:>22}" for t in MEMBER_TAGS)
+    header = f"{'Fruit':<10}" + "".join(f"{MEMBER_LABELS[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
     print(header)
     for fruit in FRUITS:
         row = f"{fruit.capitalize():<10}"
         for tag in MEMBER_TAGS:
             acc = accuracy_by_member[fruit].get(tag)
-            row += f"{acc * 100:>21.1f}%" if acc is not None else f"{'—':>22}"
+            row += f"{acc * 100:>{COL_WIDTH - 1}.1f}%" if acc is not None else f"{'—':>{COL_WIDTH}}"
         print(row)
 
-    # --- console table: per-class recall, all 4 members side by side ---
+    # --- console table: per-class recall, all members side by side ---
     print("\n=== Per-class recall by member ===")
     for fruit in FRUITS:
         print(f"\n-- {fruit.capitalize()} --")
-        header = f"{'Class':<10}" + "".join(f"{MEMBER_LABELS[t]:>22}" for t in MEMBER_TAGS)
+        header = f"{'Class':<10}" + "".join(f"{MEMBER_LABELS[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
         print(header)
         for cls in CLASSES:
             row = f"{cls:<10}"
             for tag in MEMBER_TAGS:
                 metrics = consolidated[fruit][cls].get(tag)
-                row += f"{metrics['recall'] * 100:>21.1f}%" if metrics else f"{'—':>22}"
+                row += f"{metrics['recall'] * 100:>{COL_WIDTH - 1}.1f}%" if metrics else f"{'—':>{COL_WIDTH}}"
             print(row)
 
     if missing:

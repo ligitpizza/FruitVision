@@ -16,6 +16,8 @@ member_apps/member_3_cd/uploads/
 member_apps/member_4_da/uploads/
 
 fruitvision.db
+trained_logs/
+trained_models/
 
 outputs/annotated/
 outputs/reports/

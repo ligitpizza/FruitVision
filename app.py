@@ -45,6 +45,10 @@ sys.path.append(os.path.join(MEMBER_APPS_DIR, "merged_member_1_4"))
 # --- Merged 1+4 v2 (same idea, plus texture (C) on top -- colour+shape+
 #     gabor+texture; see member_apps/merged_member_1_4_v2) --
 sys.path.append(os.path.join(MEMBER_APPS_DIR, "merged_member_1_4_v2"))
+# --- Merged 1+4 v3 (same 4-feature set as v2, but detection combines
+#     member 1's Otsu box + member 4's HSV-saturation box (union) and
+#     calibration uses member 4's deskew; see member_apps/merged_member_1_4_v3) --
+sys.path.append(os.path.join(MEMBER_APPS_DIR, "merged_member_1_4_v3"))
 
 from member_apps.member_1_ab.m1_predict import predict_ripeness as m1_predict_ripeness, NotAFruitError as M1NotAFruitError
 from member_apps.member_2_bc.m2_predict import predict_ripeness as m2_predict_ripeness, NotAFruitError as M2NotAFruitError
@@ -52,6 +56,7 @@ from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ri
 from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
 from member_apps.merged_member_1_4.m14_predict import predict_ripeness as m14_predict_ripeness, NotAFruitError as M14NotAFruitError
 from member_apps.merged_member_1_4_v2.m14v2_predict import predict_ripeness as m14v2_predict_ripeness, NotAFruitError as M14v2NotAFruitError
+from member_apps.merged_member_1_4_v3.m14v3_predict import predict_ripeness as m14v3_predict_ripeness, NotAFruitError as M14v3NotAFruitError
 
 from pipeline.pure_yolo.yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
 
@@ -208,6 +213,11 @@ PREDICTORS = {
         "not_fruit_err": M14v2NotAFruitError,
         "label": "Merged 1+4 v2 (Colour + Shape + Gabor + Texture, single SVM)",
     },
+    "m14v3": {
+        "fn": m14v3_predict_ripeness,
+        "not_fruit_err": M14v3NotAFruitError,
+        "label": "Merged 1+4 v3 (Otsu+HSV union detect, deskew calibrate, Colour + Shape + Gabor + Texture)",
+    },
 }
 MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 
@@ -216,6 +226,7 @@ MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 _MEMBER_TAG_OVERRIDES = {
     "yolo_pure": "yolo_pure",
     "merged_1_4": "merged_1_4",
+    "m14v3": "m14v3",
     "m14v2": "m14v2",
 }
 

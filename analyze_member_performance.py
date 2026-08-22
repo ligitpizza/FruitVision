@@ -6,14 +6,16 @@ in mX_train_report.py) into one side-by-side comparison.
 Place this file at the PROJECT ROOT (same level as train_all.py).
 
 Run this AFTER train_all.py, once every member's *_classification_report.json
-exists under outputs/training/{ab,bc,cd,da,merged_1_4,m14v2}/.
+exists under outputs/training/{ab,bc,cd,da,merged_1_4,m14v2,m14v3}/.
 
-Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus the two feature-fusion
-experiments -- merged_1_4 (member 1 + member 4: colour+shape+gabor) and
-m14v2 (the same plus texture: colour+shape+gabor+texture). The
-pure-YOLOv8-cls pipeline is intentionally excluded -- it's a fully
-independent 5th predictor, not part of the soft-voted ensemble this data
-is meant to support.
+Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus the three feature-fusion
+experiments -- merged_1_4 (member 1 + member 4: colour+shape+gabor),
+m14v2 (the same plus texture: colour+shape+gabor+texture), and m14v3
+(same 4 features as v2, but detection combines member 1's Otsu box +
+member 4's HSV-saturation box via union, and calibration uses member 4's
+deskew). The pure-YOLOv8-cls pipeline is intentionally excluded -- it's a
+fully independent 5th predictor, not part of the soft-voted ensemble this
+data is meant to support.
 
 Usage:
     python analyze_member_performance.py
@@ -25,7 +27,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 TRAINING_DIR = PROJECT_ROOT / "outputs" / "training"
 
-MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4", "m14v2"]
+MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4", "m14v2", "m14v3"]
 # Short codes for the console tables (kept narrow on purpose -- see
 # MEMBER_LABELS below for the full descriptive names, printed once as a
 # legend instead of repeated in every column header).
@@ -36,6 +38,7 @@ MEMBER_SHORT = {
     "da": "M4",
     "merged_1_4": "M1+4",
     "m14v2": "M1+4v2",
+    "m14v3": "M1+4v3",
 }
 MEMBER_LABELS = {
     "ab": "M1 (colour+shape)",
@@ -44,6 +47,7 @@ MEMBER_LABELS = {
     "da": "M4 (gabor+colour)",
     "merged_1_4": "M1+4 (colour+shape+gabor)",
     "m14v2": "M1+4v2 (colour+shape+gabor+texture)",
+    "m14v3": "M1+4v3 (Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)",
 }
 # Folder name under outputs/training/ -- NOT the same as MEMBER_FOLDER below
 # (that one is the member_apps/ source folder, used only in the "run this
@@ -54,12 +58,14 @@ MEMBER_FOLDER = {
     "cd": "member_3_cd", "da": "member_4_da",
     "merged_1_4": "merged_member_1_4",
     "m14v2": "merged_member_1_4_v2",
+    "m14v3": "merged_member_1_4_v3",
 }
 MEMBER_SCRIPT = {
     "ab": "m1_train.py", "bc": "m2_train.py",
     "cd": "m3_train.py", "da": "m4_train.py",
     "merged_1_4": "m14_train.py",
     "m14v2": "m14v2_train.py",
+    "m14v3": "m14v3_train.py",
 }
 # Column width derived from the short codes, not the full labels -- keeps
 # the console tables narrow enough to not wrap in a normal terminal

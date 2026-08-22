@@ -1,0 +1,85 @@
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+
+Building feature dataset for apple (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
+Loaded 5969 samples for apple across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for apple:
+              precision    recall  f1-score   support
+
+        ripe       0.86      0.91      0.88       339
+      rotten       0.94      0.93      0.93       468
+      unripe       0.98      0.95      0.96       387
+
+    accuracy                           0.93      1194
+   macro avg       0.93      0.93      0.93      1194
+weighted avg       0.93      0.93      0.93      1194
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\apple_m14v3.pkl
+[time] apple took 1m 44.2s
+
+Building feature dataset for banana (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
+Loaded 5902 samples for banana across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for banana:
+              precision    recall  f1-score   support
+
+        ripe       0.90      0.95      0.92       316
+      rotten       0.92      0.93      0.92       445
+      unripe       0.97      0.91      0.94       420
+
+    accuracy                           0.93      1181
+   macro avg       0.93      0.93      0.93      1181
+weighted avg       0.93      0.93      0.93      1181
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\banana_m14v3.pkl
+[time] banana took 1m 49.7s
+
+Building feature dataset for orange (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
+Loaded 4346 samples for orange across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for orange:
+              precision    recall  f1-score   support
+
+        ripe       0.88      0.93      0.91       294
+      rotten       0.94      0.87      0.90       319
+      unripe       0.94      0.96      0.95       257
+
+    accuracy                           0.92       870
+   macro avg       0.92      0.92      0.92       870
+weighted avg       0.92      0.92      0.92       870
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\orange_m14v3.pkl
+[time] orange took 1m 15.7s
+
+Building feature dataset for mango (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
+Loaded 1240 samples for mango across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for mango:
+              precision    recall  f1-score   support
+
+        ripe       0.80      0.74      0.77       106
+      rotten       0.39      0.58      0.47        31
+      unripe       0.97      0.92      0.94       111
+
+    accuracy                           0.80       248
+   macro avg       0.72      0.75      0.73       248
+weighted avg       0.83      0.80      0.81       248
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\mango_m14v3.pkl
+[time] mango took 21.0s
+
+[time] Total training run took 5m 10.7s
+
+All graphs saved to outputs/training/m14v3/
+Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\m14v3\accuracy_summary.png

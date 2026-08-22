@@ -29,7 +29,7 @@ from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
 from core_modules.md_gabor_filters import extract_gabor
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models', 'merged_1_4')
+MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models', 'm14')
 _clf_cache = {}
 
 
@@ -40,7 +40,7 @@ class NotAFruitError(Exception):
 
 def _load_model(fruit_type):
     if fruit_type not in _clf_cache:
-        model_path = os.path.join(MODEL_DIR, f"{fruit_type}_merged_1_4.pkl")
+        model_path = os.path.join(MODEL_DIR, f"{fruit_type}_m14.pkl")
         _clf_cache[fruit_type] = joblib.load(model_path)
     return _clf_cache[fruit_type]
 

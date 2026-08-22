@@ -8,6 +8,9 @@ alone (as m14/m14v2 do):
 
 - Detection: union of member 1's Otsu box and member 4's HSV-saturation
   box (m14v3_detection.py) -- a fruit found by either detector survives.
+  Falls back to trusting whichever detector produced a non-degenerate
+  (non-full-frame) box if the other one fails outright, instead of
+  unioning with a failure and dragging the whole result to full-frame.
 - Calibration: member 4's deskew + pad + resize (m14v3_calibration.py) --
   a strict superset of member 1's plain pad + resize, so no tradeoff there.
 - Preprocessing: still member 1's alone (unchanged) -- blending/chaining

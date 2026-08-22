@@ -31,7 +31,7 @@ from core_modules.mb_shape_contours import extract_shape
 from core_modules.md_gabor_filters import extract_gabor
 
 DATASET_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "datasets", "fruit_ripeness"))
-MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models", "merged_1_4"))
+MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models", "m14"))
 
 FRUITS = ["apple", "banana", "orange", "mango"]
 CLASSES = ["ripe", "rotten", "unripe"]
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         clf.fit(X_scaled, y)
 
         os.makedirs(MODEL_OUT_DIR, exist_ok=True)
-        out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_merged_1_4.pkl")
+        out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_m14.pkl")
         joblib.dump({"model": clf, "scaler": scaler}, out_path)
         print(f"Model saved to {out_path}")
 

@@ -228,6 +228,7 @@ _MEMBER_TAG_OVERRIDES = {
     "merged_1_4": "merged_1_4",
     "m14v3": "m14v3",
     "m14v2": "m14v2",
+    "m14v3": "m14v3",
 }
 
 

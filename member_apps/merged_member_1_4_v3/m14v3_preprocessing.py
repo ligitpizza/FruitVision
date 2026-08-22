@@ -5,8 +5,8 @@ def clean(image):
     m14v3's preprocessing: reused as-is from member_1_ab / merged_member_1_4
     (Gaussian blur denoise + histogram equalization on the luminance
     channel). Kept unchanged on purpose -- v3's experiment is scoped to
-    detection (watershed, from member 3) + calibration (deskew, from
-    member 4) + mask-based feature extraction, not preprocessing.
+    detection (union of member 1's Otsu box + member 4's HSV-saturation
+    box) + calibration (member 4's deskew), not preprocessing.
     """
     denoised = cv2.GaussianBlur(image, (5, 5), 0)
 

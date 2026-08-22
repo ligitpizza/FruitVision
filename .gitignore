@@ -16,8 +16,6 @@ member_apps/member_3_cd/uploads/
 member_apps/member_4_da/uploads/
 
 fruitvision.db
-trained_logs/
-trained_models/
 
 outputs/annotated/
 outputs/reports/
@@ -30,7 +28,3 @@ uploads/
 pipeline/pure_yolo/runs/
 
 datasets/yolo_cls/
-
-trained_logs/
-
-trained_models/

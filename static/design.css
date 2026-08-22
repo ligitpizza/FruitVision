@@ -142,7 +142,7 @@ button:disabled { background: #cfd6cc; color: #82897f; cursor: not-allowed; }
 /* ---------- Forms ---------- */
 label { display: block; font-weight: 600; font-size: 0.82rem; margin: 14px 0 6px; color: var(--ink); }
 select, input[type=file], input[type=number], input[type=text], input[type=email],
-input[type=password], input[type=range], textarea {
+input[type=password], input[type=range], input[type=date], textarea {
   font-family: var(--font); font-size: 0.9rem; padding: 10px 12px; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--card); color: var(--ink); width: 100%;
 }

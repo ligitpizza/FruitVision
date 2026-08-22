@@ -20,11 +20,25 @@ def _connect():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_paginated(member=None, fruit=None, user_id=None, page=1, per_page=20):
+def _add_date_filters(where_clauses, params, date_from=None, date_to=None):
+    """Filters on created_at by calendar date (YYYY-MM-DD), inclusive on both
+    ends. ISO timestamp strings sort/compare correctly as plain strings, so
+    date_from (a date-only prefix) is naturally <= any timestamp that day,
+    and date_to gets end-of-day appended so the whole end date is included."""
+    if date_from:
+        where_clauses.append("created_at >= ?")
+        params.append(date_from)
+    if date_to:
+        where_clauses.append("created_at <= ?")
+        params.append(f"{date_to}T23:59:59")
+
+
+def get_paginated(member=None, fruit=None, user_id=None, date_from=None, date_to=None, page=1, per_page=20):
     """
-    Fetch a page of results, optionally filtered by member, fruit, and/or
-    owning user. Returns (rows, total) where rows is a list of dicts for the
-    requested page and total is the count of all rows matching the filters.
+    Fetch a page of results, optionally filtered by member, fruit, owning
+    user, and/or a created_at date range. Returns (rows, total) where rows
+    is a list of dicts for the requested page and total is the count of all
+    rows matching the filters.
     """
     page = max(page, 1)
     per_page = max(per_page, 1)
@@ -43,6 +57,7 @@ def get_paginated(member=None, fruit=None, user_id=None, page=1, per_page=20):
     if user_id is not None:
         where_clauses.append("user_id = ?")
         params.append(user_id)
+    _add_date_filters(where_clauses, params, date_from, date_to)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     total = conn.execute(
@@ -103,12 +118,13 @@ def delete_result(result_id):
     return deleted
 
 
-def get_stats(member=None, fruit=None, user_id=None, since_hours=None):
+def get_stats(member=None, fruit=None, user_id=None, since_hours=None, date_from=None, date_to=None):
     """
     Summary stats for a dashboard, optionally filtered by member, fruit,
-    user, and/or a rolling time window (since_hours). Returns a dict: total
-    count, counts per label, counts per fruit, overall average confidence,
-    average confidence per fruit, and average inference latency.
+    user, a rolling time window (since_hours), and/or a created_at date
+    range. Returns a dict: total count, counts per label, counts per fruit,
+    overall average confidence, average confidence per fruit, and average
+    inference latency.
     """
     conn = _connect()
 
@@ -127,6 +143,7 @@ def get_stats(member=None, fruit=None, user_id=None, since_hours=None):
         cutoff = (datetime.now() - timedelta(hours=since_hours)).isoformat(timespec="seconds")
         where_clauses.append("created_at >= ?")
         params.append(cutoff)
+    _add_date_filters(where_clauses, params, date_from, date_to)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     params = tuple(params)
 
@@ -232,6 +249,7 @@ def init_db():
         "user_id": "INTEGER",
         "latency_ms": "REAL",
         "flagged": "INTEGER DEFAULT 0",
+        "detection_breakdown": "TEXT",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:
@@ -256,29 +274,36 @@ def log_result(
     user_id=None,
     latency_ms=None,
     flagged=0,
+    detection_breakdown=None,
 ):
-    """Insert one prediction result. Call this right after predict_ripeness() returns."""
+    """Insert one prediction result. Call this right after predict_ripeness() returns.
+
+    detection_breakdown: optional JSON string like '{"ripe": 2, "unripe": 2,
+    "rotten": 1}', set only by the multi-fruit-per-photo batch path (see
+    app.py's /analyse) when one photo's majority label is being logged as a
+    single row -- None for every ordinary single-fruit prediction.
+    """
     conn = _connect()
     conn.execute(
         """INSERT INTO results (
                member, filename, fruit, label, confidence, annotated_path,
                fruit_area_px, blemish_area_px, blemish_percentage,
                quality_grade, surface_path, source, created_at,
-               user_id, latency_ms, flagged
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               user_id, latency_ms, flagged, detection_breakdown
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             member, filename, fruit, label, confidence, annotated_path,
             fruit_area_px, blemish_area_px, blemish_percentage,
             quality_grade, surface_path, source,
             datetime.now().isoformat(timespec="seconds"),
-            user_id, latency_ms, int(bool(flagged)),
+            user_id, latency_ms, int(bool(flagged)), detection_breakdown,
         ),
     )
     conn.commit()
     conn.close()
 
 
-def get_all(member=None, fruit=None, user_id=None):
+def get_all(member=None, fruit=None, user_id=None, date_from=None, date_to=None):
     """Unpaginated fetch, for CSV export. Same filters as get_paginated."""
     conn = _connect()
     where_clauses = []
@@ -292,6 +317,7 @@ def get_all(member=None, fruit=None, user_id=None):
     if user_id is not None:
         where_clauses.append("user_id = ?")
         params.append(user_id)
+    _add_date_filters(where_clauses, params, date_from, date_to)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     rows = conn.execute(
         f"SELECT * FROM results {where_sql} ORDER BY id DESC", params

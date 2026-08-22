@@ -28,3 +28,7 @@ uploads/
 pipeline/pure_yolo/runs/
 
 datasets/yolo_cls/
+
+trained_logs/
+
+trained_models/

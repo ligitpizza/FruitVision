@@ -47,7 +47,7 @@ from member_apps.member_3_cd.m3_predict import predict_ripeness as m3_predict_ri
 from member_apps.member_4_da.m4_predict import predict_ripeness as m4_predict_ripeness, NotAFruitError as M4NotAFruitError
 from member_apps.merged_member_1_4.m14_predict import predict_ripeness as m14_predict_ripeness, NotAFruitError as M14NotAFruitError
 
-from yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
+from pipeline.pure_yolo.yolo_cls_predict import predict_ripeness as yolo_pure_predict_ripeness, NotAFruitError as YoloPureNotAFruitError
 
 # --- 4-member ensemble (soft-voting across all members) -----------------
 from member_apps.predict_ensemble import predict_ensemble

@@ -28,6 +28,9 @@ MODEL_LABELS = {
     "ensemble_bc_realtime": "Real-Time YOLO Tracking + Ensemble BC (Shape + Texture)",
     "ensemble_cd_realtime": "Real-Time YOLO Tracking + Ensemble CD (Texture + Gabor)",
     "ensemble_da_realtime": "Real-Time YOLO Tracking + Ensemble DA (Gabor + Colour)",
+    "yolo_pure": "YOLOv8 Classification (pure CNN, no SVM)",
+    "merged_1_4": "Merged 1+4 (Colour + Shape + Gabor, single SVM)",
+    "merged_1_4_realtime": "Real-Time YOLO Tracking + Merged 1+4 (Colour + Shape + Gabor)",
 }
 
 
@@ -81,14 +84,24 @@ def generate_pdf_report(
     if surface_data and surface_data.get("fruit"):
         pdf.cell(0, 10, f"Fruit: {surface_data['fruit'].capitalize()}", ln=True)
 
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 10, "Surface Analysis", ln=True)
-    pdf.set_font("Helvetica", "", 12)
-    _write_surface_metrics(pdf, surface_data or {})
-    surface_image_path = (surface_data or {}).get("surface_image_path")
-    if surface_image_path and os.path.exists(surface_image_path):
-        pdf.ln(2)
-        pdf.image(surface_image_path, w=100)
+    breakdown = (surface_data or {}).get("detection_breakdown")
+    if breakdown:
+        fruit_count = (surface_data or {}).get("fruit_count") or sum(breakdown.values())
+        breakdown_str = ", ".join(f"{count} {breakdown_label}" for breakdown_label, count in breakdown.items())
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 10, "Multi-Fruit Detection", ln=True)
+        pdf.set_font("Helvetica", "", 12)
+        pdf.cell(0, 10, f"Detected {fruit_count} fruit(s) in this photo: {breakdown_str}", ln=True)
+        pdf.cell(0, 10, f"Majority result shown above: {label.upper()}", ln=True)
+    else:
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 10, "Surface Analysis", ln=True)
+        pdf.set_font("Helvetica", "", 12)
+        _write_surface_metrics(pdf, surface_data or {})
+        surface_image_path = (surface_data or {}).get("surface_image_path")
+        if surface_image_path and os.path.exists(surface_image_path):
+            pdf.ln(2)
+            pdf.image(surface_image_path, w=100)
 
     pdf.output(out_path)
     return out_path
@@ -138,7 +151,12 @@ def generate_pdf_report_batch(results, model_tag="ab", output_dir=None):
         pdf.cell(0, 10, f"Ripeness: {r['label'].upper()}", ln=True)
         pdf.set_font("Helvetica", "", 12)
         pdf.cell(0, 10, f"Confidence: {r['confidence']:.1f}%", ln=True)
-        _write_surface_metrics(pdf, r)
+        if r.get("detection_breakdown"):
+            breakdown_str = ", ".join(f"{count} {label}" for label, count in r["detection_breakdown"].items())
+            pdf.cell(0, 10, f"Detected {r.get('fruit_count', sum(r['detection_breakdown'].values()))} fruit(s) in this photo: {breakdown_str}", ln=True)
+            pdf.cell(0, 10, f"Majority result shown above: {r['label'].upper()}", ln=True)
+        else:
+            _write_surface_metrics(pdf, r)
 
         surface_image_path = r.get("surface_image_path")
         if surface_image_path and os.path.exists(surface_image_path):

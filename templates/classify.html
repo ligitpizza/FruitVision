@@ -80,7 +80,12 @@
         <input type="file" id="images" name="images" accept="image/*" multiple required>
       </div>
     </div>
-    <button type="submit" style="margin-top:16px;">Analyse Batch</button>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:16px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" name="multi_fruit" style="width:auto;">
+      This photo may contain multiple fruits (e.g. a bag/bunch with mixed ripeness)
+    </label>
+    <p class="field-hint">Apple, banana, and orange only — YOLO detects each fruit in the photo individually. Mango falls back to single-fruit detection.</p>
+    <button type="submit" style="margin-top:8px;">Analyse Batch</button>
   </form>
 </div>
 

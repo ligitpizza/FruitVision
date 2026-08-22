@@ -1,14 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Harvest Records — FruitVision{% endblock %}
 {% block content %}
+{# NOTE: Jinja macro default args here do NOT close over the calling
+   template's top-level variables (e.g. `member=member_filter` as a default
+   does not resolve to the request's actual member_filter) -- every call
+   site below must pass all 4 filters explicitly, even when unchanged. #}
+{% macro filter_qs(fruit, member, date_from, date_to, page=none) %}
+{%- set parts = [] -%}
+{%- if fruit %}{% set _ = parts.append('fruit=' ~ fruit) %}{% endif -%}
+{%- if member %}{% set _ = parts.append('member=' ~ member) %}{% endif -%}
+{%- if date_from %}{% set _ = parts.append('date_from=' ~ date_from) %}{% endif -%}
+{%- if date_to %}{% set _ = parts.append('date_to=' ~ date_to) %}{% endif -%}
+{%- if page %}{% set _ = parts.append('page=' ~ page) %}{% endif -%}
+{%- if parts %}?{{ parts|join('&') }}{% endif -%}
+{% endmacro %}
 <div class="page-head">
   <div>
     <p class="eyebrow">HISTORICAL DATA LEDGER</p>
     <h1>Harvest Records</h1>
-    <p>Every prediction logged across every model — filter by fruit or by which model produced it.</p>
+    <p>Every prediction logged across every model — filter by fruit, model, or the date it was classified.</p>
   </div>
   <div class="actions">
-    <a class="btn btn-outline" href="/history/export.csv{{ '?fruit=' ~ fruit_filter if fruit_filter }}{{ ('&' if fruit_filter else '?') ~ 'member=' ~ member_filter if member_filter }}">Export CSV</a>
+    <a class="btn btn-outline" href="/history/export.csv{{ filter_qs(fruit_filter, member_filter, date_from, date_to) }}">Export CSV</a>
   </div>
 </div>
 
@@ -33,19 +46,36 @@
   <div class="filters">
     <div class="group">
       Fruit:
-      <a href="/history{{ '?member=' ~ member_filter if member_filter }}" class="{{ 'active' if not fruit_filter }}">All</a>
+      <a href="/history{{ filter_qs(none, member_filter, date_from, date_to) }}" class="{{ 'active' if not fruit_filter }}">All</a>
       {% for fruit in fruits %}
-        <a href="/history?fruit={{ fruit }}{{ '&member=' ~ member_filter if member_filter }}" class="{{ 'active' if fruit_filter == fruit }}">{{ fruit.capitalize() }}</a>
+        <a href="/history{{ filter_qs(fruit, member_filter, date_from, date_to) }}" class="{{ 'active' if fruit_filter == fruit }}">{{ fruit.capitalize() }}</a>
       {% endfor %}
     </div>
     <div class="group">
       Model:
-      <a href="/history{{ '?fruit=' ~ fruit_filter if fruit_filter }}" class="{{ 'active' if not member_filter }}">All</a>
+      <a href="/history{{ filter_qs(fruit_filter, none, date_from, date_to) }}" class="{{ 'active' if not member_filter }}">All</a>
       {% for m in member_options %}
-        <a href="/history?member={{ m }}{{ '&fruit=' ~ fruit_filter if fruit_filter }}" class="{{ 'active' if member_filter == m }}">{{ m.replace('ensemble_', '')|upper }}</a>
+        <a href="/history{{ filter_qs(fruit_filter, m, date_from, date_to) }}" class="{{ 'active' if member_filter == m }}">{{ m.replace('ensemble_', '')|upper }}</a>
       {% endfor %}
     </div>
   </div>
+
+  <form method="get" action="/history" style="margin-top:14px; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+    {% if fruit_filter %}<input type="hidden" name="fruit" value="{{ fruit_filter }}">{% endif %}
+    {% if member_filter %}<input type="hidden" name="member" value="{{ member_filter }}">{% endif %}
+    <div>
+      <label for="date_from" style="margin:0 0 4px;">Classified from</label>
+      <input type="date" id="date_from" name="date_from" value="{{ date_from or '' }}">
+    </div>
+    <div>
+      <label for="date_to" style="margin:0 0 4px;">to</label>
+      <input type="date" id="date_to" name="date_to" value="{{ date_to or '' }}">
+    </div>
+    <button type="submit" class="btn-sm">Apply</button>
+    {% if date_from or date_to %}
+      <a class="btn-outline btn-sm" href="/history{{ filter_qs(fruit_filter, member_filter, none, none) }}">Clear dates</a>
+    {% endif %}
+  </form>
 
   {% if results %}
   <table>
@@ -78,13 +108,22 @@
       <td>
         <span class="badge {{ r.label }}">{{ r.label.upper() }}</span>
         {% if r.flagged %}<span class="badge flagged">FLAGGED</span>{% endif %}
+        {% if r.detection_breakdown %}
+          <div class="field-hint" style="margin-top:4px;">
+            majority of {{ r.detection_breakdown.values()|sum }}:
+            {% for label, count in r.detection_breakdown.items() %}{{ count }} {{ label }}{{ ", " if not loop.last }}{% endfor %}
+          </div>
+        {% endif %}
       </td>
       <td>{{ r.confidence }}%</td>
-      <td>{{ ('%.2f%%'|format(r.blemish_percentage)) if r.blemish_percentage is not none else 'Unknown' }}</td>
-      <td>{{ r.quality_grade or 'Unknown' }}</td>
+      <td>{{ ('%.2f%%'|format(r.blemish_percentage)) if r.blemish_percentage is not none else ('n/a (multi-fruit)' if r.detection_breakdown else 'Unknown') }}</td>
+      <td>{{ r.quality_grade or ('n/a' if r.detection_breakdown else 'Unknown') }}</td>
       <td>{{ r.source }}</td>
       <td class="actions">
         <a href="/history/{{ r.id }}/edit">Edit</a>
+        <form action="/history/{{ r.id }}/export_pdf" method="post" style="display:inline;">
+          <button type="submit" class="btn-outline btn-sm">Export PDF</button>
+        </form>
         <form action="/history/{{ r.id }}/delete" method="post" style="display:inline;"
               onsubmit="return confirm('Delete this record? This cannot be undone.');">
           <input type="hidden" name="page" value="{{ page }}">
@@ -96,22 +135,20 @@
   </table>
 
   <div class="pagination">
-    {% set base_qs = ('fruit=' ~ fruit_filter if fruit_filter else '') %}
-    {% set base_qs = base_qs ~ ('&member=' ~ member_filter if member_filter else '') %}
     {% if page > 1 %}
-      <a href="/history?page={{ page - 1 }}{{ '&' ~ base_qs if base_qs }}">← Prev</a>
+      <a href="/history{{ filter_qs(fruit_filter, member_filter, date_from, date_to, page - 1) }}">← Prev</a>
     {% endif %}
 
     {% for p in range(1, total_pages + 1) %}
       {% if p == page %}
         <span class="current">{{ p }}</span>
       {% else %}
-        <a href="/history?page={{ p }}{{ '&' ~ base_qs if base_qs }}">{{ p }}</a>
+        <a href="/history{{ filter_qs(fruit_filter, member_filter, date_from, date_to, p) }}">{{ p }}</a>
       {% endif %}
     {% endfor %}
 
     {% if page < total_pages %}
-      <a href="/history?page={{ page + 1 }}{{ '&' ~ base_qs if base_qs }}">Next →</a>
+      <a href="/history{{ filter_qs(fruit_filter, member_filter, date_from, date_to, page + 1) }}">Next →</a>
     {% endif %}
 
     <span class="info">{{ total }} record{{ 's' if total != 1 else '' }} total · page {{ page }} of {{ total_pages }}</span>

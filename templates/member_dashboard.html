@@ -22,6 +22,10 @@
     <input type="hidden" name="model" value="{{ model_choice }}">
     <label>Upload Images (multiple):</label>
     <input type="file" name="images" accept="image/*" multiple required>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" name="multi_fruit" style="width:auto;">
+      This photo may contain multiple fruits (apple/banana/orange only)
+    </label>
     <button type="submit" style="margin-top:14px;">Analyse Batch with {{ model_label }}</button>
   </form>
 </div>
@@ -37,7 +41,19 @@
         Fruit: <strong>{{ r.fruit|capitalize }}</strong><br>
         Ripeness: <span class="badge {{ r.label }}">{{ r.label }}</span><br>
         Confidence: {{ r.confidence }}%<br>
-        {% if r.blemish_percentage is not none %}
+        {% if r.multi_fruit_fallback %}
+          <small class="field-hint">"Multiple fruits" was checked, but no separable fruit boxes were found (they may be touching/overlapping, or this fruit isn't YOLO-detectable) — analysed as one region instead.</small><br>
+        {% endif %}
+        {% if r.detection_breakdown %}
+          Detected <strong>{{ r.detection_breakdown.values()|sum }} fruit(s)</strong> in this photo:
+          {% for label, count in r.detection_breakdown.items() %}{{ count }} {{ label }}{{ ", " if not loop.last }}{% endfor %}<br>
+          <small class="field-hint">Majority result shown above; each fruit was boxed and classified individually below.</small>
+          {% if r.annotated_path %}
+            <div class="surface-preview">
+              <img src="/outputs/{{ r.annotated_path }}" alt="Each detected fruit, boxed and labelled" style="max-width:360px; width:100%; margin-top:10px; border-radius:10px;">
+            </div>
+          {% endif %}
+        {% elif r.blemish_percentage is not none %}
           Blemished Surface: <strong>{{ '%.2f'|format(r.blemish_percentage) }}%</strong><br>
           Surface Quality: <strong>{{ r.quality_grade }}</strong><br>
           Visible Fruit Area: {{ r.fruit_area_px }} px<br>
@@ -50,6 +66,11 @@
         {% else %}
           Surface Quality: <strong>Unknown</strong>
           {% if r.surface_analysis_error %}<small>({{ r.surface_analysis_error }})</small>{% endif %}
+          {% if r.annotated_path %}
+            <div class="surface-preview">
+              <img src="/outputs/{{ r.annotated_path }}" alt="Detected fruit region" style="max-width:360px; width:100%; margin-top:10px; border-radius:10px;">
+            </div>
+          {% endif %}
         {% endif %}
         <form action="/extra_export_pdf" method="post" style="display:inline;">
           <input type="hidden" name="label" value="{{ r.label }}">
@@ -66,6 +87,10 @@
           <input type="hidden" name="blemish_area_px" value="{{ r.blemish_area_px if r.blemish_percentage is not none else '' }}">
           <input type="hidden" name="blemish_percentage" value="{{ r.blemish_percentage if r.blemish_percentage is not none else '' }}">
           <input type="hidden" name="quality_grade" value="{{ r.quality_grade }}">
+          {% if r.detection_breakdown %}
+          <input type="hidden" name="detection_breakdown" value='{{ r.detection_breakdown|tojson }}'>
+          <input type="hidden" name="fruit_count" value="{{ r.detection_breakdown.values()|sum }}">
+          {% endif %}
           <button type="submit" class="btn-outline btn-sm" style="width:auto; display:inline-block;">Export PDF</button>
         </form>
       {% endif %}

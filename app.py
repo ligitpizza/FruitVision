@@ -16,6 +16,8 @@ import math
 import time
 import csv
 import io
+from datetime import datetime
+from collections import Counter
 from functools import wraps
 import cv2
 from flask import (
@@ -56,6 +58,7 @@ from member_apps.predict_ensemble import predict_ensemble
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
 from core_modules.blemish_analysis import analyze_surface
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
+from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
 from core_modules.dashboard_charts import (
     generate_trend_chart,
     generate_history_chart,
@@ -317,6 +320,88 @@ def _surface_payload(surface):
 
 
 # --------------------------------------------------------------------------
+# Multi-fruit-per-photo batch detection ("this photo may contain multiple
+# fruits") -- separate from every member's single-largest-contour detect().
+# See core_modules/multi_fruit_detect.py for the YOLO localisation step.
+# --------------------------------------------------------------------------
+_MULTI_FRUIT_BOX_COLOURS = {"ripe": (0, 200, 0), "unripe": (0, 165, 255), "rotten": (0, 0, 200)}
+
+
+def _classify_multi_fruit_photo(img, fruit_type, classify_crop, filename):
+    """
+    Detects every fruit_type box in one photo, classifies each crop via
+    classify_crop(crop, fruit_type) -> (label, confidence_0_to_1) (or
+    (None, None) on a per-crop failure), draws every box on one annotated
+    image, and returns a dict with the majority label/confidence, a
+    {label: count} breakdown, the annotated path, and the per-fruit detail
+    list -- or None if this photo isn't a multi-fruit candidate (mango,
+    or no boxes found), signaling the caller to fall back to the existing
+    single-fruit path.
+    """
+    if not supports_multi_fruit(fruit_type):
+        return None
+    boxes = detect_fruit_boxes(img, fruit_type)
+    if not boxes:
+        return None
+
+    annotated = img.copy()
+    per_fruit = []
+    for (x0, y0, x1, y1) in boxes:
+        crop = img[y0:y1, x0:x1]
+        if crop.size == 0:
+            continue
+        try:
+            label, confidence = classify_crop(crop, fruit_type)
+        except Exception:
+            label, confidence = None, None
+        if label is None:
+            continue
+
+        per_fruit.append({"bbox": (x0, y0, x1, y1), "label": label, "confidence": confidence})
+        colour = _MULTI_FRUIT_BOX_COLOURS.get(label, (200, 200, 200))
+        cv2.rectangle(annotated, (x0, y0), (x1, y1), colour, 3)
+        cv2.putText(annotated, f"{label} {confidence * 100:.0f}%", (x0, max(y0 - 8, 0)),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, colour, 2)
+
+    if not per_fruit:
+        return None
+
+    breakdown = Counter(r["label"] for r in per_fruit)
+    majority_label, _ = breakdown.most_common(1)[0]
+    majority_confidences = [r["confidence"] for r in per_fruit if r["label"] == majority_label]
+    majority_confidence_pct = round(sum(majority_confidences) / len(majority_confidences) * 100, 1)
+
+    annotated_dir = os.path.join(OUTPUTS_DIR, "annotated")
+    os.makedirs(annotated_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(annotated_dir, filename), annotated)
+
+    return {
+        "label": majority_label,
+        "confidence": majority_confidence_pct,
+        "breakdown": dict(breakdown),
+        "annotated_path": f"annotated/{filename}",
+        "per_fruit": per_fruit,
+        "fruit_count": len(per_fruit),
+    }
+
+
+def _ensemble_crop_classify(crop, fruit_type):
+    """classify_crop adapter for _classify_multi_fruit_photo: predict_ensemble
+    returns confidence on a 0-100 scale, but the multi-fruit helper's
+    contract (matching every member's predict_ripeness()) expects 0-1."""
+    label, confidence_pct, _per_member, _bbox = predict_ensemble(crop, fruit_type)
+    return label, confidence_pct / 100
+
+
+def _single_model_crop_classify(entry):
+    """classify_crop adapter for a single PREDICTORS[model_choice] entry."""
+    def _classify(crop, fruit_type):
+        label, confidence, _bbox, _cleaned, _proba = entry["fn"](crop, fruit_type)
+        return label, confidence
+    return _classify
+
+
+# --------------------------------------------------------------------------
 # Single-image prediction
 # --------------------------------------------------------------------------
 @app.route("/predict", methods=["POST"])
@@ -532,6 +617,10 @@ def analyse():
     fruit_type = request.form.get("fruit_type", "apple")
     model_choice = request.form.get("model", "ab")
     files = request.files.getlist("images")
+    # "This photo may contain multiple fruits" -- see core_modules/multi_fruit_detect.py.
+    # Only apple/banana/orange support it (no COCO mango class); a mango
+    # photo silently keeps using the existing single-fruit path below.
+    multi_fruit = request.form.get("multi_fruit") == "on"
 
     if model_choice == ALL_FOUR_KEY:
         member_tag = "ensemble_all_four"
@@ -550,6 +639,34 @@ def analyse():
             except FruitValidationError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
+
+            if multi_fruit:
+                multi = _classify_multi_fruit_photo(img, fruit_type, _ensemble_crop_classify, f.filename)
+                if multi:
+                    log_result(
+                        member=member_tag,
+                        fruit=fruit_type,
+                        label=multi["label"],
+                        confidence=multi["confidence"],
+                        filename=f.filename,
+                        annotated_path=multi["annotated_path"],
+                        source="analyse_multi_fruit",
+                        user_id=g.user["id"] if g.user else None,
+                        flagged=_is_flagged(multi["confidence"]),
+                        detection_breakdown=json.dumps(multi["breakdown"]),
+                    )
+                    results.append({
+                        "filename": f.filename,
+                        "fruit": fruit_type,
+                        "label": multi["label"],
+                        "confidence": multi["confidence"],
+                        "annotated_path": multi["annotated_path"],
+                        "input_validation": input_validation,
+                        "detection_breakdown": multi["breakdown"],
+                        "fruit_count": multi["fruit_count"],
+                        **_surface_payload({}),
+                    })
+                    continue
 
             t0 = time.perf_counter()
             try:
@@ -582,6 +699,7 @@ def analyse():
                 "label": label,
                 "confidence": confidence,
                 "annotated_path": annotated_rel,
+                "multi_fruit_fallback": multi_fruit,
                 "per_member": per_member,
                 "input_validation": input_validation,
                 **_surface_payload(surface),
@@ -608,6 +726,35 @@ def analyse():
             except FruitValidationError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
+
+            if multi_fruit:
+                multi = _classify_multi_fruit_photo(img, fruit_type, _single_model_crop_classify(entry), f.filename)
+                if multi:
+                    confidence_pct = multi["confidence"]
+                    log_result(
+                        member=member_tag,
+                        fruit=fruit_type,
+                        label=multi["label"],
+                        confidence=confidence_pct,
+                        filename=f.filename,
+                        annotated_path=multi["annotated_path"],
+                        source="analyse_multi_fruit",
+                        user_id=g.user["id"] if g.user else None,
+                        flagged=_is_flagged(confidence_pct),
+                        detection_breakdown=json.dumps(multi["breakdown"]),
+                    )
+                    results.append({
+                        "filename": f.filename,
+                        "fruit": fruit_type,
+                        "label": multi["label"],
+                        "confidence": confidence_pct,
+                        "annotated_path": multi["annotated_path"],
+                        "input_validation": input_validation,
+                        "detection_breakdown": multi["breakdown"],
+                        "fruit_count": multi["fruit_count"],
+                        **_surface_payload({}),
+                    })
+                    continue
 
             t0 = time.perf_counter()
             try:
@@ -641,6 +788,7 @@ def analyse():
                 "label": label,
                 "confidence": confidence_pct,
                 "annotated_path": annotated_rel,
+                "multi_fruit_fallback": multi_fruit,
                 "input_validation": input_validation,
                 **_surface_payload(surface),
             })
@@ -661,6 +809,8 @@ def analyse():
             "blemish_percentage": r.get("blemish_percentage"),
             "quality_grade": r.get("quality_grade", "Unknown"),
             "surface_analysis_error": r.get("surface_analysis_error"),
+            "detection_breakdown": r.get("detection_breakdown"),
+            "fruit_count": r.get("fruit_count"),
         }
         for r in results
     ]
@@ -690,6 +840,7 @@ def extra_export_pdf():
     confidence = float(request.form["confidence"]) / 100
     image_path = request.form.get("image_path")
     model_tag = request.form.get("model_tag", "ab")
+    breakdown_raw = request.form.get("detection_breakdown")
     surface_data = {
         "fruit": request.form.get("fruit"),
         "surface_image_path": request.form.get("surface_image_path"),
@@ -697,6 +848,8 @@ def extra_export_pdf():
         "blemish_area_px": request.form.get("blemish_area_px", type=int),
         "blemish_percentage": request.form.get("blemish_percentage", type=float),
         "quality_grade": request.form.get("quality_grade") or "Unknown",
+        "detection_breakdown": json.loads(breakdown_raw) if breakdown_raw else None,
+        "fruit_count": request.form.get("fruit_count", type=int),
     }
     out_path = generate_pdf_report(
         image_path, label, confidence, model_tag=model_tag, surface_data=surface_data
@@ -717,35 +870,93 @@ def extra_export_pdf_batch():
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 
+@app.route("/history/<int:record_id>/export_pdf", methods=["POST"])
+def history_export_pdf(record_id):
+    """Exports a single already-logged Harvest Record as a PDF, reusing the
+    same generate_pdf_report() the classify page uses right after a fresh
+    prediction -- the only difference is the image/surface paths and
+    metrics come from the stored DB row instead of an in-request result."""
+    record = get_by_id(record_id)
+    if not record:
+        flash("That record no longer exists.")
+        return redirect(url_for("history"))
+
+    image_path = os.path.join(OUTPUTS_DIR, record["annotated_path"]) if record.get("annotated_path") else None
+    surface_image_path = os.path.join(OUTPUTS_DIR, record["surface_path"]) if record.get("surface_path") else None
+    breakdown_raw = record.get("detection_breakdown")
+    surface_data = {
+        "fruit": record.get("fruit"),
+        "surface_image_path": surface_image_path,
+        "fruit_area_px": record.get("fruit_area_px"),
+        "blemish_area_px": record.get("blemish_area_px"),
+        "blemish_percentage": record.get("blemish_percentage"),
+        "quality_grade": record.get("quality_grade") or "Unknown",
+        "detection_breakdown": json.loads(breakdown_raw) if breakdown_raw else None,
+    }
+    out_path = generate_pdf_report(
+        image_path, record["label"], record["confidence"] / 100,
+        model_tag=record["member"], surface_data=surface_data,
+    )
+
+    if g.user:
+        auth_db.log_activity(g.user["id"], "export_pdf", detail=f"record {record_id}")
+
+    return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
+
+
 # --------------------------------------------------------------------------
 # History (global — every member logs into the same table)
 # --------------------------------------------------------------------------
+def _valid_date_arg(name):
+    """Reads a YYYY-MM-DD query arg, ignoring it if malformed rather than
+    500ing on a hand-edited URL."""
+    raw = request.args.get(name) or None
+    if raw is None:
+        return None
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return raw
+
+
 @app.route("/history")
 def history():
     fruit_filter = request.args.get("fruit") or None
     member_filter = request.args.get("member") or None
+    date_from = _valid_date_arg("date_from")
+    date_to = _valid_date_arg("date_to")
     try:
         page = max(1, int(request.args.get("page", 1)))
     except ValueError:
         page = 1
 
     rows, total = get_paginated(
-        member=member_filter, fruit=fruit_filter, page=page, per_page=HISTORY_PAGE_SIZE
+        member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to,
+        page=page, per_page=HISTORY_PAGE_SIZE,
     )
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
     page = min(page, total_pages)
+
+    # Parse the multi-fruit breakdown JSON here so the template can just
+    # iterate a dict instead of needing a JSON filter.
+    for row in rows:
+        raw = row.get("detection_breakdown")
+        row["detection_breakdown"] = json.loads(raw) if raw else None
 
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four"] do not remove
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"] do not remove
     member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo", "yolo_pure_realtime"]
 
-    stats = get_stats(member=member_filter, fruit=fruit_filter)
+    stats = get_stats(member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to)
 
     return render_template(
         "history.html",
         results=rows,
         fruit_filter=fruit_filter,
         member_filter=member_filter,
+        date_from=date_from,
+        date_to=date_to,
         member_options=member_options,
         fruits=FRUITS,
         page=page,
@@ -760,7 +971,9 @@ def history():
 def history_export_csv():
     fruit_filter = request.args.get("fruit") or None
     member_filter = request.args.get("member") or None
-    rows = get_all_results(member=member_filter, fruit=fruit_filter)
+    date_from = _valid_date_arg("date_from")
+    date_to = _valid_date_arg("date_to")
+    rows = get_all_results(member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to)
 
     buf = io.StringIO()
     writer = csv.writer(buf)

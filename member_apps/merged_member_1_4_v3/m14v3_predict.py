@@ -1,17 +1,28 @@
 # helper module. do not run!!
 
 """
-merged_member_1_4: combines member 1's feature pair (A: colour + B: shape)
-with member 4's feature pair (D: gabor + A: colour) into ONE feature
-vector fed to a single SVM, instead of training two separate classifiers
-and soft-voting their outputs (that's what predict_ensemble.py already
-does at the decision level). Colour (A) is de-duplicated -- it only
-appears once even though both member 1 and member 4 use it.
+merged_member_1_4_v3 (m14v3): same feature set as m14v2 (colour + shape +
+gabor + texture = 21 features, one SVM), but this time combines detection
+AND calibration from member 1 + member 4, instead of reusing member 1's
+alone (as m14/m14v2 do):
 
-Combined vector = colour(8) + shape(5) + gabor(4) = 17 features.
-Preprocessing/detection/calibration are reused from member 1 as-is (see
-m14_preprocessing.py / m14_detection.py / m14_calibration.py) -- this
-experiment is scoped to feature-level fusion only.
+- Detection: union of member 1's Otsu box and member 4's HSV-saturation
+  box (m14v3_detection.py) -- a fruit found by either detector survives.
+  Falls back to trusting whichever detector produced a non-degenerate
+  (non-full-frame) box if the other one fails outright, instead of
+  unioning with a failure and dragging the whole result to full-frame.
+- Calibration: member 4's deskew + pad + resize (m14v3_calibration.py) --
+  a strict superset of member 1's plain pad + resize, so no tradeoff there.
+- Preprocessing: still member 1's alone (unchanged) -- blending/chaining
+  two different denoise+contrast pipelines was judged too likely to
+  produce mush without a clear win, so it's left as a single choice.
+
+(An earlier version of this file used member 3's watershed segmentation to
+mask features instead. That was abandoned after testing showed the mask
+itself was unreliable -- large jagged regions unrelated to the fruit's
+actual shape -- which member 3's original code never surfaced since it
+only used the mask to compute a bounding box, not the mask pixels
+directly.)
 """
 
 import os
@@ -21,15 +32,16 @@ import joblib
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from m14_preprocessing import clean
-from m14_detection import detect
-from m14_calibration import calibrate
+from m14v3_preprocessing import clean
+from m14v3_detection import detect
+from m14v3_calibration import calibrate
 
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
+from core_modules.mc_texture_glmc import extract_texture_glcm
 from core_modules.md_gabor_filters import extract_gabor
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models', 'm14')
+MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'trained_models', 'm14v3')
 _clf_cache = {}
 
 
@@ -40,7 +52,7 @@ class NotAFruitError(Exception):
 
 def _load_model(fruit_type):
     if fruit_type not in _clf_cache:
-        model_path = os.path.join(MODEL_DIR, f"{fruit_type}_m14.pkl")
+        model_path = os.path.join(MODEL_DIR, f"{fruit_type}_m14v3.pkl")
         _clf_cache[fruit_type] = joblib.load(model_path)
     return _clf_cache[fruit_type]
 
@@ -63,8 +75,9 @@ def _looks_like_fruit(shape_vec, cleaned_img):
 
 def predict_ripeness(raw_img, fruit_type):
     """
-    Pipeline: preprocess (clean) -> detect -> calibrate -> feature
-    extraction (colour + shape + gabor, concatenated) -> single SVM.
+    Pipeline: preprocess (clean) -> detect (Otsu + HSV-saturation union) ->
+    calibrate (deskew) -> feature extraction (colour + shape + gabor +
+    texture, concatenated) -> single SVM.
 
     Returns (label, confidence, bbox, cleaned_img, proba_dict), same
     signature as every other member's predict_ripeness().
@@ -80,12 +93,13 @@ def predict_ripeness(raw_img, fruit_type):
     vec_a = extract_colour(cleaned)
     vec_b = extract_shape(cleaned)
     vec_d = extract_gabor(cleaned)
+    vec_c = extract_texture_glcm(cleaned)
 
     is_fruit, reason = _looks_like_fruit(vec_b, cleaned)
     if not is_fruit:
         raise NotAFruitError(reason)
 
-    combined = np.concatenate([vec_a, vec_b, vec_d]).reshape(1, -1)
+    combined = np.concatenate([vec_a, vec_b, vec_d, vec_c]).reshape(1, -1)
     combined_scaled = scaler.transform(combined)
 
     label = clf.predict(combined_scaled)[0]

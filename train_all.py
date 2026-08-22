@@ -9,8 +9,13 @@ Place this file at the PROJECT ROOT (same level as member_apps/, core_modules/).
 
 Covers:
   - The 4 original SVM ensemble members (member_1_ab .. member_4_da)
-  - merged_1_4 (feature-level fusion of member 1 + member 4 into one SVM)
+  - merged_1_4 / m14 (feature-level fusion of member 1 + member 4 into one
+    SVM -- trained_models/ and trained_logs/ use the short "m14" name;
+    everywhere else (URLs, DB rows, PREDICTORS key) still says "merged_1_4")
   - m14v2 (merged_1_4 plus texture -- colour+shape+gabor+texture, one SVM)
+  - m14v3 (same features as m14v2, but detection combines member 1's Otsu
+    box + member 4's HSV-saturation box via union, and calibration uses
+    member 4's deskew)
   - yolo_pure (YOLOv8-cls fine-tuning, NOT an SVM -- needs
     datasets/yolo_cls/{fruit}/{train,val}/{ripe,unripe,rotten}/ to already
     exist; run pipeline/pure_yolo/dataset_prep.py first if it doesn't. If
@@ -34,8 +39,9 @@ MEMBERS = [
     ("member_apps/member_2_bc", "m2_train.py", "member_2_bc"),
     ("member_apps/member_3_cd", "m3_train.py", "member_3_cd"),
     ("member_apps/member_4_da", "m4_train.py", "member_4_da"),
-    ("member_apps/merged_member_1_4", "m14_train.py", "merged_member_1_4"),
+    ("member_apps/merged_member_1_4", "m14_train.py", "m14"),
     ("member_apps/merged_member_1_4_v2", "m14v2_train.py", "merged_member_1_4_v2"),
+    ("member_apps/merged_member_1_4_v3", "m14v3_train.py", "merged_member_1_4_v3"),
     ("pipeline/pure_yolo", "yolo_cls_train.py", "yolo_pure"),
 ]
 

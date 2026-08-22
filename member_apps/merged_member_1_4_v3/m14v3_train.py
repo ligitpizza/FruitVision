@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 
-from m14_train_report import (
+from m14v3_train_report import (
     plot_confusion_matrix,
     plot_class_distribution,
     plot_accuracy_summary,
@@ -22,16 +22,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, '..', '..'))
 
 from core_modules.image_io import load_image
-from m14_preprocessing import clean
-from m14_detection import detect
-from m14_calibration import calibrate
+from m14v3_preprocessing import clean
+from m14v3_detection import detect
+from m14v3_calibration import calibrate
 
 from core_modules.ma_colour_space import extract_colour
 from core_modules.mb_shape_contours import extract_shape
+from core_modules.mc_texture_glmc import extract_texture_glcm
 from core_modules.md_gabor_filters import extract_gabor
 
 DATASET_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "datasets", "fruit_ripeness"))
-MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models", "m14"))
+MODEL_OUT_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "..", "trained_models", "m14v3"))
 
 FRUITS = ["apple", "banana", "orange", "mango"]
 CLASSES = ["ripe", "rotten", "unripe"]
@@ -53,7 +54,8 @@ def build_dataset(fruit):
                 vec_a = extract_colour(cleaned)
                 vec_b = extract_shape(cleaned)
                 vec_d = extract_gabor(cleaned)
-                vec = np.concatenate([vec_a, vec_b, vec_d])
+                vec_c = extract_texture_glcm(cleaned)
+                vec = np.concatenate([vec_a, vec_b, vec_d, vec_c])
                 X.append(vec)
                 y.append(label)
             except Exception as e:
@@ -69,7 +71,7 @@ if __name__ == "__main__":
     for fruit in FRUITS:
         fruit_start = time.time()
 
-        print(f"\nBuilding feature dataset for {fruit} (merged: A colour + B shape + D gabor)...")
+        print(f"\nBuilding feature dataset for {fruit} (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...")
         X, y = build_dataset(fruit)
         print(f"Loaded {len(X)} samples for {fruit} across classes: {set(y)}")
 
@@ -102,7 +104,7 @@ if __name__ == "__main__":
         clf.fit(X_scaled, y)
 
         os.makedirs(MODEL_OUT_DIR, exist_ok=True)
-        out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_m14.pkl")
+        out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_m14v3.pkl")
         joblib.dump({"model": clf, "scaler": scaler}, out_path)
         print(f"Model saved to {out_path}")
 
@@ -115,5 +117,5 @@ if __name__ == "__main__":
 
     if accuracies:
         summary_path = plot_accuracy_summary(accuracies)
-        print(f"\nAll graphs saved to outputs/training/merged_1_4/")
+        print(f"\nAll graphs saved to outputs/training/m14v3/")
         print(f"Accuracy summary: {summary_path}")

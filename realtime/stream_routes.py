@@ -25,6 +25,11 @@ from .merged_1_4_tracker import (
     get_session_log as merged14_get_session_log,
     clear_session_log as merged14_clear_session_log,
 )
+from .m14v2_tracker import (
+    process_frame as m14v2_process_frame,
+    get_session_log as m14v2_get_session_log,
+    clear_session_log as m14v2_clear_session_log,
+)
 from .svm_yolo_tracker import (
     process_frame as svm_process_frame,
     get_session_log as svm_get_session_log,
@@ -56,6 +61,7 @@ _ENGINES = {
     "ensemble_cd": (cd_process_frame, cd_get_session_log, cd_clear_session_log, "ensemble_cd_realtime"),
     "ensemble_da": (da_process_frame, da_get_session_log, da_clear_session_log, "ensemble_da_realtime"),
     "merged_1_4": (merged14_process_frame, merged14_get_session_log, merged14_clear_session_log, "merged_1_4_realtime"),
+    "m14v2": (m14v2_process_frame, m14v2_get_session_log, m14v2_clear_session_log, "m14v2_realtime"),
 }
 
 

@@ -31,6 +31,8 @@ MODEL_LABELS = {
     "yolo_pure": "YOLOv8 Classification (pure CNN, no SVM)",
     "merged_1_4": "Merged 1+4 (Colour + Shape + Gabor, single SVM)",
     "merged_1_4_realtime": "Real-Time YOLO Tracking + Merged 1+4 (Colour + Shape + Gabor)",
+    "m14v2": "Merged 1+4 v2 (Colour + Shape + Gabor + Texture, single SVM)",
+    "m14v2_realtime": "Real-Time YOLO Tracking + Merged 1+4 v2 (Colour + Shape + Gabor + Texture)",
 }
 
 

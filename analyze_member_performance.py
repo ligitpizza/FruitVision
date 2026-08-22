@@ -6,10 +6,11 @@ in mX_train_report.py) into one side-by-side comparison.
 Place this file at the PROJECT ROOT (same level as train_all.py).
 
 Run this AFTER train_all.py, once every member's *_classification_report.json
-exists under outputs/training/{ab,bc,cd,da,merged_1_4}/.
+exists under outputs/training/{ab,bc,cd,da,merged_1_4,m14v2}/.
 
-Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus merged_1_4 (the
-feature-level fusion of member 1 + member 4 into one SVM). The
+Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus the two feature-fusion
+experiments -- merged_1_4 (member 1 + member 4: colour+shape+gabor) and
+m14v2 (the same plus texture: colour+shape+gabor+texture). The
 pure-YOLOv8-cls pipeline is intentionally excluded -- it's a fully
 independent 5th predictor, not part of the soft-voted ensemble this data
 is meant to support.
@@ -24,27 +25,46 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 TRAINING_DIR = PROJECT_ROOT / "outputs" / "training"
 
-MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4"]
+MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4", "m14v2"]
+# Short codes for the console tables (kept narrow on purpose -- see
+# MEMBER_LABELS below for the full descriptive names, printed once as a
+# legend instead of repeated in every column header).
+MEMBER_SHORT = {
+    "ab": "M1",
+    "bc": "M2",
+    "cd": "M3",
+    "da": "M4",
+    "merged_1_4": "M1+4",
+    "m14v2": "M1+4v2",
+}
 MEMBER_LABELS = {
     "ab": "M1 (colour+shape)",
     "bc": "M2 (shape+texture)",
     "cd": "M3 (texture+gabor)",
     "da": "M4 (gabor+colour)",
     "merged_1_4": "M1+4 (colour+shape+gabor)",
+    "m14v2": "M1+4v2 (colour+shape+gabor+texture)",
 }
+# Folder name under outputs/training/ -- NOT the same as MEMBER_FOLDER below
+# (that one is the member_apps/ source folder, used only in the "run this
+# script" hint). This must match mX_train_report.py's TRAINING_OUT_DIR for
+# each model, e.g. merged_1_4's is outputs/training/merged_1_4/, not m14/.
 MEMBER_FOLDER = {
     "ab": "member_1_ab", "bc": "member_2_bc",
     "cd": "member_3_cd", "da": "member_4_da",
     "merged_1_4": "merged_member_1_4",
+    "m14v2": "merged_member_1_4_v2",
 }
 MEMBER_SCRIPT = {
     "ab": "m1_train.py", "bc": "m2_train.py",
     "cd": "m3_train.py", "da": "m4_train.py",
     "merged_1_4": "m14_train.py",
+    "m14v2": "m14v2_train.py",
 }
-# Column width derived from the longest label instead of a hardcoded 22, so
-# merged_1_4's longer label doesn't misalign the console tables.
-COL_WIDTH = max(22, max(len(l) for l in MEMBER_LABELS.values()) + 3)
+# Column width derived from the short codes, not the full labels -- keeps
+# the console tables narrow enough to not wrap in a normal terminal
+# regardless of how long a future model's descriptive label gets.
+COL_WIDTH = max(10, max(len(s) for s in MEMBER_SHORT.values()) + 3)
 FRUITS = ["apple", "banana", "orange", "mango"]
 CLASSES = ["ripe", "rotten", "unripe"]  # matches CLASSES in every mX_train.py
 
@@ -77,9 +97,19 @@ def main():
                 if cls in report["per_class"]:
                     consolidated[fruit][cls][tag] = report["per_class"][cls]
 
+    # --- legend: full descriptive names, printed once instead of repeated
+    # in every column header (that's what was blowing the tables past
+    # terminal width and wrapping into a mess) ---
+    print("=== Legend ===")
+    for tag in MEMBER_TAGS:
+        # MEMBER_LABELS already starts with the short code (e.g. "M1
+        # (colour+shape)") -- strip it so the legend doesn't read "M1 = M1 (...)".
+        features = MEMBER_LABELS[tag].split(" ", 1)[1]
+        print(f"  {MEMBER_SHORT[tag]:<8} = {features}")
+
     # --- console table: overall accuracy, all members side by side ---
     print("\n=== Overall accuracy by member, per fruit ===")
-    header = f"{'Fruit':<10}" + "".join(f"{MEMBER_LABELS[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
+    header = f"{'Fruit':<10}" + "".join(f"{MEMBER_SHORT[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
     print(header)
     for fruit in FRUITS:
         row = f"{fruit.capitalize():<10}"
@@ -92,7 +122,7 @@ def main():
     print("\n=== Per-class recall by member ===")
     for fruit in FRUITS:
         print(f"\n-- {fruit.capitalize()} --")
-        header = f"{'Class':<10}" + "".join(f"{MEMBER_LABELS[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
+        header = f"{'Class':<10}" + "".join(f"{MEMBER_SHORT[t]:>{COL_WIDTH}}" for t in MEMBER_TAGS)
         print(header)
         for cls in CLASSES:
             row = f"{cls:<10}"

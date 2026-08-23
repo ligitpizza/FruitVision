@@ -96,7 +96,13 @@
     applyTheme(next);
   }
 
-  applyTheme(localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
+  // Page-specific override (if the user has toggled it here before) wins;
+  // otherwise fall back to whatever the server already rendered on <body>
+  // based on their account-level Settings > Appearance preference, instead
+  // of always defaulting to light and clobbering that.
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  const initialTheme = storedTheme || (document.body.classList.contains("dark-mode") ? "dark" : "light");
+  applyTheme(initialTheme);
 
   function switchTab(name) {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));

@@ -26,6 +26,5 @@ outputs/surface/
 uploads/
 
 pipeline/pure_yolo/runs/
-pipeline/pure_yolo/*.pt
 
 datasets/yolo_cls/

@@ -6,7 +6,7 @@
   <title>{% block title %}FruitVision{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='design.css') }}">
 </head>
-<body>
+<body class="{{ 'dark-mode' if g.user and g.user.dark_mode }}">
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand"><span class="logo">FV</span> FruitVision</div>

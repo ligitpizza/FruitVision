@@ -44,6 +44,13 @@ def init_db():
         )
     """)
 
+    # Per-user (not global) preference: dark mode is remembered per account,
+    # not shared app-wide like the `settings` table below -- so it follows
+    # whichever user is logged in, on any device, starting from their very
+    # next page load after toggling it.
+    if not _column_exists(conn, "users", "dark_mode"):
+        conn.execute("ALTER TABLE users ADD COLUMN dark_mode INTEGER DEFAULT 0")
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS activity_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -165,6 +172,13 @@ def set_password(user_id, new_password):
 def update_user_name(user_id, name):
     conn = _connect()
     conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_dark_mode(user_id, enabled):
+    conn = _connect()
+    conn.execute("UPDATE users SET dark_mode = ? WHERE id = ?", (int(bool(enabled)), user_id))
     conn.commit()
     conn.close()
 

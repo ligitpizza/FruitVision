@@ -1225,6 +1225,14 @@ def settings():
                 auth_db.log_activity(g.user["id"], "change_password")
                 flash("Password updated.")
 
+        elif form == "appearance":
+            # Per-user, not the app-wide `settings` table above -- this
+            # follows whichever account is logged in, starting next page load.
+            dark_mode = request.form.get("dark_mode") == "on"
+            auth_db.set_dark_mode(g.user["id"], dark_mode)
+            auth_db.log_activity(g.user["id"], "update_appearance", detail="dark_mode=" + str(dark_mode))
+            flash("Appearance updated.")
+
         return redirect(url_for("settings"))
 
     return render_template(

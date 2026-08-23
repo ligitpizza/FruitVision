@@ -19,10 +19,22 @@ m3_predict.py and m4_predict.py already use for members whose feature pair
 doesn't include shape. The crop from detect() is what actually gets handed
 to the YOLO model, so the model sees a fruit-centered image rather than a
 full frame that might include background clutter.
+
+detect() below is NOT a bare import of member 1's original m1_detection.py
+-- it wraps the same Otsu logic with a fallback to member 4's HSV-saturation
+detector when Otsu degenerates to ~the whole frame (a real, observed
+failure: e.g. a multi-object photo on a plain background, or not enough
+intensity contrast to threshold cleanly). Without this, the whole photo
+silently gets cropped as "the fruit" and fed to the CNN, which is exactly
+what caused a plain green apple photo to misclassify after retraining --
+diagnosed live against member_1_ab's original detect() before this fix.
+member_1_ab's own file is left untouched (graded coursework); this wrapper
+lives here since yolo_pure is code under active maintenance, not graded.
 """
 import os
 import sys
 import numpy as np
+import cv2
 from ultralytics import YOLO
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -31,8 +43,63 @@ sys.path.append(PROJECT_ROOT)
 sys.path.append(os.path.join(PROJECT_ROOT, "member_apps", "member_1_ab"))
 
 from m1_preprocessing import clean
-from m1_detection import detect
 from core_modules.mb_shape_contours import extract_shape
+
+
+def _detect_otsu(enhanced_image):
+    gray = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    largest = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(largest)
+    return x, y, x + w, y + h
+
+
+def _detect_hsv_saturation(enhanced_image):
+    hsv = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2HSV)
+    saturation = hsv[:, :, 1]
+    _, sat_thresh = cv2.threshold(saturation, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    closed = cv2.morphologyEx(sat_thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    largest = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(largest)
+    return x, y, x + w, y + h
+
+
+def _is_degenerate(box, frame_area, threshold=0.9):
+    if box is None:
+        return True
+    x0, y0, x1, y1 = box
+    area = max(0, x1 - x0) * max(0, y1 - y0)
+    return area >= threshold * frame_area
+
+
+def detect(enhanced_image):
+    h_full, w_full = enhanced_image.shape[:2]
+    frame_area = h_full * w_full
+
+    box = _detect_otsu(enhanced_image)
+    if _is_degenerate(box, frame_area):
+        fallback = _detect_hsv_saturation(enhanced_image)
+        if fallback is not None and not _is_degenerate(fallback, frame_area):
+            box = fallback
+
+    if box is None:
+        return enhanced_image, (0, 0, w_full, h_full)
+
+    x, y_, x1_raw, y1_raw = box
+    pad = 10
+    x0, y0 = max(0, x - pad), max(0, y_ - pad)
+    x1 = min(w_full, x1_raw + pad)
+    y1 = min(h_full, y1_raw + pad)
+    cropped = enhanced_image[y0:y1, x0:x1]
+    bbox = (x0, y0, x1, y1)
+    return cropped, bbox
 
 MODEL_DIR = os.path.join(PROJECT_ROOT, "trained_models", "yolo_pure")
 _model_cache = {}

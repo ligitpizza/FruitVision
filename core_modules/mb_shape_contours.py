@@ -11,6 +11,19 @@ def extract_shape(cleaned_img):
     """
     gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Otsu just splits the histogram in two -- it doesn't know which side is
+    # "the object". Every member's calibrate() pads with white, so the
+    # image border is reliably background; if most of the border landed on
+    # the 255 (foreground) side, the actual object must be on the 0 side,
+    # so invert to put it back on 255 where findContours(RETR_EXTERNAL)
+    # expects foreground to be. Without this, a fruit darker than the white
+    # padding (common, since almost everything is) gets its contour traced
+    # as the image's own outer border instead of the fruit's silhouette.
+    border = np.concatenate([thresh[0, :], thresh[-1, :], thresh[:, 0], thresh[:, -1]])
+    if np.mean(border) > 127:
+        thresh = cv2.bitwise_not(thresh)
+
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     if not contours:

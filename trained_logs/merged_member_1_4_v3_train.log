@@ -2,9 +2,9 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
   warnings.warn(
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-[ WARN:0@1806.321] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn√á√ë250G√á√Ø_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg'): can't open/read file: check file path/integrity
-[ WARN:0@1954.496] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG√á√Ø_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg'): can't open/read file: check file path/integrity
-[ WARN:0@1954.496] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG√á√Ø_png.rf.Jd9En5JfkFaniemeIfvP.png'): can't open/read file: check file path/integrity
+[ WARN:0@759.398] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn√á√ë250G√á√Ø_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@847.992] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG√á√Ø_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@847.992] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG√á√Ø_png.rf.Jd9En5JfkFaniemeIfvP.png'): can't open/read file: check file path/integrity
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
@@ -18,23 +18,23 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
 
-Building feature dataset for apple (C: texture + D: gabor)...
+Building feature dataset for apple (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
 Loaded 7608 samples for apple across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
-        ripe       0.51      0.54      0.52       423
-      rotten       0.70      0.46      0.55       635
-      unripe       0.60      0.85      0.70       464
+        ripe       0.81      0.87      0.84       423
+      rotten       0.93      0.93      0.93       635
+      unripe       0.93      0.87      0.90       464
 
-    accuracy                           0.60      1522
-   macro avg       0.60      0.62      0.59      1522
-weighted avg       0.62      0.60      0.59      1522
+    accuracy                           0.89      1522
+   macro avg       0.89      0.89      0.89      1522
+weighted avg       0.89      0.89      0.89      1522
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\apple_ensemble_cd.pkl
-[time] apple took 16m 45.4s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\apple_m14v3.pkl
+[time] apple took 7m 13.8s
 
-Building feature dataset for banana (C: texture + D: gabor)...
+Building feature dataset for banana (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
 Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn«—250G«Ô_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn«—250G«Ô_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg
 Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG«Ô_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG«Ô_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg
 Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG«Ô_png.rf.Jd9En5JfkFaniemeIfvP.png: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG«Ô_png.rf.Jd9En5JfkFaniemeIfvP.png
@@ -42,50 +42,50 @@ Loaded 7714 samples for banana across classes: {np.str_('unripe'), np.str_('ripe
 Test set performance for banana:
               precision    recall  f1-score   support
 
-        ripe       0.78      0.79      0.79       445
-      rotten       0.90      0.63      0.74       613
-      unripe       0.65      0.88      0.75       485
+        ripe       0.90      0.92      0.91       445
+      rotten       0.94      0.95      0.94       613
+      unripe       0.97      0.94      0.95       485
 
-    accuracy                           0.76      1543
-   macro avg       0.77      0.77      0.76      1543
-weighted avg       0.78      0.76      0.76      1543
+    accuracy                           0.94      1543
+   macro avg       0.94      0.94      0.94      1543
+weighted avg       0.94      0.94      0.94      1543
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\banana_ensemble_cd.pkl
-[time] banana took 16m 57.3s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\banana_m14v3.pkl
+[time] banana took 7m 23.4s
 
-Building feature dataset for orange (C: texture + D: gabor)...
+Building feature dataset for orange (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
 Loaded 5818 samples for orange across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
-        ripe       0.75      0.78      0.77       392
-      rotten       0.83      0.57      0.68       468
-      unripe       0.63      0.90      0.74       304
+        ripe       0.86      0.93      0.89       392
+      rotten       0.92      0.86      0.89       468
+      unripe       0.93      0.91      0.92       304
 
-    accuracy                           0.73      1164
-   macro avg       0.74      0.75      0.73      1164
-weighted avg       0.75      0.73      0.72      1164
+    accuracy                           0.90      1164
+   macro avg       0.90      0.90      0.90      1164
+weighted avg       0.90      0.90      0.90      1164
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\orange_ensemble_cd.pkl
-[time] orange took 12m 13.6s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\orange_m14v3.pkl
+[time] orange took 5m 52.5s
 
-Building feature dataset for mango (C: texture + D: gabor)...
+Building feature dataset for mango (m14v3: Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)...
 Loaded 4955 samples for mango across classes: {np.str_('unripe'), np.str_('ripe'), np.str_('rotten')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
-        ripe       0.46      0.59      0.52       226
-      rotten       0.69      0.63      0.66       364
-      unripe       0.83      0.76      0.79       401
+        ripe       0.64      0.81      0.72       226
+      rotten       0.83      0.74      0.78       364
+      unripe       0.94      0.90      0.92       401
 
-    accuracy                           0.67       991
-   macro avg       0.66      0.66      0.66       991
-weighted avg       0.69      0.67      0.68       991
+    accuracy                           0.82       991
+   macro avg       0.80      0.81      0.81       991
+weighted avg       0.83      0.82      0.82       991
 
-Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_cd\mango_ensemble_cd.pkl
-[time] mango took 8m 30.5s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v3\mango_m14v3.pkl
+[time] mango took 4m 21.4s
 
-[time] Total training run took 54m 26.9s
+[time] Total training run took 24m 51.1s
 
-All graphs saved to outputs/training/cd/
-Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\cd\accuracy_summary.png
+All graphs saved to outputs/training/m14v3/
+Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\m14v3\accuracy_summary.png

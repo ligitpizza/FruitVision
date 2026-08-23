@@ -32,6 +32,7 @@
         <option value="ensemble_da">Ensemble DA only (Gabor + Colour)</option>
         <option value="merged_1_4">Merged 1+4 (Colour + Shape + Gabor, single SVM)</option>
         <option value="m14v2">Merged 1+4 v2 (Colour + Shape + Gabor + Texture, single SVM)</option>
+        <option value="m14v3">Merged 1+4 v3 (Otsu+HSV union detect, deskew calibrate, single SVM)</option>
         <option value="yolo_cls">Pure YOLO (YOLOv8-cls, no SVM)</option>
       </select>
     </div>
@@ -79,6 +80,7 @@
     ensemble_da: "ensemble_da_realtime",
     merged_1_4: "merged_1_4_realtime",
     m14v2: "m14v2_realtime",
+    m14v3: "m14v3_realtime",
   };
 
   const THEME_KEY = "fruitvision_realtime_theme";

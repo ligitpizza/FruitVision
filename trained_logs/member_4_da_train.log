@@ -1,85 +1,91 @@
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+[ WARN:0@1065.284] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn√á√ë250G√á√Ø_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@1154.799] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG√á√Ø_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@1154.799] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG√á√Ø_png.rf.Jd9En5JfkFaniemeIfvP.png'): can't open/read file: check file path/integrity
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\.venv\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
 
 Building feature dataset for apple (D: gabor + A: colour)...
-Loaded 5969 samples for apple across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 7608 samples for apple across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
-        ripe       0.85      0.88      0.87       339
-      rotten       0.92      0.91      0.91       468
-      unripe       0.96      0.94      0.95       387
+        ripe       0.83      0.85      0.84       423
+      rotten       0.92      0.92      0.92       635
+      unripe       0.92      0.88      0.90       464
 
-    accuracy                           0.91      1194
-   macro avg       0.91      0.91      0.91      1194
-weighted avg       0.91      0.91      0.91      1194
+    accuracy                           0.89      1522
+   macro avg       0.89      0.89      0.89      1522
+weighted avg       0.89      0.89      0.89      1522
 
-Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_da\apple_ensemble_da.pkl
-[time] apple took 56.2s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\apple_ensemble_da.pkl
+[time] apple took 9m 41.7s
 
 Building feature dataset for banana (D: gabor + A: colour)...
-Loaded 5902 samples for banana across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn«—250G«Ô_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn«—250G«Ô_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg
+Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG«Ô_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgG«Ô_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg
+Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG«Ô_png.rf.Jd9En5JfkFaniemeIfvP.png: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgG«Ô_png.rf.Jd9En5JfkFaniemeIfvP.png
+Loaded 7714 samples for banana across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for banana:
               precision    recall  f1-score   support
 
-        ripe       0.92      0.94      0.93       316
-      rotten       0.94      0.98      0.96       445
-      unripe       0.96      0.91      0.94       420
+        ripe       0.93      0.93      0.93       445
+      rotten       0.95      0.97      0.96       613
+      unripe       0.96      0.92      0.94       485
 
-    accuracy                           0.94      1181
-   macro avg       0.94      0.94      0.94      1181
-weighted avg       0.94      0.94      0.94      1181
+    accuracy                           0.94      1543
+   macro avg       0.94      0.94      0.94      1543
+weighted avg       0.94      0.94      0.94      1543
 
-Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_da\banana_ensemble_da.pkl
-[time] banana took 1m 1.0s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\banana_ensemble_da.pkl
+[time] banana took 10m 10.3s
 
 Building feature dataset for orange (D: gabor + A: colour)...
-Loaded 4346 samples for orange across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 5818 samples for orange across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
-        ripe       0.89      0.90      0.90       294
-      rotten       0.90      0.86      0.88       319
-      unripe       0.93      0.96      0.94       257
+        ripe       0.81      0.88      0.85       392
+      rotten       0.89      0.83      0.86       468
+      unripe       0.94      0.93      0.94       304
 
-    accuracy                           0.90       870
-   macro avg       0.91      0.91      0.91       870
-weighted avg       0.90      0.90      0.90       870
+    accuracy                           0.87      1164
+   macro avg       0.88      0.88      0.88      1164
+weighted avg       0.88      0.87      0.87      1164
 
-Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_da\orange_ensemble_da.pkl
-[time] orange took 42.5s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\orange_ensemble_da.pkl
+[time] orange took 7m 36.9s
 
 Building feature dataset for mango (D: gabor + A: colour)...
-Loaded 1240 samples for mango across classes: {np.str_('rotten'), np.str_('unripe'), np.str_('ripe')}
+Loaded 4955 samples for mango across classes: {np.str_('unripe'), np.str_('rotten'), np.str_('ripe')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
-        ripe       0.83      0.59      0.69       106
-      rotten       0.36      0.74      0.48        31
-      unripe       0.97      0.95      0.96       111
+        ripe       0.65      0.80      0.72       226
+      rotten       0.86      0.75      0.80       364
+      unripe       0.93      0.92      0.92       401
 
-    accuracy                           0.77       248
-   macro avg       0.72      0.76      0.71       248
-weighted avg       0.83      0.77      0.79       248
+    accuracy                           0.83       991
+   macro avg       0.81      0.82      0.81       991
+weighted avg       0.84      0.83      0.83       991
 
-Model saved to C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\trained_models\ensemble_da\mango_ensemble_da.pkl
-[time] mango took 10.8s
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\ensemble_da\mango_ensemble_da.pkl
+[time] mango took 6m 19.8s
 
-[time] Total training run took 2m 50.5s
+[time] Total training run took 33m 48.8s
 
 All graphs saved to outputs/training/da/
-Accuracy summary: C:\Users\weith\Downloads\ImageProcessingAssignment\FruitVision\outputs\training\da\accuracy_summary.png
+Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\da\accuracy_summary.png

@@ -34,6 +34,7 @@ MODEL_LABELS = {
     "m14v2": "Merged 1+4 v2 (Colour + Shape + Gabor + Texture, single SVM)",
     "m14v2_realtime": "Real-Time YOLO Tracking + Merged 1+4 v2 (Colour + Shape + Gabor + Texture)",
     "m14v3": "Merged 1+4 v3 (Otsu+HSV union detect, deskew calibrate, Colour + Shape + Gabor + Texture)",
+    "m14v3_realtime": "Real-Time YOLO Tracking + Merged 1+4 v3 (Otsu+HSV union detect, deskew calibrate, Colour + Shape + Gabor + Texture)",
 }
 
 

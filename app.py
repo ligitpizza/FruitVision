@@ -85,11 +85,12 @@ from database.history_db import (
     get_stats,
     get_stats_since,
 )
-from database import auth_db
+from database import auth_db, stock_db
 
 FRUITS = ["apple", "banana", "orange", "mango"]
 RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
 HISTORY_PAGE_SIZE = 15
+STOCK_PAGE_SIZE = 15
 
 app = Flask(__name__)
 app.secret_key = "fruitivision-dev-key"  # only used for flash(); replace for real deployment
@@ -496,6 +497,7 @@ def predict_unified():
     """
     fruit_type = request.form.get("fruit", "apple")
     model_choice = request.form.get("model", "ab")
+    validate_upload = request.form.get("validate", "1") != "0"
     files = request.files.getlist("image")
     if not files or files[0].filename == "":
         return {"error": "No image uploaded"}, 400
@@ -506,10 +508,18 @@ def predict_unified():
     img = cv2.imread(path)
     if img is None:
         return {"error": "Uploaded image could not be read", "filename": f.filename}, 400
-    try:
-        input_validation = validate_selected_fruit(img, fruit_type)
-    except FruitValidationError as e:
-        return {"error": str(e), "filename": f.filename}, 422
+    if validate_upload:
+        try:
+            input_validation = validate_selected_fruit(img, fruit_type)
+        except FruitValidationError as e:
+            return {"error": str(e), "filename": f.filename}, 422
+    else:
+        input_validation = {
+            "selected_fruit": fruit_type,
+            "detected_fruit": None,
+            "confidence": None,
+            "validation_method": "skipped",
+        }
 
     if model_choice == "all_four":
         t0 = time.perf_counter()
@@ -621,6 +631,28 @@ def dashboard(model_key):
         active_page="classify",
     )
 
+def _log_batch_stock(add_to_stock, fruit_type, label, breakdown=None):
+    """Log one batch-analysis image's result(s) as stock movements, if the
+    'add to stock' checkbox was ticked. In multi-fruit mode, breakdown is the
+    {label: count} Counter from that one photo and logs one row per detected
+    ripeness label with that label's count as quantity; otherwise logs a
+    single +1 for the image's overall label."""
+    if not add_to_stock:
+        return
+    user_id = g.user["id"] if g.user else None
+    if breakdown:
+        for detected_label, count in breakdown.items():
+            stock_db.log_stock_event(
+                fruit=fruit_type, label=detected_label, quantity=count,
+                source="batch", user_id=user_id,
+            )
+    else:
+        stock_db.log_stock_event(
+            fruit=fruit_type, label=label, quantity=1,
+            source="batch", user_id=user_id,
+        )
+
+
 ALL_FOUR_LABEL = "Ensemble (All 4 members, soft-voted)"
 ALL_FOUR_KEY = "all_four"
 
@@ -642,6 +674,7 @@ def analyse():
     # Only apple/banana/orange support it (no COCO mango class); a mango
     # photo silently keeps using the existing single-fruit path below.
     multi_fruit = request.form.get("multi_fruit") == "on"
+    add_to_stock = request.form.get("add_to_stock") == "on"
 
     if model_choice == ALL_FOUR_KEY:
         member_tag = "ensemble_all_four"
@@ -676,6 +709,7 @@ def analyse():
                         flagged=_is_flagged(multi["confidence"]),
                         detection_breakdown=json.dumps(multi["breakdown"]),
                     )
+                    _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
                     results.append({
                         "filename": f.filename,
                         "fruit": fruit_type,
@@ -713,6 +747,7 @@ def analyse():
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence),
             )
+            _log_batch_stock(add_to_stock, fruit_type, label)
 
             results.append({
                 "filename": f.filename,
@@ -764,6 +799,7 @@ def analyse():
                         flagged=_is_flagged(confidence_pct),
                         detection_breakdown=json.dumps(multi["breakdown"]),
                     )
+                    _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
                     results.append({
                         "filename": f.filename,
                         "fruit": fruit_type,
@@ -802,6 +838,7 @@ def analyse():
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence_pct),
             )
+            _log_batch_stock(add_to_stock, fruit_type, label)
 
             results.append({
                 "filename": f.filename,
@@ -1047,6 +1084,108 @@ def history_delete(record_id):
     deleted = delete_result(record_id)
     flash("Record deleted." if deleted else "Record not found.")
     return redirect(url_for("history", page=request.form.get("page", 1)))
+
+
+# --------------------------------------------------------------------------
+# Fruit Stock — CRUD ledger of stock movements (manual entries, plus
+# automatic entries from batch analysis; see _log_batch_stock above).
+# --------------------------------------------------------------------------
+@app.route("/stock")
+def stock():
+    fruit_filter = request.args.get("fruit") or None
+    label_filter = request.args.get("label") or None
+    source_filter = request.args.get("source") or None
+    date_from = _valid_date_arg("date_from")
+    date_to = _valid_date_arg("date_to")
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+
+    rows, total = stock_db.get_paginated(
+        fruit=fruit_filter, label=label_filter, source=source_filter,
+        date_from=date_from, date_to=date_to, page=page, per_page=STOCK_PAGE_SIZE,
+    )
+    total_pages = max(1, math.ceil(total / STOCK_PAGE_SIZE))
+    page = min(page, total_pages)
+
+    summary = stock_db.get_summary(fruit=fruit_filter, date_from=date_from, date_to=date_to)
+
+    return render_template(
+        "stock.html",
+        results=rows,
+        fruit_filter=fruit_filter,
+        label_filter=label_filter,
+        source_filter=source_filter,
+        date_from=date_from,
+        date_to=date_to,
+        fruits=FRUITS,
+        classes=RIPENESS_CLASSES,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        summary=summary,
+        active_page="stock",
+    )
+
+
+@app.route("/stock/add", methods=["POST"])
+def stock_add():
+    fruit = request.form.get("fruit")
+    label = request.form.get("label")
+    note = request.form.get("note") or None
+    try:
+        quantity = int(request.form.get("quantity", ""))
+    except ValueError:
+        flash("Quantity must be a whole number.")
+        return redirect(url_for("stock"))
+    if fruit not in FRUITS or label not in RIPENESS_CLASSES or quantity == 0:
+        flash("Enter a valid fruit, ripeness, and non-zero quantity.")
+        return redirect(url_for("stock"))
+
+    stock_db.log_stock_event(
+        fruit=fruit, label=label, quantity=quantity, source="manual",
+        note=note, user_id=g.user["id"] if g.user else None,
+    )
+    flash("Stock entry added.")
+    return redirect(url_for("stock"))
+
+
+@app.route("/stock/<int:event_id>/edit", methods=["GET", "POST"])
+def stock_edit(event_id):
+    record = stock_db.get_by_id(event_id)
+    if not record:
+        flash("That stock entry no longer exists.")
+        return redirect(url_for("stock"))
+
+    if request.method == "POST":
+        try:
+            quantity = int(request.form.get("quantity", ""))
+        except ValueError:
+            flash("Quantity must be a whole number.")
+            return redirect(url_for("stock_edit", event_id=event_id))
+
+        stock_db.update_stock_event(
+            event_id,
+            fruit=request.form.get("fruit"),
+            label=request.form.get("label"),
+            quantity=quantity,
+            note=request.form.get("note") or None,
+        )
+        flash("Stock entry updated.")
+        return redirect(url_for("stock"))
+
+    return render_template(
+        "stock_edit.html", record=record, fruits=FRUITS, classes=RIPENESS_CLASSES,
+        active_page="stock",
+    )
+
+
+@app.route("/stock/<int:event_id>/delete", methods=["POST"])
+def stock_delete(event_id):
+    deleted = stock_db.delete_stock_event(event_id)
+    flash("Stock entry deleted." if deleted else "Stock entry not found.")
+    return redirect(url_for("stock", page=request.form.get("page", 1)))
 
 
 # --------------------------------------------------------------------------

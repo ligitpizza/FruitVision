@@ -28,6 +28,7 @@ from member_apps.merged_member_1_4_v2.m14v2_preprocessing import clean
 from member_apps.merged_member_1_4_v2.m14v2_detection import detect as classical_detect
 
 from database.history_db import log_result
+from database.stock_db import log_stock_event
 from .tracker_config import (
     YOLO_WEIGHTS_PATH,
     YOLO_IMGSZ,
@@ -53,6 +54,7 @@ MIN_FRAME_CONFIDENCE = 0.35
 CROP_PAD = 15
 
 _track_state = {}
+_counted_tracks = set()  # track_ids already logged into the stock ledger, once per physical fruit
 _mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []
 
@@ -224,6 +226,10 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
     prev_label = state["label"]
     committed_label, committed_confidence, stable = _update_rolling_vote(state, frame_label, frame_confidence)
     state["label"], state["confidence"] = committed_label, committed_confidence
+
+    if stable and tid not in _counted_tracks:
+        _counted_tracks.add(tid)
+        log_stock_event(fruit=fruit_type, label=committed_label, quantity=1, source="realtime", track_tag=f"track{tid}")
 
     if stable and committed_label != prev_label:
         _record_classification(crop, fruit_type, committed_label, committed_confidence, tag=f"track{tid}_frame{frame_idx}")

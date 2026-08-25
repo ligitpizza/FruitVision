@@ -40,6 +40,8 @@ class HistoryDatabaseSurfaceTests(unittest.TestCase):
         self.assertIsNone(row["blemish_percentage"])
         self.assertIn("marketability_status", row)
         self.assertIsNone(row["marketability_status"])
+        self.assertIn("review_status", row)
+        self.assertIsNone(row["review_status"])
 
     def test_failed_analysis_persists_as_null_not_zero(self):
         history_db.init_db()
@@ -90,6 +92,31 @@ class HistoryDatabaseSurfaceTests(unittest.TestCase):
         stats = history_db.get_stats("ensemble_ab")
         self.assertEqual(stats["avg_blemish_percentage"], 5.0)
         self.assertEqual(stats["by_quality_grade"], {"Grade A": 1})
+
+    def test_operator_review_is_stored_without_overwriting_model_result(self):
+        history_db.init_db()
+        history_db.log_result(
+            member="yolo_pure", fruit="banana", label="rotten", confidence=76.1,
+            marketability_status="remove", dispatch_priority="remove",
+        )
+
+        updated = history_db.update_result(
+            1,
+            review_status="corrected",
+            review_fruit="banana",
+            review_label="ripe",
+            review_reason="Yellow peel and firm fruit confirmed during inspection.",
+            reviewed_by="Test Farmer",
+            reviewed_at="2026-08-25T16:00:00",
+        )
+
+        self.assertTrue(updated)
+        row = history_db.get_by_id(1)
+        self.assertEqual(row["label"], "rotten")
+        self.assertEqual(row["confidence"], 76.1)
+        self.assertEqual(row["marketability_status"], "remove")
+        self.assertEqual(row["review_status"], "corrected")
+        self.assertEqual(row["review_label"], "ripe")
 
 
 if __name__ == "__main__":

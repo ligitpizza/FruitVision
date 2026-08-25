@@ -340,6 +340,43 @@ def _marketability_sort_key(record):
     )
 
 
+def _review_for_record(record, breakdown, estimate):
+    """Return the operator-review view without changing the model result."""
+    stored_status = record.get("review_status")
+    if stored_status in {"confirmed", "corrected"}:
+        return {
+            "status": stored_status,
+            "fruit": record.get("review_fruit"),
+            "label": record.get("review_label"),
+            "reason": record.get("review_reason"),
+            "reviewed_by": record.get("reviewed_by"),
+            "reviewed_at": record.get("reviewed_at"),
+            "triggers": [],
+        }
+
+    triggers = []
+    if record.get("flagged"):
+        triggers.append("Low confidence")
+    if breakdown:
+        present_classes = [label for label, count in breakdown.items() if int(count) > 0]
+        if len(present_classes) > 1:
+            triggers.append("Mixed classifications")
+    if estimate.get("status") in {"remove", "inspect", "isolate"}:
+        triggers.append("Handling decision requires inspection")
+    elif estimate.get("dispatch_priority") in {"remove", "urgent"}:
+        triggers.append("Urgent handling decision")
+
+    return {
+        "status": "needs_review" if triggers else "not_required",
+        "fruit": None,
+        "label": None,
+        "reason": None,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "triggers": triggers,
+    }
+
+
 def _decorate_marketability_rows(rows):
     decorated = []
     for row in rows:
@@ -402,6 +439,7 @@ def _decorate_marketability_rows(rows):
         else:
             item["detected_count"] = None
         item["marketability"] = estimate
+        item["review"] = _review_for_record(item, breakdown, estimate)
         decorated.append(item)
     return sorted(decorated, key=_marketability_sort_key)
 
@@ -1186,6 +1224,7 @@ def marketability_dashboard():
     analysis_filter = request.args.get("analysis") or None
     status_filter = request.args.get("status") or None
     priority_filter = request.args.get("priority") or None
+    review_filter = request.args.get("review") or None
     date_from = _valid_date_arg("date_from")
     date_to = _valid_date_arg("date_to")
 
@@ -1206,6 +1245,8 @@ def marketability_dashboard():
             row for row in rows
             if row["marketability"].get("dispatch_priority") == priority_filter
         ]
+    if review_filter:
+        rows = [row for row in rows if row["review"].get("status") == review_filter]
 
     summary = {
         "total": len(rows),
@@ -1223,6 +1264,9 @@ def marketability_dashboard():
         "batch": sum(
             row.get("analysis_kind") in {"batch", "multi_fruit_batch"}
             for row in rows
+        ),
+        "needs_review": sum(
+            row["review"].get("status") == "needs_review" for row in rows
         ),
     }
     model_options = [
@@ -1243,10 +1287,60 @@ def marketability_dashboard():
         analysis_filter=analysis_filter,
         status_filter=status_filter,
         priority_filter=priority_filter,
+        review_filter=review_filter,
         date_from=date_from,
         date_to=date_to,
         active_page="marketability",
     )
+
+
+@app.route("/marketability/<int:record_id>/review", methods=["POST"])
+def marketability_review(record_id):
+    """Store a human decision alongside, never over, the model prediction."""
+    record = get_by_id(record_id)
+    if not record:
+        flash("That prediction record no longer exists.")
+        return redirect(url_for("marketability_dashboard"))
+
+    decision = request.form.get("decision", "")
+    reason = request.form.get("reason", "").strip()[:500] or None
+    review_fields = {
+        "reviewed_by": g.user["name"],
+        "reviewed_at": datetime.now().isoformat(timespec="seconds"),
+        "review_reason": reason,
+    }
+    if decision == "confirm":
+        review_fields.update({
+            "review_status": "confirmed",
+            "review_fruit": None,
+            "review_label": None,
+        })
+        message = "Model result confirmed after inspection."
+    elif decision == "correct":
+        review_fruit = request.form.get("review_fruit")
+        review_label = request.form.get("review_label")
+        if review_fruit not in FRUITS or review_label not in RIPENESS_CLASSES:
+            flash("Choose a valid observed fruit and ripeness classification.")
+            return redirect(url_for("marketability_dashboard"))
+        review_fields.update({
+            "review_status": "corrected",
+            "review_fruit": review_fruit,
+            "review_label": review_label,
+        })
+        message = "Operator correction saved separately from the model result."
+    else:
+        flash("Choose whether to confirm or correct the model result.")
+        return redirect(url_for("marketability_dashboard"))
+
+    if not update_result(record_id, **review_fields):
+        flash("The review could not be saved because the record is no longer available.")
+        return redirect(url_for("marketability_dashboard"))
+    auth_db.log_activity(
+        g.user["id"], "review_marketability",
+        detail=f"record {record_id}: {review_fields['review_status']}",
+    )
+    flash(message)
+    return redirect(url_for("marketability_dashboard"))
 
 
 @app.route("/history")

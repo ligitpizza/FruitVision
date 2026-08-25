@@ -177,6 +177,10 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertIn("2 ripe", dashboard_html)
             self.assertIn("1 rotten", dashboard_html)
             self.assertIn("Sort this mixed batch", dashboard_html)
+            self.assertIn("Needs Review", dashboard_html)
+            self.assertIn("NEEDS REVIEW", dashboard_html)
+            self.assertIn("openMarketabilityReview", dashboard_html)
+            self.assertIn("This original model result will not be changed.", dashboard_html)
 
             rotten_only_response = client.get("/marketability?ripeness=rotten")
             rotten_only_html = rotten_only_response.get_data(as_text=True)
@@ -189,6 +193,39 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertIn("#3", batch_only_html)
             self.assertNotIn("#1", batch_only_html)
             self.assertNotIn("#2", batch_only_html)
+
+            review_only_response = client.get("/marketability?review=needs_review")
+            review_only_html = review_only_response.get_data(as_text=True)
+            self.assertIn("#2", review_only_html)
+            self.assertIn("#3", review_only_html)
+            self.assertNotIn("#1", review_only_html)
+            self.assertIn('value="needs_review" selected', review_only_html)
+
+            review_updates = []
+            app_module.get_by_id = lambda record_id: {
+                "id": record_id, "fruit": "banana", "label": "rotten", "confidence": 76.1,
+            }
+            app_module.update_result = lambda record_id, **fields: review_updates.append((record_id, fields)) or True
+            app_module.auth_db.get_user_by_id = lambda user_id: {
+                "id": user_id, "name": "Test Farmer", "email": "farmer@example.test",
+                "role": "farmer", "dark_mode": 0,
+            }
+            app_module.auth_db.log_activity = lambda *args, **kwargs: None
+            with client.session_transaction() as session_data:
+                session_data["user_id"] = 7
+            review_response = client.post(
+                "/marketability/2/review",
+                data={
+                    "decision": "correct", "review_fruit": "banana",
+                    "review_label": "ripe", "reason": "Yellow peel and firm fruit.",
+                },
+            )
+            self.assertEqual(review_response.status_code, 302)
+            self.assertEqual(review_updates[0][0], 2)
+            self.assertEqual(review_updates[0][1]["review_status"], "corrected")
+            self.assertEqual(review_updates[0][1]["review_label"], "ripe")
+            self.assertNotIn("label", review_updates[0][1])
+            self.assertNotIn("confidence", review_updates[0][1])
 
             expired = app_module._marketability_for_record({
                 "id": 3, "created_at": "2020-01-01T00:00:00", "fruit": "banana",

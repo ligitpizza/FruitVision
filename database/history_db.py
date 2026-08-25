@@ -95,6 +95,8 @@ def update_result(result_id, **fields):
         "dispatch_priority", "marketability_min_days", "marketability_max_days",
         "marketability_action", "marketability_reliability",
         "marketability_storage_assumption",
+        "review_status", "review_fruit", "review_label", "review_reason",
+        "reviewed_by", "reviewed_at",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
@@ -241,7 +243,13 @@ def init_db():
             marketability_max_days INTEGER,
             marketability_action TEXT,
             marketability_reliability TEXT,
-            marketability_storage_assumption TEXT
+            marketability_storage_assumption TEXT,
+            review_status TEXT,
+            review_fruit TEXT,
+            review_label TEXT,
+            review_reason TEXT,
+            reviewed_by TEXT,
+            reviewed_at TEXT
         )
     """)
     # Compatibility migration for databases created by earlier versions.
@@ -267,6 +275,12 @@ def init_db():
         "marketability_action": "TEXT",
         "marketability_reliability": "TEXT",
         "marketability_storage_assumption": "TEXT",
+        "review_status": "TEXT",
+        "review_fruit": "TEXT",
+        "review_label": "TEXT",
+        "review_reason": "TEXT",
+        "reviewed_by": "TEXT",
+        "reviewed_at": "TEXT",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:

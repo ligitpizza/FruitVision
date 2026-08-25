@@ -95,7 +95,6 @@ class MarketabilityConsistencyTests(unittest.TestCase):
         self.assertEqual(result["status"], "inspect")
         self.assertIsNone(result["min_days"])
 
-
 class EnsembleProbabilityTests(unittest.TestCase):
     def test_member_probabilities_are_averaged_without_changing_member_results(self):
         members = {

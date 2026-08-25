@@ -38,6 +38,8 @@ class HistoryDatabaseSurfaceTests(unittest.TestCase):
         self.assertEqual(row["label"], "ripe")
         self.assertIn("blemish_percentage", row)
         self.assertIsNone(row["blemish_percentage"])
+        self.assertIn("marketability_status", row)
+        self.assertIsNone(row["marketability_status"])
 
     def test_failed_analysis_persists_as_null_not_zero(self):
         history_db.init_db()
@@ -52,6 +54,27 @@ class HistoryDatabaseSurfaceTests(unittest.TestCase):
         row = history_db.get_by_id(1)
         self.assertIsNone(row["blemish_percentage"])
         self.assertIsNone(row["quality_grade"])
+
+    def test_marketability_decision_is_persisted(self):
+        history_db.init_db()
+        history_db.log_result(
+            member="ensemble_ab",
+            fruit="apple",
+            label="rotten",
+            confidence=91.0,
+            marketability_status="remove",
+            dispatch_priority="remove",
+            marketability_min_days=0,
+            marketability_max_days=0,
+            marketability_action="Do not market this fruit.",
+            marketability_reliability="high",
+            marketability_storage_assumption="whole fruit in cold storage",
+        )
+        row = history_db.get_by_id(1)
+        self.assertEqual(row["marketability_status"], "remove")
+        self.assertEqual(row["dispatch_priority"], "remove")
+        self.assertEqual(row["marketability_min_days"], 0)
+        self.assertEqual(row["marketability_max_days"], 0)
 
     def test_surface_analytics_ignore_failed_rows(self):
         history_db.init_db()

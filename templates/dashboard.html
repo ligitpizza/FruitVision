@@ -18,6 +18,19 @@
   </div>
 {% else %}
 
+{% if marketability_alert_count %}
+<div class="marketability-alert" id="marketability-alert" data-alert-count="{{ marketability_alert_count }}" style="margin-top:20px;">
+  <div>
+    <strong>{{ marketability_alert_count }} recent scan{{ '' if marketability_alert_count == 1 else 's' }} require urgent handling</strong>
+    <div>Review dispatch, isolation, and removal recommendations.</div>
+  </div>
+  <div class="marketability-alert-actions">
+    <a class="btn btn-sm" href="/marketability">Open Marketability</a>
+    <button type="button" class="marketability-alert-close" aria-label="Dismiss urgent handling alert" title="Dismiss" onclick="dismissMarketabilityAlert()">&times;</button>
+  </div>
+</div>
+{% endif %}
+
 <div class="grid grid-3" style="margin-top:20px;">
   <div class="stat-tile">
     <div class="label">Scans (Last 24h)</div>
@@ -111,6 +124,20 @@
 {% endif %}
 
 <script>
+  function dismissMarketabilityAlert() {
+    const alert = document.getElementById('marketability-alert');
+    if (!alert) return;
+    sessionStorage.setItem('marketability-alert-dismissed-count', alert.dataset.alertCount);
+    alert.hidden = true;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const alert = document.getElementById('marketability-alert');
+    if (!alert) return;
+    const dismissedCount = sessionStorage.getItem('marketability-alert-dismissed-count');
+    if (dismissedCount === alert.dataset.alertCount) alert.hidden = true;
+  });
+
   function dashSwitchView(name) {
     document.querySelectorAll('.tabs .tab-btn').forEach(b => b.classList.remove('active'));
     event.target.classList.add('active');

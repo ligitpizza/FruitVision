@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Marketability - FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Marketability Dashboard</h1>
+    <p>Farmer-focused handling priorities derived after each unchanged ripeness prediction.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/history">Harvest Records</a>
+    <a class="btn" href="/classify">+ New Classification</a>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Urgent Handling</div>
+    <div class="value marketability-urgent-text">{{ summary.urgent }}</div>
+    <div class="delta down">dispatch, inspect, or remove</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Ready for Market</div>
+    <div class="value">{{ summary.ready }}</div>
+    <div class="delta">plan dispatch</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Hold for Ripening</div>
+    <div class="value">{{ summary.hold }}</div>
+    <div class="delta">monitor and re-scan</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Manual Inspection</div>
+    <div class="value">{{ summary.inspect }}</div>
+    <div class="delta down">estimate withheld</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Remove from Market</div>
+    <div class="value marketability-urgent-text">{{ summary.remove }}</div>
+    <div class="delta down">classified as rotten</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Displayed Records</div>
+    <div class="value">{{ summary.total }}</div>
+    <div class="delta">maximum 250 rows shown</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Batch Results</div>
+    <div class="value">{{ summary.batch }}</div>
+    <div class="delta">batch and multi-fruit analyses</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <form method="get" class="marketability-filter-grid">
+    <div>
+      <label for="marketability-fruit">Fruit</label>
+      <select id="marketability-fruit" name="fruit">
+        <option value="">All fruits</option>
+        {% for fruit in fruits %}
+        <option value="{{ fruit }}" {{ 'selected' if fruit_filter == fruit }}>{{ fruit.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-model">Predictor</label>
+      <select id="marketability-model" name="model">
+        <option value="">All predictors</option>
+        {% for value, label in model_options %}
+        <option value="{{ value }}" {{ 'selected' if model_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-ripeness">Classification</label>
+      <select id="marketability-ripeness" name="ripeness">
+        <option value="">All classifications</option>
+        {% for value in ['ripe', 'unripe', 'rotten'] %}
+        <option value="{{ value }}" {{ 'selected' if ripeness_filter == value }}>{{ value.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-analysis">Analysis type</label>
+      <select id="marketability-analysis" name="analysis">
+        <option value="">All analysis types</option>
+        {% for value, label in [('single', 'Single classification'), ('batch', 'Batch analysis'), ('multi_fruit_batch', 'Multi-fruit batch'), ('realtime', 'Real-time')] %}
+        <option value="{{ value }}" {{ 'selected' if analysis_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-status">Handling status</label>
+      <select id="marketability-status" name="status">
+        <option value="">All statuses</option>
+        {% for value, label in [('ready', 'Ready'), ('hold', 'Hold'), ('sort', 'Sort batch'), ('inspect', 'Inspect'), ('isolate', 'Isolate'), ('remove', 'Remove')] %}
+        <option value="{{ value }}" {{ 'selected' if status_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-priority">Priority</label>
+      <select id="marketability-priority" name="priority">
+        <option value="">All priorities</option>
+        {% for value in ['remove', 'urgent', 'high', 'normal', 'unknown'] %}
+        <option value="{{ value }}" {{ 'selected' if priority_filter == value }}>{{ value.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-from">From</label>
+      <input id="marketability-from" type="date" name="date_from" value="{{ date_from or '' }}">
+    </div>
+    <div>
+      <label for="marketability-to">To</label>
+      <input id="marketability-to" type="date" name="date_to" value="{{ date_to or '' }}">
+    </div>
+    <div class="marketability-filter-actions">
+      <button type="submit">Apply filters</button>
+      <a class="btn btn-outline" href="/marketability">Clear</a>
+    </div>
+  </form>
+</div>
+
+{% if results %}
+<div class="card marketability-table-card" style="margin-top:18px;">
+  <div class="row-between">
+    <div>
+      <h3 style="margin:0;">Handling Queue</h3>
+      <p class="field-hint">Removal and inspection appear first, followed by dispatch and hold recommendations.</p>
+    </div>
+  </div>
+  <div class="marketability-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Scan</th>
+          <th>Analysis</th>
+          <th>Fruit condition</th>
+          <th>Predictor</th>
+          <th>Surface</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Remaining estimate</th>
+          <th>Recommended action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        {% set estimate = row.marketability %}
+        <tr>
+          <td>
+            <div class="marketability-scan-cell">
+              {% if row.annotated_path %}<img class="thumb" src="/outputs/{{ row.annotated_path }}" alt="">{% endif %}
+              <div>
+                <strong>#{{ row.id }}</strong>
+                <div class="field-hint">{{ row.created_at.replace('T', ' ') }}</div>
+                <a href="/history/{{ row.id }}/edit">View record</a>
+              </div>
+            </div>
+          </td>
+          <td class="marketability-analysis-cell">
+            <strong>{{ row.analysis_type }}</strong>
+            <div class="field-hint">{{ row.source or 'unknown source' }}</div>
+            {% if row.detection_breakdown %}
+            <div class="marketability-breakdown">
+              {% for label in ['ripe', 'unripe', 'rotten'] %}
+                {% if row.detection_breakdown.get(label, 0) %}
+                <span class="badge {{ label }}">{{ row.detection_breakdown.get(label) }} {{ label }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="field-hint">{{ row.detected_count }} fruit detected</div>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ row.fruit.capitalize() }}</strong><br>
+            <span class="badge {{ row.label }}">{{ row.label.upper() }}</span>
+            <span class="field-hint">{{ row.confidence }}%</span>
+          </td>
+          <td class="marketability-predictor-cell">
+            <strong>{{ model_labels.get(row.member, row.member.replace('_', ' ').upper()) }}</strong>
+            <div class="field-hint">{{ row.member }}</div>
+          </td>
+          <td>
+            {% if row.blemish_percentage is not none %}
+              {{ '%.2f'|format(row.blemish_percentage) }}%<br>
+              <span class="field-hint">{{ row.quality_grade or 'Unknown' }}</span>
+            {% else %}
+              <span class="field-hint">Not available</span>
+            {% endif %}
+          </td>
+          <td><span class="badge marketability-{{ estimate.status }}">{{ estimate.status.upper() }}</span></td>
+          <td><span class="badge priority-{{ estimate.dispatch_priority }}">{{ estimate.dispatch_priority.upper() }}</span></td>
+          <td>
+            <strong>{{ estimate.window or 'Withheld' }}</strong>
+            {% if estimate.elapsed_days %}<div class="field-hint">{{ estimate.elapsed_days }} day{{ '' if estimate.elapsed_days == 1 else 's' }} since scan</div>{% endif %}
+            <div class="field-hint">{{ estimate.reliability.capitalize() }} reliability</div>
+          </td>
+          <td class="marketability-action-cell">
+            {{ estimate.action }}
+            {% if estimate.storage_assumption %}<div class="field-hint">Assumes {{ estimate.storage_assumption }}.</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="field-hint" style="margin-top:12px;">Image-based operational estimates are not food-safety guarantees. Inspect produce before sale or disposal.</p>
+</div>
+{% else %}
+<div class="card" style="margin-top:18px;">
+  <p class="empty">No prediction records match these filters. <a href="/classify">Run a classification</a> or clear the filters.</p>
+</div>
+{% endif %}
+{% endblock %}

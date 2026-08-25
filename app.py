@@ -66,6 +66,7 @@ from member_apps.predict_ensemble import predict_ensemble
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
 from core_modules.blemish_analysis import analyze_surface
+from core_modules.marketability import estimate_marketability, average_member_probabilities
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
 from core_modules.dashboard_charts import (
@@ -459,6 +460,14 @@ def predict():
         annotated_rel = _save_annotated(img, bbox, f.filename)
         surface = _analyse_surface_and_save(img, bbox, f.filename)
         confidence_pct = round(confidence * 100, 1)
+        marketability = estimate_marketability(
+            fruit=fruit_type,
+            ripeness=label,
+            confidence=confidence_pct,
+            probabilities=proba_dict,
+            blemish_percentage=surface.get("blemish_percentage"),
+            quality_grade=surface.get("quality_grade"),
+        )
 
         log_result(
             member=_member_tag("ab"),
@@ -479,6 +488,7 @@ def predict():
             "fruit": fruit_type,
             "ripeness": label,
             "confidence": round(confidence * 100, 1),
+            "marketability": marketability,
             "input_validation": input_validation,
             **_surface_payload(surface),
         })
@@ -522,6 +532,15 @@ def predict_unified():
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
         surface = _analyse_surface_and_save(img, bbox, f.filename)
+        ensemble_proba = average_member_probabilities(per_member)
+        marketability = estimate_marketability(
+            fruit=fruit_type,
+            ripeness=label,
+            confidence=confidence,
+            probabilities=ensemble_proba,
+            blemish_percentage=surface.get("blemish_percentage"),
+            quality_grade=surface.get("quality_grade"),
+        )
 
         log_result(
             member="ensemble_all_four",
@@ -543,6 +562,8 @@ def predict_unified():
             "ripeness": label,
             "confidence": confidence,
             "per_member": per_member,
+            "proba": ensemble_proba,
+            "marketability": marketability,
             "input_validation": input_validation,
             **_surface_payload(surface),
         }
@@ -561,6 +582,14 @@ def predict_unified():
     annotated_rel = _save_annotated(img, bbox, f.filename)
     surface = _analyse_surface_and_save(img, bbox, f.filename)
     confidence_pct = round(confidence * 100, 1)
+    marketability = estimate_marketability(
+        fruit=fruit_type,
+        ripeness=label,
+        confidence=confidence_pct,
+        probabilities=proba_dict,
+        blemish_percentage=surface.get("blemish_percentage"),
+        quality_grade=surface.get("quality_grade"),
+    )
 
     log_result(
         member=_member_tag(model_choice),
@@ -583,6 +612,7 @@ def predict_unified():
         "confidence": confidence_pct,
         "per_member": None,
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+        "marketability": marketability,
         "input_validation": input_validation,
         **_surface_payload(surface),
     }

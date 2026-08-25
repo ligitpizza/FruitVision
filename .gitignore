@@ -28,3 +28,6 @@ uploads/
 pipeline/pure_yolo/runs/
 
 datasets/yolo_cls/
+
+trained_models/merged_1_4/
+trained_logs/merged_member_1_4_train.log

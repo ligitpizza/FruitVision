@@ -91,7 +91,12 @@ def update_result(result_id, **fields):
     allowed = {
         "member", "filename", "fruit", "label", "confidence", "annotated_path",
         "fruit_area_px", "blemish_area_px", "blemish_percentage",
-        "quality_grade", "surface_path", "source",
+        "quality_grade", "surface_path", "source", "marketability_status",
+        "dispatch_priority", "marketability_min_days", "marketability_max_days",
+        "marketability_action", "marketability_reliability",
+        "marketability_storage_assumption",
+        "review_status", "review_fruit", "review_label", "review_reason",
+        "reviewed_by", "reviewed_at",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
@@ -231,7 +236,20 @@ def init_db():
             created_at TEXT NOT NULL,
             user_id INTEGER,
             latency_ms REAL,
-            flagged INTEGER DEFAULT 0
+            flagged INTEGER DEFAULT 0,
+            marketability_status TEXT,
+            dispatch_priority TEXT,
+            marketability_min_days INTEGER,
+            marketability_max_days INTEGER,
+            marketability_action TEXT,
+            marketability_reliability TEXT,
+            marketability_storage_assumption TEXT,
+            review_status TEXT,
+            review_fruit TEXT,
+            review_label TEXT,
+            review_reason TEXT,
+            reviewed_by TEXT,
+            reviewed_at TEXT
         )
     """)
     # Compatibility migration for databases created by earlier versions.
@@ -250,6 +268,19 @@ def init_db():
         "latency_ms": "REAL",
         "flagged": "INTEGER DEFAULT 0",
         "detection_breakdown": "TEXT",
+        "marketability_status": "TEXT",
+        "dispatch_priority": "TEXT",
+        "marketability_min_days": "INTEGER",
+        "marketability_max_days": "INTEGER",
+        "marketability_action": "TEXT",
+        "marketability_reliability": "TEXT",
+        "marketability_storage_assumption": "TEXT",
+        "review_status": "TEXT",
+        "review_fruit": "TEXT",
+        "review_label": "TEXT",
+        "review_reason": "TEXT",
+        "reviewed_by": "TEXT",
+        "reviewed_at": "TEXT",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:
@@ -275,6 +306,13 @@ def log_result(
     latency_ms=None,
     flagged=0,
     detection_breakdown=None,
+    marketability_status=None,
+    dispatch_priority=None,
+    marketability_min_days=None,
+    marketability_max_days=None,
+    marketability_action=None,
+    marketability_reliability=None,
+    marketability_storage_assumption=None,
 ):
     """Insert one prediction result. Call this right after predict_ripeness() returns.
 
@@ -289,14 +327,22 @@ def log_result(
                member, filename, fruit, label, confidence, annotated_path,
                fruit_area_px, blemish_area_px, blemish_percentage,
                quality_grade, surface_path, source, created_at,
-               user_id, latency_ms, flagged, detection_breakdown
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               user_id, latency_ms, flagged, detection_breakdown,
+               marketability_status, dispatch_priority,
+               marketability_min_days, marketability_max_days,
+               marketability_action, marketability_reliability,
+               marketability_storage_assumption
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             member, filename, fruit, label, confidence, annotated_path,
             fruit_area_px, blemish_area_px, blemish_percentage,
             quality_grade, surface_path, source,
             datetime.now().isoformat(timespec="seconds"),
             user_id, latency_ms, int(bool(flagged)), detection_breakdown,
+            marketability_status, dispatch_priority,
+            marketability_min_days, marketability_max_days,
+            marketability_action, marketability_reliability,
+            marketability_storage_assumption,
         ),
     )
     conn.commit()

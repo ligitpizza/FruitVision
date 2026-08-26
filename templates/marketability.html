@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Marketability - FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Marketability Dashboard</h1>
+    <p>Farmer-focused handling priorities derived after each unchanged ripeness prediction.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/history">Harvest Records</a>
+    <a class="btn" href="/classify">+ New Classification</a>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Urgent Handling</div>
+    <div class="value marketability-urgent-text">{{ summary.urgent }}</div>
+    <div class="delta down">dispatch, inspect, or remove</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Ready for Market</div>
+    <div class="value">{{ summary.ready }}</div>
+    <div class="delta">plan dispatch</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Hold for Ripening</div>
+    <div class="value">{{ summary.hold }}</div>
+    <div class="delta">monitor and re-scan</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Manual Inspection</div>
+    <div class="value">{{ summary.inspect }}</div>
+    <div class="delta down">estimate withheld</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Remove from Market</div>
+    <div class="value marketability-urgent-text">{{ summary.remove }}</div>
+    <div class="delta down">classified as rotten</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Displayed Records</div>
+    <div class="value">{{ summary.total }}</div>
+    <div class="delta">maximum 250 rows shown</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Batch Results</div>
+    <div class="value">{{ summary.batch }}</div>
+    <div class="delta">batch and multi-fruit analyses</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Needs Review</div>
+    <div class="value marketability-urgent-text">{{ summary.needs_review }}</div>
+    <div class="delta down">awaiting farmer inspection</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <form method="get" class="marketability-filter-grid">
+    <div>
+      <label for="marketability-fruit">Fruit</label>
+      <select id="marketability-fruit" name="fruit">
+        <option value="">All fruits</option>
+        {% for fruit in fruits %}
+        <option value="{{ fruit }}" {{ 'selected' if fruit_filter == fruit }}>{{ fruit.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-model">Predictor</label>
+      <select id="marketability-model" name="model">
+        <option value="">All predictors</option>
+        {% for value, label in model_options %}
+        <option value="{{ value }}" {{ 'selected' if model_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-ripeness">Classification</label>
+      <select id="marketability-ripeness" name="ripeness">
+        <option value="">All classifications</option>
+        {% for value in ['ripe', 'unripe', 'rotten'] %}
+        <option value="{{ value }}" {{ 'selected' if ripeness_filter == value }}>{{ value.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-analysis">Analysis type</label>
+      <select id="marketability-analysis" name="analysis">
+        <option value="">All analysis types</option>
+        {% for value, label in [('single', 'Single classification'), ('batch', 'Batch analysis'), ('multi_fruit_batch', 'Multi-fruit batch'), ('realtime', 'Real-time')] %}
+        <option value="{{ value }}" {{ 'selected' if analysis_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-status">Handling status</label>
+      <select id="marketability-status" name="status">
+        <option value="">All statuses</option>
+        {% for value, label in [('ready', 'Ready'), ('hold', 'Hold'), ('sort', 'Sort batch'), ('inspect', 'Inspect'), ('isolate', 'Isolate'), ('remove', 'Remove')] %}
+        <option value="{{ value }}" {{ 'selected' if status_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-priority">Priority</label>
+      <select id="marketability-priority" name="priority">
+        <option value="">All priorities</option>
+        {% for value in ['remove', 'urgent', 'high', 'normal', 'unknown'] %}
+        <option value="{{ value }}" {{ 'selected' if priority_filter == value }}>{{ value.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-review">Review status</label>
+      <select id="marketability-review" name="review">
+        <option value="">All review statuses</option>
+        {% for value, label in [('needs_review', 'Needs review'), ('confirmed', 'Confirmed'), ('corrected', 'Corrected'), ('not_required', 'Not required')] %}
+        <option value="{{ value }}" {{ 'selected' if review_filter == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="marketability-from">From</label>
+      <input id="marketability-from" type="date" name="date_from" value="{{ date_from or '' }}">
+    </div>
+    <div>
+      <label for="marketability-to">To</label>
+      <input id="marketability-to" type="date" name="date_to" value="{{ date_to or '' }}">
+    </div>
+    <div class="marketability-filter-actions">
+      <button type="submit">Apply filters</button>
+      <a class="btn btn-outline" href="/marketability">Clear</a>
+    </div>
+  </form>
+</div>
+
+{% if results %}
+<div class="card marketability-table-card" style="margin-top:18px;">
+  <div class="row-between">
+    <div>
+      <h3 style="margin:0;">Handling Queue</h3>
+      <p class="field-hint">Removal and inspection appear first, followed by dispatch and hold recommendations.</p>
+    </div>
+  </div>
+  <div class="marketability-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Scan</th>
+          <th>Analysis</th>
+          <th>Fruit condition</th>
+          <th>Predictor</th>
+          <th>Surface</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Operator review</th>
+          <th>Remaining estimate</th>
+          <th>Recommended action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        {% set estimate = row.marketability %}
+        {% set review = row.review %}
+        <tr>
+          <td>
+            <div class="marketability-scan-cell">
+              {% if row.annotated_path %}<img class="thumb" src="/outputs/{{ row.annotated_path }}" alt="">{% endif %}
+              <div>
+                <strong>#{{ row.id }}</strong>
+                <div class="field-hint">{{ row.created_at.replace('T', ' ') }}</div>
+                <a href="/history/{{ row.id }}/edit">View record</a>
+              </div>
+            </div>
+          </td>
+          <td class="marketability-analysis-cell">
+            <strong>{{ row.analysis_type }}</strong>
+            <div class="field-hint">{{ row.source or 'unknown source' }}</div>
+            {% if row.detection_breakdown %}
+            <div class="marketability-breakdown">
+              {% for label in ['ripe', 'unripe', 'rotten'] %}
+                {% if row.detection_breakdown.get(label, 0) %}
+                <span class="badge {{ label }}">{{ row.detection_breakdown.get(label) }} {{ label }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="field-hint">{{ row.detected_count }} fruit detected</div>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ row.fruit.capitalize() }}</strong><br>
+            <span class="badge {{ row.label }}">{{ row.label.upper() }}</span>
+            <span class="field-hint">{{ row.confidence }}%</span>
+          </td>
+          <td class="marketability-predictor-cell">
+            <strong>{{ model_labels.get(row.member, row.member.replace('_', ' ').upper()) }}</strong>
+            <div class="field-hint">{{ row.member }}</div>
+          </td>
+          <td>
+            {% if row.blemish_percentage is not none %}
+              {{ '%.2f'|format(row.blemish_percentage) }}%<br>
+              <span class="field-hint">{{ row.quality_grade or 'Unknown' }}</span>
+            {% else %}
+              <span class="field-hint">Not available</span>
+            {% endif %}
+          </td>
+          <td><span class="badge marketability-{{ estimate.status }}">{{ estimate.status.upper() }}</span></td>
+          <td><span class="badge priority-{{ estimate.dispatch_priority }}">{{ estimate.dispatch_priority.upper() }}</span></td>
+          <td class="marketability-review-cell">
+            {% if review.status == 'needs_review' %}
+              <span class="badge review-needs_review">NEEDS REVIEW</span>
+              {% for trigger in review.triggers %}<div class="field-hint">{{ trigger }}</div>{% endfor %}
+            {% elif review.status == 'confirmed' %}
+              <span class="badge review-confirmed">CONFIRMED</span>
+              <div class="field-hint">by {{ review.reviewed_by or 'operator' }}</div>
+              {% if review.reviewed_at %}<div class="field-hint">{{ review.reviewed_at.replace('T', ' ') }}</div>{% endif %}
+            {% elif review.status == 'corrected' %}
+              <span class="badge review-corrected">CORRECTED</span>
+              <div class="field-hint">Observed: {{ (review.fruit or row.fruit).capitalize() }} / {{ (review.label or row.label).capitalize() }}</div>
+              <div class="field-hint">by {{ review.reviewed_by or 'operator' }}</div>
+              {% if review.reviewed_at %}<div class="field-hint">{{ review.reviewed_at.replace('T', ' ') }}</div>{% endif %}
+            {% else %}
+              <span class="badge review-not_required">NOT REQUIRED</span>
+            {% endif %}
+            <button
+              type="button"
+              class="btn btn-outline btn-sm marketability-review-button"
+              data-record-id="{{ row.id }}"
+              data-fruit="{{ row.fruit }}"
+              data-label="{{ row.label }}"
+              data-confidence="{{ row.confidence }}"
+              data-predictor="{{ model_labels.get(row.member, row.member.replace('_', ' ').upper()) }}"
+              data-image="{{ '/outputs/' ~ row.annotated_path if row.annotated_path else '' }}"
+              data-review-fruit="{{ review.fruit or row.fruit }}"
+              data-review-label="{{ review.label or row.label }}"
+              data-reason="{{ review.reason or '' }}"
+              onclick="openMarketabilityReview(this)"
+            >{{ 'Update review' if review.status in ['confirmed', 'corrected'] else 'Review' }}</button>
+            {% if review.reason %}<div class="field-hint marketability-review-note">{{ review.reason }}</div>{% endif %}
+          </td>
+          <td>
+            <strong>{{ estimate.window or 'Withheld' }}</strong>
+            {% if estimate.elapsed_days %}<div class="field-hint">{{ estimate.elapsed_days }} day{{ '' if estimate.elapsed_days == 1 else 's' }} since scan</div>{% endif %}
+            <div class="field-hint">{{ estimate.reliability.capitalize() }} reliability</div>
+          </td>
+          <td class="marketability-action-cell">
+            {{ estimate.action }}
+            {% if estimate.storage_assumption %}<div class="field-hint">Assumes {{ estimate.storage_assumption }}.</div>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="field-hint" style="margin-top:12px;">Image-based operational estimates are not food-safety guarantees. Inspect produce before sale or disposal.</p>
+</div>
+{% else %}
+<div class="card" style="margin-top:18px;">
+  <p class="empty">No prediction records match these filters. <a href="/classify">Run a classification</a> or clear the filters.</p>
+</div>
+{% endif %}
+
+<dialog id="marketability-review-dialog" class="marketability-review-dialog" aria-labelledby="marketability-review-title">
+  <form method="post" id="marketability-review-form">
+    <div class="row-between marketability-review-heading">
+      <div>
+        <div class="eyebrow">Operator inspection</div>
+        <h3 id="marketability-review-title">Review prediction</h3>
+      </div>
+      <button type="button" class="marketability-dialog-close" aria-label="Close review dialog" onclick="closeMarketabilityReview()">&times;</button>
+    </div>
+
+    <div class="marketability-review-original">
+      <img id="marketability-review-image" alt="Fruit scan being reviewed">
+      <div>
+        <strong id="marketability-review-result"></strong>
+        <div class="field-hint" id="marketability-review-predictor"></div>
+        <div class="field-hint">This original model result will not be changed.</div>
+      </div>
+    </div>
+
+    <div class="marketability-review-fields">
+      <div>
+        <label for="marketability-review-fruit">Observed fruit</label>
+        <select name="review_fruit" id="marketability-review-fruit">
+          {% for fruit in fruits %}<option value="{{ fruit }}">{{ fruit.capitalize() }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="marketability-review-label">Observed ripeness</label>
+        <select name="review_label" id="marketability-review-label">
+          {% for label in ['ripe', 'unripe', 'rotten'] %}<option value="{{ label }}">{{ label.capitalize() }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label for="marketability-review-reason">Inspection note (optional)</label>
+    <textarea name="reason" id="marketability-review-reason" rows="3" maxlength="500" placeholder="For example: peel is yellow and firm; stem damage only"></textarea>
+    <p class="field-hint">Confirm when the prediction is correct, or save the observed condition as a separate operator correction.</p>
+
+    <div class="marketability-review-actions">
+      <button type="button" class="btn btn-outline" onclick="closeMarketabilityReview()">Cancel</button>
+      <button type="submit" name="decision" value="confirm" class="btn btn-outline">Confirm model result</button>
+      <button type="submit" name="decision" value="correct">Save correction</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  function openMarketabilityReview(button) {
+    const dialog = document.getElementById('marketability-review-dialog');
+    const form = document.getElementById('marketability-review-form');
+    const image = document.getElementById('marketability-review-image');
+    form.action = `/marketability/${button.dataset.recordId}/review`;
+    document.getElementById('marketability-review-title').textContent = `Review prediction #${button.dataset.recordId}`;
+    document.getElementById('marketability-review-result').textContent =
+      `${button.dataset.fruit} — ${button.dataset.label} (${button.dataset.confidence}%)`;
+    document.getElementById('marketability-review-predictor').textContent = `Predictor: ${button.dataset.predictor}`;
+    document.getElementById('marketability-review-fruit').value = button.dataset.reviewFruit;
+    document.getElementById('marketability-review-label').value = button.dataset.reviewLabel;
+    document.getElementById('marketability-review-reason').value = button.dataset.reason;
+    image.src = button.dataset.image;
+    image.hidden = !button.dataset.image;
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+
+  function closeMarketabilityReview() {
+    const dialog = document.getElementById('marketability-review-dialog');
+    if (dialog.close) dialog.close();
+    else dialog.removeAttribute('open');
+  }
+</script>
+{% endblock %}

@@ -118,12 +118,145 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             payload = response.get_json()
             self.assertIn("blemish_percentage", payload)
             self.assertIn("quality_grade", payload)
+            self.assertIn("marketability", payload)
+            self.assertEqual(payload["marketability"]["status"], "ready")
+            self.assertGreater(payload["marketability"]["min_days"], 0)
             self.assertGreater(payload["fruit_area_px"], 0)
             self.assertTrue(payload["surface_path"].startswith("surface/"))
             self.assertTrue(os.path.exists(os.path.join(app_module.OUTPUTS_DIR, payload["surface_path"])))
             self.assertEqual(len(logged), 1)
             self.assertEqual(logged[0]["blemish_percentage"], payload["blemish_percentage"])
             self.assertEqual(logged[0]["quality_grade"], payload["quality_grade"])
+            self.assertEqual(logged[0]["marketability_status"], "ready")
+            self.assertEqual(logged[0]["marketability_min_days"], payload["marketability"]["min_days"])
+
+            app_module.PUBLIC_PATHS.add("/marketability")
+            app_module.get_all_results = lambda **kwargs: [
+                {
+                    "id": 1, "created_at": "2099-01-01T00:00:00", "member": "ensemble_ab",
+                    "filename": "ripe.png", "fruit": "apple", "label": "ripe",
+                    "confidence": 92.0, "annotated_path": None, "blemish_percentage": 2.0,
+                    "quality_grade": "Grade A", "marketability_status": "ready",
+                    "dispatch_priority": "high", "marketability_min_days": 7,
+                    "marketability_max_days": 14, "marketability_action": "Ready for market.",
+                    "marketability_reliability": "high",
+                    "marketability_storage_assumption": "test cold storage",
+                },
+                {
+                    "id": 2, "created_at": "2099-01-01T00:00:00", "member": "ensemble_ab",
+                    "filename": "rotten.png", "fruit": "apple", "label": "rotten",
+                    "confidence": 95.0, "annotated_path": None, "blemish_percentage": 25.0,
+                    "quality_grade": "Grade C", "marketability_status": "remove",
+                    "dispatch_priority": "remove", "marketability_min_days": 0,
+                    "marketability_max_days": 0, "marketability_action": "Do not market this fruit.",
+                    "marketability_reliability": "high",
+                    "marketability_storage_assumption": "test cold storage",
+                },
+                {
+                    "id": 3, "created_at": "2099-01-01T00:00:00", "member": "ensemble_ab",
+                    "filename": "batch.png", "fruit": "banana", "label": "ripe",
+                    "confidence": 88.0, "annotated_path": None, "blemish_percentage": None,
+                    "quality_grade": None, "source": "analyse_multi_fruit",
+                    "detection_breakdown": '{"ripe": 2, "rotten": 1}',
+                    "marketability_status": "ready", "dispatch_priority": "high",
+                    "marketability_min_days": 3, "marketability_max_days": 7,
+                    "marketability_action": "Ready for market.",
+                    "marketability_reliability": "moderate",
+                    "marketability_storage_assumption": "test storage",
+                },
+            ]
+            dashboard_response = client.get("/marketability")
+            self.assertEqual(dashboard_response.status_code, 200)
+            dashboard_html = dashboard_response.get_data(as_text=True)
+            self.assertIn("Marketability Dashboard", dashboard_html)
+            self.assertIn("Predictor", dashboard_html)
+            self.assertIn("Ensemble AB (Colour + Shape)", dashboard_html)
+            self.assertIn("Do not market this fruit.", dashboard_html)
+            self.assertLess(dashboard_html.index("#2"), dashboard_html.index("#1"))
+            self.assertIn("Multi-fruit batch", dashboard_html)
+            self.assertIn("2 ripe", dashboard_html)
+            self.assertIn("1 rotten", dashboard_html)
+            self.assertIn("Sort this mixed batch", dashboard_html)
+            self.assertIn("Needs Review", dashboard_html)
+            self.assertIn("NEEDS REVIEW", dashboard_html)
+            self.assertIn("openMarketabilityReview", dashboard_html)
+            self.assertIn("This original model result will not be changed.", dashboard_html)
+
+            rotten_only_response = client.get("/marketability?ripeness=rotten")
+            rotten_only_html = rotten_only_response.get_data(as_text=True)
+            self.assertIn("#2", rotten_only_html)
+            self.assertNotIn("#1", rotten_only_html)
+            self.assertIn('value="rotten" selected', rotten_only_html)
+
+            batch_only_response = client.get("/marketability?analysis=multi_fruit_batch")
+            batch_only_html = batch_only_response.get_data(as_text=True)
+            self.assertIn("#3", batch_only_html)
+            self.assertNotIn("#1", batch_only_html)
+            self.assertNotIn("#2", batch_only_html)
+
+            review_only_response = client.get("/marketability?review=needs_review")
+            review_only_html = review_only_response.get_data(as_text=True)
+            self.assertIn("#2", review_only_html)
+            self.assertIn("#3", review_only_html)
+            self.assertNotIn("#1", review_only_html)
+            self.assertIn('value="needs_review" selected', review_only_html)
+
+            review_updates = []
+            app_module.get_by_id = lambda record_id: {
+                "id": record_id, "fruit": "banana", "label": "rotten", "confidence": 76.1,
+            }
+            app_module.update_result = lambda record_id, **fields: review_updates.append((record_id, fields)) or True
+            app_module.auth_db.get_user_by_id = lambda user_id: {
+                "id": user_id, "name": "Test Farmer", "email": "farmer@example.test",
+                "role": "farmer", "dark_mode": 0,
+            }
+            app_module.auth_db.log_activity = lambda *args, **kwargs: None
+            with client.session_transaction() as session_data:
+                session_data["user_id"] = 7
+            review_response = client.post(
+                "/marketability/2/review",
+                data={
+                    "decision": "correct", "review_fruit": "banana",
+                    "review_label": "ripe", "reason": "Yellow peel and firm fruit.",
+                },
+            )
+            self.assertEqual(review_response.status_code, 302)
+            self.assertEqual(review_updates[0][0], 2)
+            self.assertEqual(review_updates[0][1]["review_status"], "corrected")
+            self.assertEqual(review_updates[0][1]["review_label"], "ripe")
+            self.assertNotIn("label", review_updates[0][1])
+            self.assertNotIn("confidence", review_updates[0][1])
+
+            expired = app_module._marketability_for_record({
+                "id": 3, "created_at": "2020-01-01T00:00:00", "fruit": "banana",
+                "label": "ripe", "confidence": 95.0, "blemish_percentage": 1.0,
+                "quality_grade": "Grade A", "marketability_status": "ready",
+                "dispatch_priority": "high", "marketability_min_days": 3,
+                "marketability_max_days": 7, "marketability_action": "Ready for market.",
+                "marketability_reliability": "high",
+                "marketability_storage_assumption": "test storage",
+            })
+            self.assertEqual(expired["status"], "inspect")
+            self.assertEqual(expired["dispatch_priority"], "urgent")
+            self.assertIsNone(expired["window"])
+
+            app_module.get_recent = lambda **kwargs: app_module.get_all_results()
+            dashboard_stats = {
+                "total": 3,
+                "avg_confidence": 91.7,
+                "avg_latency_ms": 10.0,
+                "by_fruit": {"apple": 2, "banana": 1},
+                "by_label": {"ripe": 2, "rotten": 1},
+                "avg_confidence_by_fruit": {"apple": 93.5, "banana": 88.0},
+            }
+            app_module.get_stats = lambda *args, **kwargs: dashboard_stats
+            app_module.get_stats_since = lambda *args, **kwargs: dashboard_stats
+            app_module.PUBLIC_PATHS.add("/")
+            home_response = client.get("/")
+            home_html = home_response.get_data(as_text=True)
+            self.assertIn("marketability-alert-close", home_html)
+            self.assertIn("Dismiss urgent handling alert", home_html)
+            self.assertIn("dismissMarketabilityAlert", home_html)
 
 
 if __name__ == "__main__":

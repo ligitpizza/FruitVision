@@ -66,6 +66,7 @@ from member_apps.predict_ensemble import predict_ensemble
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
 from core_modules.blemish_analysis import analyze_surface
+from core_modules.marketability import estimate_marketability, average_member_probabilities
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
 from core_modules.dashboard_charts import (
@@ -227,6 +228,7 @@ MODEL_CHOICES = list(PREDICTORS.keys()) + ["all_four"]
 _MEMBER_TAG_OVERRIDES = {
     "yolo_pure": "yolo_pure",
     "merged_1_4": "merged_1_4",
+    "m14v3": "m14v3",
     "m14v2": "m14v2",
     "m14v3": "m14v3",
 }
@@ -243,6 +245,206 @@ def outputs_file(filename):
     return send_from_directory(OUTPUTS_DIR, filename)
 
 
+def _marketability_db_fields(estimate):
+    """Map a marketability payload to optional history columns."""
+    return {
+        "marketability_status": estimate.get("status"),
+        "dispatch_priority": estimate.get("dispatch_priority"),
+        "marketability_min_days": estimate.get("min_days"),
+        "marketability_max_days": estimate.get("max_days"),
+        "marketability_action": estimate.get("action"),
+        "marketability_reliability": estimate.get("reliability"),
+        "marketability_storage_assumption": estimate.get("storage_assumption"),
+    }
+
+
+def _marketability_for_record(record):
+    """Return a current, display-only view of a historical scan estimate.
+
+    New rows use the exact estimate stored at prediction time. Older rows are
+    reconstructed from their unchanged label/confidence/surface fields. Day
+    ranges count down from the scan date; expired estimates require re-scan
+    instead of continuing to claim that old fruit is market-ready.
+    """
+    if record.get("marketability_status"):
+        estimate = {
+            "status": record.get("marketability_status"),
+            "dispatch_priority": record.get("dispatch_priority") or "unknown",
+            "min_days": record.get("marketability_min_days"),
+            "max_days": record.get("marketability_max_days"),
+            "action": record.get("marketability_action") or "Inspect this fruit before marketing.",
+            "reliability": record.get("marketability_reliability") or "unavailable",
+            "storage_assumption": record.get("marketability_storage_assumption"),
+            "blemish_percentage": record.get("blemish_percentage"),
+            "disclaimer": "Image-based operational estimate only; inspect fruit before sale or disposal.",
+        }
+    else:
+        estimate = estimate_marketability(
+            fruit=record.get("fruit"),
+            ripeness=record.get("label"),
+            confidence=record.get("confidence"),
+            blemish_percentage=record.get("blemish_percentage"),
+            quality_grade=record.get("quality_grade"),
+        )
+
+    estimate = dict(estimate)
+    elapsed_days = 0
+    try:
+        scanned_at = datetime.fromisoformat(record.get("created_at"))
+        elapsed_days = max(0, int((datetime.now() - scanned_at).total_seconds() // 86400))
+    except (TypeError, ValueError):
+        pass
+    estimate["elapsed_days"] = elapsed_days
+
+    min_days = estimate.get("min_days")
+    max_days = estimate.get("max_days")
+    if min_days is not None and max_days is not None and estimate.get("status") != "remove":
+        min_days = max(0, int(min_days) - elapsed_days)
+        max_days = max(0, int(max_days) - elapsed_days)
+        if max_days == 0:
+            estimate.update({
+                "status": "inspect",
+                "dispatch_priority": "urgent",
+                "min_days": None,
+                "max_days": None,
+                "window": None,
+                "reliability": "low",
+                "action": "The estimate from this scan has expired. Re-scan or inspect before marketing.",
+            })
+        else:
+            estimate["min_days"] = min_days
+            estimate["max_days"] = max_days
+            estimate["window"] = f"{min_days}-{max_days} days" if min_days != max_days else f"{max_days} days"
+    elif min_days is not None and max_days is not None:
+        estimate["window"] = "0 days"
+    else:
+        estimate["window"] = None
+    return estimate
+
+
+def _marketability_sort_key(record):
+    estimate = record["marketability"]
+    status_rank = {
+        "remove": 0,
+        "sort": 1,
+        "isolate": 2,
+        "inspect": 3,
+        "ready": 4,
+        "hold": 5,
+    }
+    priority_rank = {"remove": 0, "urgent": 1, "high": 2, "normal": 3, "unknown": 4}
+    return (
+        status_rank.get(estimate.get("status"), 5),
+        priority_rank.get(estimate.get("dispatch_priority"), 5),
+        estimate.get("max_days") if estimate.get("max_days") is not None else 999999,
+        -int(record.get("id") or 0),
+    )
+
+
+def _review_for_record(record, breakdown, estimate):
+    """Return the operator-review view without changing the model result."""
+    stored_status = record.get("review_status")
+    if stored_status in {"confirmed", "corrected"}:
+        return {
+            "status": stored_status,
+            "fruit": record.get("review_fruit"),
+            "label": record.get("review_label"),
+            "reason": record.get("review_reason"),
+            "reviewed_by": record.get("reviewed_by"),
+            "reviewed_at": record.get("reviewed_at"),
+            "triggers": [],
+        }
+
+    triggers = []
+    if record.get("flagged"):
+        triggers.append("Low confidence")
+    if breakdown:
+        present_classes = [label for label, count in breakdown.items() if int(count) > 0]
+        if len(present_classes) > 1:
+            triggers.append("Mixed classifications")
+    if estimate.get("status") in {"remove", "inspect", "isolate"}:
+        triggers.append("Handling decision requires inspection")
+    elif estimate.get("dispatch_priority") in {"remove", "urgent"}:
+        triggers.append("Urgent handling decision")
+
+    return {
+        "status": "needs_review" if triggers else "not_required",
+        "fruit": None,
+        "label": None,
+        "reason": None,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "triggers": triggers,
+    }
+
+
+def _decorate_marketability_rows(rows):
+    decorated = []
+    for row in rows:
+        item = dict(row)
+        raw_breakdown = item.get("detection_breakdown")
+        if isinstance(raw_breakdown, str):
+            try:
+                breakdown = json.loads(raw_breakdown)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                breakdown = None
+        elif isinstance(raw_breakdown, dict):
+            breakdown = raw_breakdown
+        else:
+            breakdown = None
+        item["detection_breakdown"] = breakdown
+
+        source = item.get("source") or ""
+        if source == "analyse_multi_fruit":
+            item["analysis_type"] = "Multi-fruit batch"
+            item["analysis_kind"] = "multi_fruit_batch"
+        elif source == "analyse":
+            item["analysis_type"] = "Batch analysis"
+            item["analysis_kind"] = "batch"
+        elif source.startswith("realtime") or source.endswith("realtime"):
+            item["analysis_type"] = "Real-time"
+            item["analysis_kind"] = "realtime"
+        else:
+            item["analysis_type"] = "Single classification"
+            item["analysis_kind"] = "single"
+
+        estimate = _marketability_for_record(item)
+        if breakdown:
+            detected_count = sum(max(0, int(count)) for count in breakdown.values())
+            present_classes = [label for label, count in breakdown.items() if int(count) > 0]
+            item["detected_count"] = detected_count
+            # One majority label cannot safely represent a genuinely mixed
+            # group. Preserve every classifier result in the breakdown and
+            # issue a sorting action only in the dashboard layer.
+            if len(present_classes) > 1:
+                estimate = dict(estimate)
+                rotten_count = max(0, int(breakdown.get("rotten", 0)))
+                ripe_count = max(0, int(breakdown.get("ripe", 0)))
+                unripe_count = max(0, int(breakdown.get("unripe", 0)))
+                action_parts = []
+                if rotten_count:
+                    action_parts.append(f"isolate {rotten_count} rotten")
+                if ripe_count:
+                    action_parts.append(f"dispatch {ripe_count} ripe")
+                if unripe_count:
+                    action_parts.append(f"hold {unripe_count} unripe")
+                estimate.update({
+                    "status": "sort",
+                    "dispatch_priority": "urgent" if rotten_count else "high",
+                    "min_days": None,
+                    "max_days": None,
+                    "window": None,
+                    "reliability": "per-fruit",
+                    "action": "Sort this mixed batch: " + ", ".join(action_parts) + ".",
+                })
+        else:
+            item["detected_count"] = None
+        item["marketability"] = estimate
+        item["review"] = _review_for_record(item, breakdown, estimate)
+        decorated.append(item)
+    return sorted(decorated, key=_marketability_sort_key)
+
+
 # --------------------------------------------------------------------------
 # Dashboard (overview) + Fruit Classification (was "/")
 # --------------------------------------------------------------------------
@@ -255,6 +457,11 @@ def dashboard_home():
     fruit_chart = generate_fruit_breakdown_chart(None, file_tag="all")
     history_chart = generate_history_chart(None, file_tag="all")
     confidence_chart = generate_confidence_trend_chart(None, file_tag="all")
+    marketability_rows = _decorate_marketability_rows(get_recent(limit=100))
+    marketability_alert_count = sum(
+        row["marketability"].get("dispatch_priority") in {"urgent", "remove"}
+        for row in marketability_rows
+    )
 
     return render_template(
         "dashboard.html",
@@ -264,6 +471,7 @@ def dashboard_home():
         fruit_chart=fruit_chart is not None,
         history_chart=history_chart is not None,
         confidence_chart=confidence_chart is not None,
+        marketability_alert_count=marketability_alert_count,
         chart_tag="all",
         active_page="dashboard",
     )
@@ -459,6 +667,14 @@ def predict():
         annotated_rel = _save_annotated(img, bbox, f.filename)
         surface = _analyse_surface_and_save(img, bbox, f.filename)
         confidence_pct = round(confidence * 100, 1)
+        marketability = estimate_marketability(
+            fruit=fruit_type,
+            ripeness=label,
+            confidence=confidence_pct,
+            probabilities=proba_dict,
+            blemish_percentage=surface.get("blemish_percentage"),
+            quality_grade=surface.get("quality_grade"),
+        )
 
         log_result(
             member=_member_tag("ab"),
@@ -469,6 +685,7 @@ def predict():
             annotated_path=annotated_rel,
             source="predict",
             **_surface_db_fields(surface),
+            **_marketability_db_fields(marketability),
             user_id=g.user["id"] if g.user else None,
             latency_ms=latency_ms,
             flagged=_is_flagged(confidence_pct),
@@ -479,6 +696,7 @@ def predict():
             "fruit": fruit_type,
             "ripeness": label,
             "confidence": round(confidence * 100, 1),
+            "marketability": marketability,
             "input_validation": input_validation,
             **_surface_payload(surface),
         })
@@ -531,6 +749,15 @@ def predict_unified():
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
         surface = _analyse_surface_and_save(img, bbox, f.filename)
+        ensemble_proba = average_member_probabilities(per_member)
+        marketability = estimate_marketability(
+            fruit=fruit_type,
+            ripeness=label,
+            confidence=confidence,
+            probabilities=ensemble_proba,
+            blemish_percentage=surface.get("blemish_percentage"),
+            quality_grade=surface.get("quality_grade"),
+        )
 
         log_result(
             member="ensemble_all_four",
@@ -541,6 +768,7 @@ def predict_unified():
             annotated_path=annotated_rel,
             source="predict_unified",
             **_surface_db_fields(surface),
+            **_marketability_db_fields(marketability),
             user_id=g.user["id"] if g.user else None,
             latency_ms=latency_ms,
             flagged=_is_flagged(confidence),
@@ -552,6 +780,8 @@ def predict_unified():
             "ripeness": label,
             "confidence": confidence,
             "per_member": per_member,
+            "proba": ensemble_proba,
+            "marketability": marketability,
             "input_validation": input_validation,
             **_surface_payload(surface),
         }
@@ -570,6 +800,14 @@ def predict_unified():
     annotated_rel = _save_annotated(img, bbox, f.filename)
     surface = _analyse_surface_and_save(img, bbox, f.filename)
     confidence_pct = round(confidence * 100, 1)
+    marketability = estimate_marketability(
+        fruit=fruit_type,
+        ripeness=label,
+        confidence=confidence_pct,
+        probabilities=proba_dict,
+        blemish_percentage=surface.get("blemish_percentage"),
+        quality_grade=surface.get("quality_grade"),
+    )
 
     log_result(
         member=_member_tag(model_choice),
@@ -580,6 +818,7 @@ def predict_unified():
         annotated_path=annotated_rel,
         source="predict_unified",
         **_surface_db_fields(surface),
+        **_marketability_db_fields(marketability),
         user_id=g.user["id"] if g.user else None,
         latency_ms=latency_ms,
         flagged=_is_flagged(confidence_pct),
@@ -592,6 +831,7 @@ def predict_unified():
         "confidence": confidence_pct,
         "per_member": None,
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+        "marketability": marketability,
         "input_validation": input_validation,
         **_surface_payload(surface),
     }
@@ -697,6 +937,11 @@ def analyse():
             if multi_fruit:
                 multi = _classify_multi_fruit_photo(img, fruit_type, _ensemble_crop_classify, f.filename)
                 if multi:
+                    marketability = estimate_marketability(
+                        fruit=fruit_type,
+                        ripeness=multi["label"],
+                        confidence=multi["confidence"],
+                    )
                     log_result(
                         member=member_tag,
                         fruit=fruit_type,
@@ -708,6 +953,7 @@ def analyse():
                         user_id=g.user["id"] if g.user else None,
                         flagged=_is_flagged(multi["confidence"]),
                         detection_breakdown=json.dumps(multi["breakdown"]),
+                        **_marketability_db_fields(marketability),
                     )
                     _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
                     results.append({
@@ -719,6 +965,7 @@ def analyse():
                         "input_validation": input_validation,
                         "detection_breakdown": multi["breakdown"],
                         "fruit_count": multi["fruit_count"],
+                        "marketability": marketability,
                         **_surface_payload({}),
                     })
                     continue
@@ -733,6 +980,15 @@ def analyse():
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
             surface = _analyse_surface_and_save(img, bbox, f.filename)
+            ensemble_proba = average_member_probabilities(per_member)
+            marketability = estimate_marketability(
+                fruit=fruit_type,
+                ripeness=label,
+                confidence=confidence,
+                probabilities=ensemble_proba,
+                blemish_percentage=surface.get("blemish_percentage"),
+                quality_grade=surface.get("quality_grade"),
+            )
 
             log_result(
                 member=member_tag,
@@ -743,6 +999,7 @@ def analyse():
                 annotated_path=annotated_rel,
                 source="analyse",
                 **_surface_db_fields(surface),
+                **_marketability_db_fields(marketability),
                 user_id=g.user["id"] if g.user else None,
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence),
@@ -758,6 +1015,7 @@ def analyse():
                 "multi_fruit_fallback": multi_fruit,
                 "per_member": per_member,
                 "input_validation": input_validation,
+                "marketability": marketability,
                 **_surface_payload(surface),
             })
     else:
@@ -787,6 +1045,11 @@ def analyse():
                 multi = _classify_multi_fruit_photo(img, fruit_type, _single_model_crop_classify(entry), f.filename)
                 if multi:
                     confidence_pct = multi["confidence"]
+                    marketability = estimate_marketability(
+                        fruit=fruit_type,
+                        ripeness=multi["label"],
+                        confidence=confidence_pct,
+                    )
                     log_result(
                         member=member_tag,
                         fruit=fruit_type,
@@ -798,6 +1061,7 @@ def analyse():
                         user_id=g.user["id"] if g.user else None,
                         flagged=_is_flagged(confidence_pct),
                         detection_breakdown=json.dumps(multi["breakdown"]),
+                        **_marketability_db_fields(marketability),
                     )
                     _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
                     results.append({
@@ -809,6 +1073,7 @@ def analyse():
                         "input_validation": input_validation,
                         "detection_breakdown": multi["breakdown"],
                         "fruit_count": multi["fruit_count"],
+                        "marketability": marketability,
                         **_surface_payload({}),
                     })
                     continue
@@ -824,6 +1089,14 @@ def analyse():
             annotated_rel = _save_annotated(img, bbox, f.filename)
             surface = _analyse_surface_and_save(img, bbox, f.filename)
             confidence_pct = round(confidence * 100, 1)
+            marketability = estimate_marketability(
+                fruit=fruit_type,
+                ripeness=label,
+                confidence=confidence_pct,
+                probabilities=proba_dict,
+                blemish_percentage=surface.get("blemish_percentage"),
+                quality_grade=surface.get("quality_grade"),
+            )
 
             log_result(
                 member=member_tag,
@@ -834,6 +1107,7 @@ def analyse():
                 annotated_path=annotated_rel,
                 source="analyse",
                 **_surface_db_fields(surface),
+                **_marketability_db_fields(marketability),
                 user_id=g.user["id"] if g.user else None,
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence_pct),
@@ -848,6 +1122,7 @@ def analyse():
                 "annotated_path": annotated_rel,
                 "multi_fruit_fallback": multi_fruit,
                 "input_validation": input_validation,
+                "marketability": marketability,
                 **_surface_payload(surface),
             })
 
@@ -978,6 +1253,133 @@ def _valid_date_arg(name):
     return raw
 
 
+@app.route("/marketability")
+def marketability_dashboard():
+    fruit_filter = request.args.get("fruit") or None
+    model_filter = request.args.get("model") or None
+    ripeness_filter = request.args.get("ripeness") or None
+    analysis_filter = request.args.get("analysis") or None
+    status_filter = request.args.get("status") or None
+    priority_filter = request.args.get("priority") or None
+    review_filter = request.args.get("review") or None
+    date_from = _valid_date_arg("date_from")
+    date_to = _valid_date_arg("date_to")
+
+    rows = _decorate_marketability_rows(get_all_results(
+        member=model_filter,
+        fruit=fruit_filter,
+        date_from=date_from,
+        date_to=date_to,
+    ))
+    if ripeness_filter:
+        rows = [row for row in rows if row.get("label") == ripeness_filter]
+    if analysis_filter:
+        rows = [row for row in rows if row.get("analysis_kind") == analysis_filter]
+    if status_filter:
+        rows = [row for row in rows if row["marketability"].get("status") == status_filter]
+    if priority_filter:
+        rows = [
+            row for row in rows
+            if row["marketability"].get("dispatch_priority") == priority_filter
+        ]
+    if review_filter:
+        rows = [row for row in rows if row["review"].get("status") == review_filter]
+
+    summary = {
+        "total": len(rows),
+        "urgent": sum(
+            row["marketability"].get("dispatch_priority") in {"urgent", "remove"}
+            for row in rows
+        ),
+        "ready": sum(row["marketability"].get("status") == "ready" for row in rows),
+        "hold": sum(row["marketability"].get("status") == "hold" for row in rows),
+        "inspect": sum(
+            row["marketability"].get("status") in {"inspect", "isolate"}
+            for row in rows
+        ),
+        "remove": sum(row["marketability"].get("status") == "remove" for row in rows),
+        "batch": sum(
+            row.get("analysis_kind") in {"batch", "multi_fruit_batch"}
+            for row in rows
+        ),
+        "needs_review": sum(
+            row["review"].get("status") == "needs_review" for row in rows
+        ),
+    }
+    model_options = [
+        (_member_tag(key), entry["label"])
+        for key, entry in PREDICTORS.items()
+    ] + [("ensemble_all_four", ALL_FOUR_LABEL)]
+
+    return render_template(
+        "marketability.html",
+        results=rows[:250],
+        summary=summary,
+        fruits=FRUITS,
+        model_options=model_options,
+        model_labels=dict(model_options),
+        fruit_filter=fruit_filter,
+        model_filter=model_filter,
+        ripeness_filter=ripeness_filter,
+        analysis_filter=analysis_filter,
+        status_filter=status_filter,
+        priority_filter=priority_filter,
+        review_filter=review_filter,
+        date_from=date_from,
+        date_to=date_to,
+        active_page="marketability",
+    )
+
+
+@app.route("/marketability/<int:record_id>/review", methods=["POST"])
+def marketability_review(record_id):
+    """Store a human decision alongside, never over, the model prediction."""
+    record = get_by_id(record_id)
+    if not record:
+        flash("That prediction record no longer exists.")
+        return redirect(url_for("marketability_dashboard"))
+
+    decision = request.form.get("decision", "")
+    reason = request.form.get("reason", "").strip()[:500] or None
+    review_fields = {
+        "reviewed_by": g.user["name"],
+        "reviewed_at": datetime.now().isoformat(timespec="seconds"),
+        "review_reason": reason,
+    }
+    if decision == "confirm":
+        review_fields.update({
+            "review_status": "confirmed",
+            "review_fruit": None,
+            "review_label": None,
+        })
+        message = "Model result confirmed after inspection."
+    elif decision == "correct":
+        review_fruit = request.form.get("review_fruit")
+        review_label = request.form.get("review_label")
+        if review_fruit not in FRUITS or review_label not in RIPENESS_CLASSES:
+            flash("Choose a valid observed fruit and ripeness classification.")
+            return redirect(url_for("marketability_dashboard"))
+        review_fields.update({
+            "review_status": "corrected",
+            "review_fruit": review_fruit,
+            "review_label": review_label,
+        })
+        message = "Operator correction saved separately from the model result."
+    else:
+        flash("Choose whether to confirm or correct the model result.")
+        return redirect(url_for("marketability_dashboard"))
+
+    if not update_result(record_id, **review_fields):
+        flash("The review could not be saved because the record is no longer available.")
+        return redirect(url_for("marketability_dashboard"))
+    auth_db.log_activity(
+        g.user["id"], "review_marketability",
+        detail=f"record {record_id}: {review_fields['review_status']}",
+    )
+    flash(message)
+    return redirect(url_for("marketability_dashboard"))
+
+
 @app.route("/history")
 def history():
     fruit_filter = request.args.get("fruit") or None
@@ -1063,12 +1465,23 @@ def history_edit(record_id):
         return redirect(url_for("history"))
 
     if request.method == "POST":
+        edited_fruit = request.form.get("fruit")
+        edited_label = request.form.get("label")
+        edited_confidence = float(request.form["confidence"]) if request.form.get("confidence") else None
+        marketability = estimate_marketability(
+            fruit=edited_fruit,
+            ripeness=edited_label,
+            confidence=edited_confidence,
+            blemish_percentage=record.get("blemish_percentage"),
+            quality_grade=record.get("quality_grade"),
+        )
         update_result(
             record_id,
-            fruit=request.form.get("fruit"),
-            label=request.form.get("label"),
-            confidence=float(request.form["confidence"]) if request.form.get("confidence") else None,
+            fruit=edited_fruit,
+            label=edited_label,
+            confidence=edited_confidence,
             source=request.form.get("source"),
+            **_marketability_db_fields(marketability),
         )
         flash("Record updated.")
         return redirect(url_for("history"))

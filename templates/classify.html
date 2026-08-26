@@ -199,6 +199,24 @@
             html += `<br><small>${data.surface_analysis_error}</small>`;
           }
         }
+        if (data.marketability) {
+          const estimate = data.marketability;
+          const estimateWindow = estimate.window || "Withheld - manual inspection required";
+          html += `
+            <div class="per-member" style="margin-top:14px;">
+              <strong>Farm handling recommendation</strong>
+              <table>
+                <tr><td>Status</td><td>${estimate.status.toUpperCase()}</td></tr>
+                <tr><td>Dispatch priority</td><td>${estimate.dispatch_priority.toUpperCase()}</td></tr>
+                <tr><td>Estimated marketable life</td><td>${estimateWindow}</td></tr>
+                <tr><td>Estimate reliability</td><td>${estimate.reliability.toUpperCase()}</td></tr>
+              </table>
+              <p style="margin:10px 0 4px;"><strong>${estimate.action}</strong></p>
+              ${estimate.storage_assumption ? `<small>Assumes ${estimate.storage_assumption}.</small><br>` : ""}
+              <small>${estimate.disclaimer}</small>
+            </div>
+          `;
+        }
         resultDiv.innerHTML = html;
       }
     } catch (err) {

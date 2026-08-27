@@ -215,6 +215,41 @@ def get_stats_since(hours=24, member=None, user_id=None):
     """Convenience wrapper: stats for the rolling window, e.g. 'last 24h'."""
     return get_stats(member=member, user_id=user_id, since_hours=hours)
 
+
+def get_fruit_label_breakdown(member=None, fruit=None, user_id=None, since_hours=None, date_from=None, date_to=None):
+    """{fruit: {label: count}} -- the same filters as get_stats(), but
+    counted per (fruit, label) pair instead of each dimension separately,
+    for the dashboard's grouped ripeness-by-fruit chart."""
+    conn = _connect()
+    where_clauses = []
+    params = []
+    if member:
+        where_clauses.append("member = ?")
+        params.append(member)
+    if fruit:
+        where_clauses.append("fruit = ?")
+        params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    if since_hours is not None:
+        cutoff = (datetime.now() - timedelta(hours=since_hours)).isoformat(timespec="seconds")
+        where_clauses.append("created_at >= ?")
+        params.append(cutoff)
+    _add_date_filters(where_clauses, params, date_from, date_to)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    rows = conn.execute(
+        f"SELECT fruit, label, COUNT(*) as cnt FROM results {where_sql} GROUP BY fruit, label",
+        tuple(params),
+    ).fetchall()
+    conn.close()
+
+    breakdown = {}
+    for row in rows:
+        breakdown.setdefault(row["fruit"], {})[row["label"]] = row["cnt"]
+    return breakdown
+
 def init_db():
     os.makedirs(DB_DIR, exist_ok=True)
     conn = _connect()

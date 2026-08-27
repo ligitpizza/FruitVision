@@ -84,6 +84,7 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                 delete_result=lambda *args, **kwargs: False,
                 get_stats=lambda *args, **kwargs: {},
                 get_stats_since=lambda *args, **kwargs: {},
+                get_fruit_label_breakdown=lambda *args, **kwargs: {},
             ),
             "database.stock_db": _module(
                 log_stock_event=lambda **kwargs: stock_events.append(kwargs),

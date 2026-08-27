@@ -93,6 +93,7 @@ from database.history_db import (
     delete_result,
     get_stats,
     get_stats_since,
+    get_fruit_label_breakdown,
 )
 from database import auth_db, stock_db
 
@@ -469,9 +470,8 @@ def dashboard_home():
     stats_today = get_stats_since(hours=24)
     recent = get_recent(limit=5)
 
-    fruit_chart = generate_fruit_breakdown_chart(None, file_tag="all")
-    history_chart = generate_history_chart(None, file_tag="all")
     confidence_chart = generate_confidence_trend_chart(None, file_tag="all")
+    fruit_label_breakdown = get_fruit_label_breakdown()
     marketability_rows = _decorate_marketability_rows(get_recent(limit=100))
     marketability_alert_count = sum(
         row["marketability"].get("dispatch_priority") in {"urgent", "remove"}
@@ -483,8 +483,9 @@ def dashboard_home():
         stats=stats,
         stats_today=stats_today,
         recent=recent,
-        fruit_chart=fruit_chart is not None,
-        history_chart=history_chart is not None,
+        fruits=FRUITS,
+        fruit_label_breakdown_json=json.dumps(fruit_label_breakdown),
+        by_label_json=json.dumps(stats["by_label"]),
         confidence_chart=confidence_chart is not None,
         marketability_alert_count=marketability_alert_count,
         chart_tag="all",

@@ -136,6 +136,7 @@
   </form>
 
   {% if results %}
+  <div style="overflow-x:auto;">
   <table>
     <tr>
       <th>Time</th>
@@ -165,6 +166,7 @@
     </tr>
     {% endfor %}
   </table>
+  </div>
 
   <div class="pagination">
     {% if page > 1 %}

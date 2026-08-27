@@ -70,20 +70,24 @@
     </div>
     <div>
       <div class="field-hint">Classified output</div>
-      {% if record.annotated_path %}
+      {% if annotated_exists %}
         <a href="/outputs/{{ record.annotated_path }}" target="_blank" rel="noopener">
           <img src="/outputs/{{ record.annotated_path }}" alt="Classified output photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
         </a>
       {% else %}
-        <p class="empty">Not available</p>
+        <p class="empty">Not available{{ ' (' ~ record.annotated_path ~ ')' if record.annotated_path }}</p>
       {% endif %}
     </div>
     {% if record.surface_path %}
     <div>
       <div class="field-hint">Surface / blemish analysis</div>
-      <a href="/outputs/{{ record.surface_path }}" target="_blank" rel="noopener">
-        <img src="/outputs/{{ record.surface_path }}" alt="Surface analysis overlay" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
-      </a>
+      {% if surface_exists %}
+        <a href="/outputs/{{ record.surface_path }}" target="_blank" rel="noopener">
+          <img src="/outputs/{{ record.surface_path }}" alt="Surface analysis overlay" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+        </a>
+      {% else %}
+        <p class="empty">Not available ({{ record.surface_path }})</p>
+      {% endif %}
     </div>
     {% endif %}
   </div>
@@ -99,9 +103,13 @@
     {% for t in group.techniques %}
     <div>
       <div class="field-hint">{{ t.label }}</div>
-      <a href="/outputs/{{ t.path }}" target="_blank" rel="noopener">
-        <img src="/outputs/{{ t.path }}" alt="{{ t.label }} filtered photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
-      </a>
+      {% if t.exists %}
+        <a href="/outputs/{{ t.path }}" target="_blank" rel="noopener">
+          <img src="/outputs/{{ t.path }}" alt="{{ t.label }} filtered photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+        </a>
+      {% else %}
+        <p class="empty">Not available</p>
+      {% endif %}
     </div>
     {% endfor %}
   </div>

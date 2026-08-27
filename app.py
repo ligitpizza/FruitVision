@@ -624,6 +624,20 @@ def _filter_photos_display(filter_photos):
     ]
 
 
+def _mark_filter_photo_availability(filter_photos_display):
+    """Checks each technique's file against disk, for a persisted record
+    being viewed later (history_detail) rather than right after it was
+    generated -- outputs/filters/ is gitignored, so a teammate's fresh
+    clone (or anyone who's cleared their outputs/ folder) has DB rows that
+    reference filter photos with nothing on disk to back them. Marks each
+    technique "exists": False instead of leaving the template to render a
+    broken <img> for a file that was never there."""
+    for group in filter_photos_display:
+        for technique in group["techniques"]:
+            technique["exists"] = os.path.exists(os.path.join(OUTPUTS_DIR, technique["path"]))
+    return filter_photos_display
+
+
 def _filter_photos_for_pdf(filter_photos_display):
     """pdf_report.py's PDF generators take filter photo paths as absolute
     filesystem paths (same convention as image_path/surface_image_path),
@@ -1645,12 +1659,24 @@ def history_detail(record_id):
     raw = record.get("detection_breakdown")
     record["detection_breakdown"] = json.loads(raw) if raw else None
     input_exists = bool(record.get("filename")) and os.path.exists(os.path.join(UPLOAD_DIR, record["filename"]))
+    # outputs/annotated/, outputs/surface/, and outputs/filters/ are all
+    # gitignored (generated artifacts, not source) -- a persisted record can
+    # reference a path that simply isn't there on this machine (a
+    # teammate's fresh clone, or a locally cleared outputs/ folder), so
+    # check disk rather than trusting the stored path is still backed by a
+    # real file.
+    annotated_exists = bool(record.get("annotated_path")) and os.path.exists(os.path.join(OUTPUTS_DIR, record["annotated_path"]))
+    surface_exists = bool(record.get("surface_path")) and os.path.exists(os.path.join(OUTPUTS_DIR, record["surface_path"]))
 
     filter_photos_raw = record.get("filter_photos")
-    filter_photos = _filter_photos_display(json.loads(filter_photos_raw)) if filter_photos_raw else []
+    filter_photos = (
+        _mark_filter_photo_availability(_filter_photos_display(json.loads(filter_photos_raw)))
+        if filter_photos_raw else []
+    )
 
     return render_template(
         "history_detail.html", record=record, input_exists=input_exists,
+        annotated_exists=annotated_exists, surface_exists=surface_exists,
         filter_photos=filter_photos, active_page="history",
     )
 

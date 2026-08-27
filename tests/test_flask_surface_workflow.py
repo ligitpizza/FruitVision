@@ -368,6 +368,9 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             app_module.PUBLIC_PATHS.add("/history/999")
             with open(os.path.join(app_module.UPLOAD_DIR, "detail_input.png"), "wb") as fh:
                 fh.write(b"fake-image-bytes")
+            os.makedirs(os.path.join(app_module.OUTPUTS_DIR, "annotated"), exist_ok=True)
+            with open(os.path.join(app_module.OUTPUTS_DIR, "annotated", "detail_out.png"), "wb") as fh:
+                fh.write(b"fake-image-bytes")
 
             app_module.get_by_id = lambda record_id: {
                 "id": 1, "created_at": "2026-01-01T00:00:00", "member": "ensemble_ab",
@@ -384,10 +387,44 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertIn("/outputs/annotated/detail_out.png", detail_html)
             self.assertNotIn("Not available", detail_html)
 
+            # --- filter photos: outputs/filters/ is gitignored, so a
+            # persisted record's filter_photos JSON can reference a
+            # technique image that isn't on disk (e.g. a teammate's fresh
+            # clone) -- that one technique should degrade to "Not
+            # available" instead of a broken <img>, without hiding the
+            # techniques that ARE actually present. ---
+            os.makedirs(os.path.join(app_module.OUTPUTS_DIR, "filters"), exist_ok=True)
+            with open(os.path.join(app_module.OUTPUTS_DIR, "filters", "detail_colour_ab.png"), "wb") as fh:
+                fh.write(b"fake-image-bytes")
+            app_module.get_by_id = lambda record_id: {
+                "id": 3, "created_at": "2026-01-01T00:00:00", "member": "ensemble_ab",
+                "filename": "detail_input.png", "fruit": "apple", "label": "ripe",
+                "confidence": 92.0, "annotated_path": "annotated/detail_out.png",
+                "surface_path": None, "source": "predict", "blemish_percentage": 2.0,
+                "quality_grade": "Grade A", "marketability_status": "ready",
+                "flagged": 0, "detection_breakdown": None,
+                "filter_photos": json.dumps({
+                    "ab": {
+                        "colour": "filters/detail_colour_ab.png",
+                        "shape": "filters/detail_shape_ab_MISSING.png",
+                    },
+                }),
+            }
+            app_module.PUBLIC_PATHS.add("/history/3")
+            filter_response = client.get("/history/3")
+            filter_html = filter_response.get_data(as_text=True)
+            self.assertEqual(filter_response.status_code, 200)
+            self.assertIn("/outputs/filters/detail_colour_ab.png", filter_html)
+            self.assertNotIn("/outputs/filters/detail_shape_ab_MISSING.png", filter_html)
+            self.assertIn("Not available", filter_html)
+
             app_module.get_by_id = lambda record_id: {
                 "id": 2, "created_at": "2026-01-01T00:00:00", "member": "ensemble_ab",
+                # annotated_path is set (like a real DB row) but nothing on
+                # disk backs it -- e.g. outputs/annotated/ is gitignored, so
+                # a teammate's fresh clone has the DB row without the file.
                 "filename": "missing_input.png", "fruit": "apple", "label": "ripe",
-                "confidence": 92.0, "annotated_path": None,
+                "confidence": 92.0, "annotated_path": "annotated/missing_out.png",
                 "surface_path": None, "source": "predict", "blemish_percentage": None,
                 "quality_grade": None, "marketability_status": None,
                 "flagged": 0, "detection_breakdown": None,
@@ -396,6 +433,7 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             missing_html = missing_response.get_data(as_text=True)
             self.assertEqual(missing_response.status_code, 200)
             self.assertNotIn('src="/uploads/missing_input.png"', missing_html)
+            self.assertNotIn('src="/outputs/annotated/missing_out.png"', missing_html)
             self.assertIn("Not available", missing_html)
 
             app_module.get_by_id = lambda record_id: None

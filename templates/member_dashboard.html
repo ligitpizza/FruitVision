@@ -72,6 +72,24 @@
             </div>
           {% endif %}
         {% endif %}
+        {% if r.filter_photos %}
+        <div style="margin-top:10px;">
+          <small class="field-hint"><strong>Filter Technique Photos</strong></small>
+          {% for group in r.filter_photos %}
+          <div style="margin-top:4px;">
+            <small class="field-hint">{{ group.member_label }}</small>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+              {% for t in group.techniques %}
+              <div style="width:100px;">
+                <img src="/outputs/{{ t.path }}" alt="{{ t.label }} filtered photo" style="width:100%; border-radius:8px; border:1px solid var(--border);">
+                <div class="field-hint" style="text-align:center; margin-top:2px;">{{ t.label }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
         <form action="/extra_export_pdf" method="post" style="display:inline;">
           <input type="hidden" name="label" value="{{ r.label }}">
           <input type="hidden" name="confidence" value="{{ r.confidence }}">
@@ -90,6 +108,9 @@
           {% if r.detection_breakdown %}
           <input type="hidden" name="detection_breakdown" value='{{ r.detection_breakdown|tojson }}'>
           <input type="hidden" name="fruit_count" value="{{ r.detection_breakdown.values()|sum }}">
+          {% endif %}
+          {% if r.filter_photos %}
+          <input type="hidden" name="filter_photos_json" value='{{ r.filter_photos|tojson }}'>
           {% endif %}
           <button type="submit" class="btn-outline btn-sm" style="width:auto; display:inline-block;">Export PDF</button>
         </form>

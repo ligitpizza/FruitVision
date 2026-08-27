@@ -222,3 +222,21 @@ def estimate_marketability(
         confidence=confidence_pct, rotten_probability=rotten_probability,
         blemish_percentage=blemish, reasons=reasons,
     )
+
+
+def stock_eligible(fruit, label, confidence):
+    """Whether a prediction should count into the Fruit Stock ledger.
+
+    unripe/rotten always do -- their disposition (hold to ripen / remove) is
+    already unambiguous from the raw label alone. A 'ripe' result only
+    counts if its marketability verdict is actually "ready": a low-confidence
+    or (when blemish data is available upstream) heavily blemished 'ripe'
+    classification shouldn't inflate the sellable-stock count just because
+    the raw classifier label said ripe.
+
+    confidence may be given on a 0-1 or 0-100 scale.
+    """
+    if label != "ripe":
+        return True
+    confidence_pct = confidence * 100 if confidence is not None and confidence <= 1.0 else confidence
+    return estimate_marketability(fruit=fruit, ripeness=label, confidence=confidence_pct)["status"] == "ready"

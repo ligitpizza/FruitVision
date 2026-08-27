@@ -49,10 +49,10 @@ _load_all_members()
 def _run_member(member, fn, raw_img, fruit_type):
     """Calls a member's predict_ripeness, tolerating both signatures."""
     try:
-        label, confidence, bbox, _, proba_dict = fn(raw_img, fruit_type)
+        label, confidence, bbox, cleaned_img, proba_dict = fn(raw_img, fruit_type)
     except TypeError:
-        label, confidence, bbox, _, proba_dict = fn(raw_img)
-    return label, float(confidence), bbox, proba_dict
+        label, confidence, bbox, cleaned_img, proba_dict = fn(raw_img)
+    return label, float(confidence), bbox, cleaned_img, proba_dict
 
 
 def predict_ensemble(raw_img, fruit_type):
@@ -71,11 +71,12 @@ def predict_ensemble(raw_img, fruit_type):
 
     for member, fn in _MEMBER_PREDICTORS.items():
         try:
-            label, confidence, member_bbox, proba_dict = _run_member(member, fn, raw_img, fruit_type)
+            label, confidence, member_bbox, cleaned_img, proba_dict = _run_member(member, fn, raw_img, fruit_type)
             per_member[member] = {
                 "label": label,
                 "confidence": round(confidence * 100, 1),
                 "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
+                "cleaned_img": cleaned_img,
             }
             bbox = bbox or member_bbox
         except Exception as e:

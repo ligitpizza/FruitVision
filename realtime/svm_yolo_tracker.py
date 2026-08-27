@@ -1,6 +1,7 @@
 # used svm
 import os
 import sys
+import json
 import time
 from collections import deque, Counter
 import cv2
@@ -14,6 +15,8 @@ from member_apps.member_1_ab.m1_detection import detect as classical_detect
 from database.history_db import log_result
 from database.stock_db import log_stock_event
 from core_modules.blemish_analysis import analyze_surface
+from core_modules.filter_photos import filter_photos_ensemble, pop_member_cleaned_images
+from core_modules.marketability import stock_eligible
 from .tracker_config import (
     YOLO_WEIGHTS_PATH,
     YOLO_IMGSZ,
@@ -119,7 +122,7 @@ def _update_rolling_vote(state, label, confidence):
     return top_label, top_confidence, True
 
 
-def _record_classification(crop, fruit_type, label, confidence, tag):
+def _record_classification(crop, fruit_type, label, confidence, tag, cleaned_by_member=None):
     """Logs a COMMITTED (post-smoothing) classification to the shared history
     DB, and appends it to this session's in-memory log for PDF export. Only
     called on a label transition, so a track sitting still doesn't spam the
@@ -134,6 +137,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
     if surface["surface_overlay"] is not None:
         surface_path = os.path.join(SNAPSHOT_DIR, f"{tag}_{int(time.time() * 1000)}_surface.jpg")
         cv2.imwrite(surface_path, surface["surface_overlay"])
+    filter_photos = filter_photos_ensemble(cleaned_by_member or {}, os.path.basename(snapshot_path), OUTPUTS_DIR)
 
     log_result(
         member="realtime_yolo",
@@ -148,6 +152,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         blemish_percentage=surface["blemish_percentage"],
         quality_grade=surface["quality_grade"] if surface["blemish_percentage"] is not None else None,
         surface_path=os.path.relpath(surface_path, OUTPUTS_DIR) if surface_path else None,
+        filter_photos=json.dumps(filter_photos) if filter_photos else None,
     )
 
     _session_log.append({
@@ -161,6 +166,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         "blemish_area_px": surface["blemish_area_px"],
         "blemish_percentage": surface["blemish_percentage"],
         "quality_grade": surface["quality_grade"],
+        "filter_photos": filter_photos,
     })
 
 
@@ -175,7 +181,8 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
     frame_label, frame_confidence = None, None
     if frame_idx - _mango_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
         try:
-            frame_label, frame_confidence, _, _ = predict_ensemble(cropped, fruit_type)
+            frame_label, frame_confidence, per_member, _ = predict_ensemble(cropped, fruit_type)
+            _mango_state["cleaned_by_member"] = pop_member_cleaned_images(per_member)
         except Exception:
             pass
         _mango_state["last_frame"] = frame_idx
@@ -185,7 +192,10 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
     _mango_state["label"], _mango_state["confidence"] = committed_label, committed_confidence
 
     if stable and committed_label != prev_label:
-        _record_classification(cropped, fruit_type, committed_label, committed_confidence, tag=f"mango_frame{frame_idx}")
+        _record_classification(
+            cropped, fruit_type, committed_label, committed_confidence,
+            tag=f"mango_frame{frame_idx}", cleaned_by_member=_mango_state.get("cleaned_by_member"),
+        )
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
@@ -244,6 +254,9 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
     if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
         try:
             frame_label, frame_confidence, per_member, _ = predict_ensemble(crop, fruit_type)
+            # cleaned_img pulled out first -- it's a raw ndarray, and the
+            # debug print below would otherwise dump its full array repr.
+            state["cleaned_by_member"] = pop_member_cleaned_images(per_member)
             # TEMP DEBUG: watch which members disagree on a known-ripe apple
             print(f"[debug] track {tid} frame {frame_idx}: {per_member}")
         except Exception:
@@ -256,10 +269,14 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
 
     if stable and tid not in _counted_tracks:
         _counted_tracks.add(tid)
-        log_stock_event(fruit=fruit_type, label=committed_label, quantity=1, source="realtime", track_tag=f"track{tid}")
+        if stock_eligible(fruit_type, committed_label, committed_confidence):
+            log_stock_event(fruit=fruit_type, label=committed_label, quantity=1, source="realtime", track_tag=f"track{tid}")
 
     if stable and committed_label != prev_label:
-        _record_classification(crop, fruit_type, committed_label, committed_confidence, tag=f"track{tid}_frame{frame_idx}")
+        _record_classification(
+            crop, fruit_type, committed_label, committed_confidence,
+            tag=f"track{tid}_frame{frame_idx}", cleaned_by_member=state.get("cleaned_by_member"),
+        )
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))

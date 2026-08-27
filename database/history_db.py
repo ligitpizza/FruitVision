@@ -281,6 +281,7 @@ def init_db():
         "review_reason": "TEXT",
         "reviewed_by": "TEXT",
         "reviewed_at": "TEXT",
+        "filter_photos": "TEXT",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:
@@ -313,6 +314,7 @@ def log_result(
     marketability_action=None,
     marketability_reliability=None,
     marketability_storage_assumption=None,
+    filter_photos=None,
 ):
     """Insert one prediction result. Call this right after predict_ripeness() returns.
 
@@ -320,6 +322,10 @@ def log_result(
     "rotten": 1}', set only by the multi-fruit-per-photo batch path (see
     app.py's /analyse) when one photo's majority label is being logged as a
     single row -- None for every ordinary single-fruit prediction.
+
+    filter_photos: optional JSON string shaped {model_key: {technique:
+    output_path}}, one sub-dict per member (or just the one model, for a
+    single-model prediction) -- see app.py's FILTER_STEPS.
     """
     conn = _connect()
     conn.execute(
@@ -331,8 +337,8 @@ def log_result(
                marketability_status, dispatch_priority,
                marketability_min_days, marketability_max_days,
                marketability_action, marketability_reliability,
-               marketability_storage_assumption
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               marketability_storage_assumption, filter_photos
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             member, filename, fruit, label, confidence, annotated_path,
             fruit_area_px, blemish_area_px, blemish_percentage,
@@ -342,7 +348,7 @@ def log_result(
             marketability_status, dispatch_priority,
             marketability_min_days, marketability_max_days,
             marketability_action, marketability_reliability,
-            marketability_storage_assumption,
+            marketability_storage_assumption, filter_photos,
         ),
     )
     conn.commit()

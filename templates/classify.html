@@ -112,6 +112,34 @@
 
 <script>
   let selectedModel = "{{ default_model }}";
+  const FILTER_TECHNIQUE_LABELS = {{ filter_technique_labels_json | safe }};
+  const ENSEMBLE_MEMBER_MAP = {{ ensemble_member_map_json | safe }};
+  const PREDICTOR_LABELS = {{ predictor_labels_json | safe }};
+
+  function memberLabel(memberKey) {
+    const modelKey = ENSEMBLE_MEMBER_MAP[memberKey] || memberKey;
+    return PREDICTOR_LABELS[modelKey] || memberKey;
+  }
+
+  function renderFilterPhotos(filterPhotos) {
+    if (!filterPhotos || Object.keys(filterPhotos).length === 0) return "";
+    let html = `<div class="per-member" style="margin-top:14px;"><strong>Filter Technique Photos</strong>`;
+    for (const [memberKey, techniques] of Object.entries(filterPhotos)) {
+      html += `<div style="margin-top:8px;"><small>${memberLabel(memberKey)}</small><div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">`;
+      for (const [technique, path] of Object.entries(techniques)) {
+        const label = FILTER_TECHNIQUE_LABELS[technique] || technique;
+        html += `
+          <div style="width:120px;">
+            <img src="/outputs/${encodeURI(path)}" alt="${label} filtered photo" style="width:100%; border-radius:8px; border:1px solid var(--border);">
+            <div class="field-hint" style="text-align:center; margin-top:2px;">${label}</div>
+          </div>
+        `;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
 
   function selectModel(model) {
     selectedModel = model;
@@ -217,6 +245,7 @@
             </div>
           `;
         }
+        html += renderFilterPhotos(data.filter_photos);
         resultDiv.innerHTML = html;
       }
     } catch (err) {

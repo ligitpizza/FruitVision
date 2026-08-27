@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import os
 import sys
 import tempfile
@@ -35,6 +36,7 @@ def _module(**attributes):
 class FlaskSurfaceWorkflowTests(unittest.TestCase):
     def test_unified_prediction_returns_and_persists_surface_fields(self):
         logged = []
+        stock_events = []
         predictor_stubs = {
             "member_apps.member_1_ab.m1_predict": _module(predict_ripeness=_predict, NotAFruitError=DummyNotFruitError),
             "member_apps.member_2_bc.m2_predict": _module(predict_ripeness=_predict, NotAFruitError=DummyNotFruitError),
@@ -44,7 +46,14 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                 predict_ripeness=_predict, NotAFruitError=DummyNotFruitError
             ),
             "member_apps.predict_ensemble": _module(
-                predict_ensemble=lambda image, fruit: ("ripe", 92.0, {}, (5, 5, image.shape[1] - 5, image.shape[0] - 5))
+                predict_ensemble=lambda image, fruit: (
+                    "ripe", 92.0,
+                    {
+                        "member_1_ab": {"label": "ripe", "confidence": 91.0, "proba": {"ripe": 91.0, "unripe": 5.0, "rotten": 4.0}, "cleaned_img": image.copy()},
+                        "member_2_bc": {"label": "ripe", "confidence": 93.0, "proba": {"ripe": 93.0, "unripe": 4.0, "rotten": 3.0}, "cleaned_img": image.copy()},
+                    },
+                    (5, 5, image.shape[1] - 5, image.shape[0] - 5),
+                )
             ),
             "core_modules.pdf_report": _module(
                 generate_pdf_report=lambda *args, **kwargs: "report.pdf",
@@ -75,6 +84,14 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                 delete_result=lambda *args, **kwargs: False,
                 get_stats=lambda *args, **kwargs: {},
                 get_stats_since=lambda *args, **kwargs: {},
+            ),
+            "database.stock_db": _module(
+                log_stock_event=lambda **kwargs: stock_events.append(kwargs),
+                get_paginated=lambda *args, **kwargs: ([], 0),
+                get_by_id=lambda *args, **kwargs: None,
+                update_stock_event=lambda *args, **kwargs: False,
+                delete_stock_event=lambda *args, **kwargs: False,
+                get_summary=lambda *args, **kwargs: {},
             ),
         }
         realtime_module = _module(realtime_bp=Blueprint("realtime_test", __name__))
@@ -129,6 +146,52 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertEqual(logged[0]["quality_grade"], payload["quality_grade"])
             self.assertEqual(logged[0]["marketability_status"], "ready")
             self.assertEqual(logged[0]["marketability_min_days"], payload["marketability"]["min_days"])
+
+            # --- single upload automatically counts a ready ripe result
+            # into stock, no "add to stock" checkbox needed (unlike batch) ---
+            self.assertEqual(len(stock_events), 1)
+            self.assertEqual(stock_events[0]["label"], "ripe")
+            self.assertEqual(stock_events[0]["fruit"], "apple")
+            self.assertEqual(stock_events[0]["source"], "single")
+            stock_events.clear()
+
+            # --- filter-technique photos: single-model prediction ("ab" ->
+            # colour + shape) ---
+            self.assertEqual(set(payload["filter_photos"].keys()), {"ab"})
+            ab_photos = payload["filter_photos"]["ab"]
+            self.assertEqual(set(ab_photos.keys()), {"colour", "shape"})
+            for rel_path in ab_photos.values():
+                self.assertTrue(os.path.exists(os.path.join(app_module.OUTPUTS_DIR, rel_path)))
+            self.assertIn("filter_photos", logged[0])
+            self.assertIsNotNone(logged[0]["filter_photos"])
+            logged_filter_photos = json.loads(logged[0]["filter_photos"])
+            self.assertEqual(logged_filter_photos, payload["filter_photos"])
+
+            # --- filter-technique photos: All-Four ensemble, one sub-dict
+            # per member (ab -> colour+shape, bc -> shape+texture) ---
+            ensemble_response = client.post(
+                "/predict_unified",
+                data={
+                    "fruit": "apple",
+                    "model": "all_four",
+                    "image": (io.BytesIO(encoded.tobytes()), "apple_ensemble.png"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(ensemble_response.status_code, 200)
+            ensemble_payload = ensemble_response.get_json()
+            self.assertEqual(
+                set(ensemble_payload["filter_photos"].keys()), {"member_1_ab", "member_2_bc"}
+            )
+            self.assertEqual(set(ensemble_payload["filter_photos"]["member_1_ab"].keys()), {"colour", "shape"})
+            self.assertEqual(set(ensemble_payload["filter_photos"]["member_2_bc"].keys()), {"shape", "texture"})
+            for member_photos in ensemble_payload["filter_photos"].values():
+                for rel_path in member_photos.values():
+                    self.assertTrue(os.path.exists(os.path.join(app_module.OUTPUTS_DIR, rel_path)))
+            # per_member itself must stay JSON-serializable -- the raw
+            # cleaned_img ndarray predict_ensemble() attaches has to be
+            # stripped before this response is jsonify()'d.
+            self.assertNotIn("cleaned_img", ensemble_payload["per_member"]["member_1_ab"])
 
             app_module.PUBLIC_PATHS.add("/marketability")
             app_module.get_all_results = lambda **kwargs: [
@@ -201,6 +264,47 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertNotIn("#1", review_only_html)
             self.assertIn('value="needs_review" selected', review_only_html)
 
+            # --- pagination regression: rows sort worst-first (remove before
+            # ready), so on a database dominated by "remove"-status history a
+            # fresh "ready" result must still be reachable via pagination
+            # instead of being silently dropped past a hard row cap. ---
+            def _remove_row(row_id):
+                return {
+                    "id": row_id, "created_at": "2099-01-01T00:00:00", "member": "ensemble_ab",
+                    "filename": f"remove_{row_id}.png", "fruit": "apple", "label": "rotten",
+                    "confidence": 95.0, "annotated_path": None, "blemish_percentage": 25.0,
+                    "quality_grade": "Grade C", "marketability_status": "remove",
+                    "dispatch_priority": "remove", "marketability_min_days": 0,
+                    "marketability_max_days": 0, "marketability_action": "Do not market this fruit.",
+                    "marketability_reliability": "high", "marketability_storage_assumption": "test storage",
+                }
+
+            fresh_ready_row = {
+                "id": 9999, "created_at": "2099-01-01T00:00:00", "member": "ensemble_ab",
+                "filename": "fresh_ready.png", "fruit": "apple", "label": "ripe",
+                "confidence": 92.0, "annotated_path": None, "blemish_percentage": 2.0,
+                "quality_grade": "Grade A", "marketability_status": "ready",
+                "dispatch_priority": "high", "marketability_min_days": 7,
+                "marketability_max_days": 14, "marketability_action": "Ready for market.",
+                "marketability_reliability": "high", "marketability_storage_assumption": "test storage",
+            }
+            app_module.get_all_results = lambda **kwargs: (
+                [_remove_row(i) for i in range(1, 31)] + [fresh_ready_row]
+            )
+
+            page1_response = client.get("/marketability")
+            page1_html = page1_response.get_data(as_text=True)
+            # Within the same status/priority/days group, newest (highest id)
+            # sorts first -- so id=30 (not id=1) is the one guaranteed on page 1.
+            self.assertIn("#30<", page1_html)  # sanity: remove rows fill page 1
+            self.assertNotIn("#9999", page1_html)  # BUG: fresh ready result invisible on page 1
+
+            page2_response = client.get("/marketability?page=2")
+            page2_html = page2_response.get_data(as_text=True)
+            self.assertIn("#9999", page2_html)  # FIX: still reachable via pagination
+            self.assertIn("31 record", page2_html)
+            self.assertIn("page 2 of 2", page2_html)
+
             review_updates = []
             app_module.get_by_id = lambda record_id: {
                 "id": record_id, "fruit": "banana", "label": "rotten", "confidence": 76.1,
@@ -257,6 +361,82 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertIn("marketability-alert-close", home_html)
             self.assertIn("Dismiss urgent handling alert", home_html)
             self.assertIn("dismissMarketabilityAlert", home_html)
+
+            # --- harvest record detail page: full input + output photos ---
+            app_module.PUBLIC_PATHS.add("/history/1")
+            app_module.PUBLIC_PATHS.add("/history/2")
+            app_module.PUBLIC_PATHS.add("/history/999")
+            with open(os.path.join(app_module.UPLOAD_DIR, "detail_input.png"), "wb") as fh:
+                fh.write(b"fake-image-bytes")
+
+            app_module.get_by_id = lambda record_id: {
+                "id": 1, "created_at": "2026-01-01T00:00:00", "member": "ensemble_ab",
+                "filename": "detail_input.png", "fruit": "apple", "label": "ripe",
+                "confidence": 92.0, "annotated_path": "annotated/detail_out.png",
+                "surface_path": None, "source": "predict", "blemish_percentage": 2.0,
+                "quality_grade": "Grade A", "marketability_status": "ready",
+                "flagged": 0, "detection_breakdown": None,
+            }
+            detail_response = client.get("/history/1")
+            detail_html = detail_response.get_data(as_text=True)
+            self.assertEqual(detail_response.status_code, 200)
+            self.assertIn("/uploads/detail_input.png", detail_html)
+            self.assertIn("/outputs/annotated/detail_out.png", detail_html)
+            self.assertNotIn("Not available", detail_html)
+
+            app_module.get_by_id = lambda record_id: {
+                "id": 2, "created_at": "2026-01-01T00:00:00", "member": "ensemble_ab",
+                "filename": "missing_input.png", "fruit": "apple", "label": "ripe",
+                "confidence": 92.0, "annotated_path": None,
+                "surface_path": None, "source": "predict", "blemish_percentage": None,
+                "quality_grade": None, "marketability_status": None,
+                "flagged": 0, "detection_breakdown": None,
+            }
+            missing_response = client.get("/history/2")
+            missing_html = missing_response.get_data(as_text=True)
+            self.assertEqual(missing_response.status_code, 200)
+            self.assertNotIn('src="/uploads/missing_input.png"', missing_html)
+            self.assertIn("Not available", missing_html)
+
+            app_module.get_by_id = lambda record_id: None
+            notfound_response = client.get("/history/999")
+            self.assertEqual(notfound_response.status_code, 302)
+            self.assertTrue(notfound_response.headers["Location"].endswith("/history"))
+
+            uploads_response = client.get("/uploads/detail_input.png")
+            self.assertEqual(uploads_response.status_code, 200)
+            self.assertEqual(uploads_response.data, b"fake-image-bytes")
+            # send_from_directory keeps the file handle open until the response
+            # is explicitly closed; on Windows the temp-dir cleanup below can't
+            # unlink the file while that handle is still alive.
+            uploads_response.close()
+
+            # --- ready-for-market gating on stock logging ---
+            stock_events.clear()
+            with app_module.app.test_request_context():
+                app_module.g.user = None
+                app_module._log_stock_result(True, "apple", "ripe", marketability_status="ready")
+                app_module._log_stock_result(True, "apple", "ripe", marketability_status="inspect")
+                app_module._log_stock_result(True, "apple", "unripe", marketability_status=None)
+                app_module._log_stock_result(True, "apple", "rotten", marketability_status=None)
+                app_module._log_stock_result(False, "apple", "ripe", marketability_status="ready")
+
+            self.assertEqual([e["label"] for e in stock_events], ["ripe", "unripe", "rotten"])
+
+            stock_events.clear()
+            with app_module.app.test_request_context():
+                app_module.g.user = None
+                app_module._log_stock_result(
+                    True, "apple", "ripe",
+                    per_fruit=[
+                        {"label": "ripe", "confidence": 0.95},
+                        {"label": "ripe", "confidence": 0.40},
+                        {"label": "unripe", "confidence": 0.30},
+                        {"label": "rotten", "confidence": 0.20},
+                    ],
+                )
+            logged_by_label = {e["label"]: e["quantity"] for e in stock_events}
+            self.assertEqual(logged_by_label, {"ripe": 1, "unripe": 1, "rotten": 1})
 
 
 if __name__ == "__main__":

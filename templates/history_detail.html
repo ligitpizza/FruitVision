@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Record #{{ record.id }} — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">HARVEST RECORD</p>
+    <h1>Record #{{ record.id }}</h1>
+    <p class="meta">Logged {{ record.created_at }} · model: {{ record.member.replace('ensemble_', '')|upper }} · source: {{ record.source or '—' }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn-outline" href="/history/{{ record.id }}/edit">Edit</a>
+    <form action="/history/{{ record.id }}/export_pdf" method="post" style="display:inline;">
+      <button type="submit" class="btn-outline">Export PDF</button>
+    </form>
+    <a class="btn-outline" href="/history">← Back to records</a>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Fruit</div>
+    <div class="value" style="font-size:1.2rem;">{{ record.fruit.capitalize() }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Result</div>
+    <div class="value" style="font-size:1.2rem;">
+      <span class="badge {{ record.label }}">{{ record.label.upper() }}</span>
+      {% if record.flagged %}<span class="badge flagged">FLAGGED</span>{% endif %}
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Confidence</div>
+    <div class="value">{{ record.confidence }}%</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Details</h2>
+  <div class="grid grid-3">
+    <div><div class="field-hint">Blemished surface</div>
+      <div>{{ ('%.2f%%'|format(record.blemish_percentage)) if record.blemish_percentage is not none else ('n/a (multi-fruit)' if record.detection_breakdown else 'Unknown') }}</div>
+    </div>
+    <div><div class="field-hint">Surface quality</div>
+      <div>{{ record.quality_grade or ('n/a' if record.detection_breakdown else 'Unknown') }}</div>
+    </div>
+    <div><div class="field-hint">Marketability</div>
+      <div>{{ record.marketability_status or '—' }}</div>
+    </div>
+  </div>
+  {% if record.detection_breakdown %}
+  <div class="field-hint" style="margin-top:12px;">
+    Multi-fruit photo — majority of {{ record.detection_breakdown.values()|sum }}:
+    {% for label, count in record.detection_breakdown.items() %}{{ count }} {{ label }}{{ ", " if not loop.last }}{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Photos</h2>
+  <div class="grid grid-3">
+    <div>
+      <div class="field-hint">Original input</div>
+      {% if input_exists %}
+        <a href="/uploads/{{ record.filename }}" target="_blank" rel="noopener">
+          <img src="/uploads/{{ record.filename }}" alt="Original input photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+        </a>
+      {% else %}
+        <p class="empty">Not available{{ ' (' ~ record.filename ~ ')' if record.filename }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <div class="field-hint">Classified output</div>
+      {% if record.annotated_path %}
+        <a href="/outputs/{{ record.annotated_path }}" target="_blank" rel="noopener">
+          <img src="/outputs/{{ record.annotated_path }}" alt="Classified output photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+        </a>
+      {% else %}
+        <p class="empty">Not available</p>
+      {% endif %}
+    </div>
+    {% if record.surface_path %}
+    <div>
+      <div class="field-hint">Surface / blemish analysis</div>
+      <a href="/outputs/{{ record.surface_path }}" target="_blank" rel="noopener">
+        <img src="/outputs/{{ record.surface_path }}" alt="Surface analysis overlay" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if filter_photos %}
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Filter Technique Photos</h2>
+  <p class="field-hint">Each model's intermediate filtered image, per technique applied by its pipeline.</p>
+  {% for group in filter_photos %}
+  <h3 style="margin:{{ '18px 0 8px' if not loop.first else '0 0 8px' }};">{{ group.member_label }}</h3>
+  <div class="grid grid-3">
+    {% for t in group.techniques %}
+    <div>
+      <div class="field-hint">{{ t.label }}</div>
+      <a href="/outputs/{{ t.path }}" target="_blank" rel="noopener">
+        <img src="/outputs/{{ t.path }}" alt="{{ t.label }} filtered photo" style="width:100%; border-radius:var(--radius-sm); border:1px solid var(--border);">
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

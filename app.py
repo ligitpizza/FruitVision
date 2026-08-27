@@ -66,9 +66,17 @@ from member_apps.predict_ensemble import predict_ensemble
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
 from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
 from core_modules.blemish_analysis import analyze_surface
-from core_modules.marketability import estimate_marketability, average_member_probabilities
+from core_modules.marketability import estimate_marketability, average_member_probabilities, stock_eligible
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
+from core_modules.filter_photos import (
+    FILTER_LABELS,
+    ENSEMBLE_MEMBER_TO_MODEL_KEY,
+    filter_photos_single,
+    filter_photos_ensemble,
+    pop_member_cleaned_images,
+)
+from core_modules import model_lab
 from core_modules.dashboard_charts import (
     generate_trend_chart,
     generate_history_chart,
@@ -92,6 +100,7 @@ FRUITS = ["apple", "banana", "orange", "mango"]
 RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
 HISTORY_PAGE_SIZE = 15
 STOCK_PAGE_SIZE = 15
+MARKETABILITY_PAGE_SIZE = 25
 
 app = Flask(__name__)
 app.secret_key = "fruitivision-dev-key"  # only used for flash(); replace for real deployment
@@ -117,7 +126,7 @@ def load_logged_in_user():
     user_id = session.get("user_id")
     g.user = auth_db.get_user_by_id(user_id) if user_id else None
 
-    if request.path.startswith("/static/") or request.path.startswith("/outputs/"):
+    if request.path.startswith("/static/") or request.path.startswith("/outputs/") or request.path.startswith("/uploads/"):
         return
     if request.path in PUBLIC_PATHS:
         return
@@ -243,6 +252,12 @@ def _member_tag(model_key):
 def outputs_file(filename):
     """Serves annotated images and charts saved under outputs/."""
     return send_from_directory(OUTPUTS_DIR, filename)
+
+
+@app.route("/uploads/<path:filename>")
+def uploads_file(filename):
+    """Serves the original user-uploaded photos saved under uploads/."""
+    return send_from_directory(UPLOAD_DIR, filename)
 
 
 def _marketability_db_fields(estimate):
@@ -483,6 +498,9 @@ def classify():
     return render_template(
         "classify.html", fruits=FRUITS, models=MODEL_CHOICES, predictors=PREDICTORS,
         default_model=default_model, active_page="classify",
+        filter_technique_labels_json=json.dumps(FILTER_LABELS),
+        ensemble_member_map_json=json.dumps(ENSEMBLE_MEMBER_TO_MODEL_KEY),
+        predictor_labels_json=json.dumps({k: v["label"] for k, v in PREDICTORS.items()}),
     )
 
 
@@ -550,6 +568,80 @@ def _surface_payload(surface):
 
 
 # --------------------------------------------------------------------------
+# Per-member filter-technique photos: after classification, render each
+# filter module's intermediate image (not just its numeric features) from
+# the calibrated `cleaned_img` every predict_ripeness() already returns.
+# Generation logic itself lives in core_modules/filter_photos.py so the
+# realtime/*.py trackers can reuse it too (they can't import app.py).
+# --------------------------------------------------------------------------
+def _filter_photos_single(cleaned_img, model_key, filename):
+    return filter_photos_single(cleaned_img, model_key, filename, OUTPUTS_DIR)
+
+
+def _filter_photos_ensemble(cleaned_by_member, filename):
+    return filter_photos_ensemble(cleaned_by_member, filename, OUTPUTS_DIR)
+
+
+def _filter_member_label(member_key):
+    """Human-readable label for a filter_photos member key -- either a model
+    key ("ab") for a single-model prediction, or predict_ensemble's member
+    key ("member_1_ab") for an All-Four ensemble prediction."""
+    model_key = ENSEMBLE_MEMBER_TO_MODEL_KEY.get(member_key, member_key)
+    entry = PREDICTORS.get(model_key)
+    return entry["label"] if entry else model_key.upper()
+
+
+def _filter_photos_display(filter_photos):
+    """Reshapes a stored filter_photos dict into a list the templates can
+    loop over directly, with human-readable labels. Handles both shapes:
+    {member_key: {technique: path}} (single-model / All-Four ensemble), and
+    {"per_fruit": [{"index", "label", "filter_photos"}, ...]} (multi-fruit
+    batch mode -- one group per (fruit, member) pair)."""
+    if not filter_photos:
+        return []
+    if "per_fruit" in filter_photos:
+        groups = []
+        for item in filter_photos["per_fruit"]:
+            fruit_tag = f"Fruit #{item['index'] + 1} ({item['label'].upper()})"
+            for member_key, techniques in item.get("filter_photos", {}).items():
+                groups.append({
+                    "member_label": f"{fruit_tag} — {_filter_member_label(member_key)}",
+                    "techniques": [
+                        {"label": FILTER_LABELS.get(step, step), "path": path}
+                        for step, path in techniques.items()
+                    ],
+                })
+        return groups
+    return [
+        {
+            "member_label": _filter_member_label(member_key),
+            "techniques": [
+                {"label": FILTER_LABELS.get(step, step), "path": path}
+                for step, path in techniques.items()
+            ],
+        }
+        for member_key, techniques in filter_photos.items()
+    ]
+
+
+def _filter_photos_for_pdf(filter_photos_display):
+    """pdf_report.py's PDF generators take filter photo paths as absolute
+    filesystem paths (same convention as image_path/surface_image_path),
+    not the outputs/-relative paths stored/displayed everywhere else --
+    resolve them here right before handing the list to a generator."""
+    return [
+        {
+            "member_label": group["member_label"],
+            "techniques": [
+                {"label": t["label"], "path": os.path.join(OUTPUTS_DIR, t["path"])}
+                for t in group["techniques"]
+            ],
+        }
+        for group in (filter_photos_display or [])
+    ]
+
+
+# --------------------------------------------------------------------------
 # Multi-fruit-per-photo batch detection ("this photo may contain multiple
 # fruits") -- separate from every member's single-largest-contour detect().
 # See core_modules/multi_fruit_detect.py for the YOLO localisation step.
@@ -560,13 +652,14 @@ _MULTI_FRUIT_BOX_COLOURS = {"ripe": (0, 200, 0), "unripe": (0, 165, 255), "rotte
 def _classify_multi_fruit_photo(img, fruit_type, classify_crop, filename):
     """
     Detects every fruit_type box in one photo, classifies each crop via
-    classify_crop(crop, fruit_type) -> (label, confidence_0_to_1) (or
-    (None, None) on a per-crop failure), draws every box on one annotated
-    image, and returns a dict with the majority label/confidence, a
-    {label: count} breakdown, the annotated path, and the per-fruit detail
-    list -- or None if this photo isn't a multi-fruit candidate (mango,
-    or no boxes found), signaling the caller to fall back to the existing
-    single-fruit path.
+    classify_crop(crop, fruit_type, crop_tag) -> (label, confidence_0_to_1,
+    filter_photos) (or (None, None, {}) on a per-crop failure), draws every
+    box on one annotated image, and returns a dict with the majority
+    label/confidence, a {label: count} breakdown, the annotated path, the
+    per-fruit detail list, and a filter_photos payload (one entry per
+    detected fruit, see app._filter_photos_display) -- or None if this photo
+    isn't a multi-fruit candidate (mango, or no boxes found), signaling the
+    caller to fall back to the existing single-fruit path.
     """
     if not supports_multi_fruit(fruit_type):
         return None
@@ -574,20 +667,30 @@ def _classify_multi_fruit_photo(img, fruit_type, classify_crop, filename):
     if not boxes:
         return None
 
+    safe_name = secure_filename(filename) or "fruit.jpg"
+    stem, extension = os.path.splitext(safe_name)
+    extension = extension if extension.lower() in {".jpg", ".jpeg", ".png"} else ".jpg"
+
     annotated = img.copy()
     per_fruit = []
-    for (x0, y0, x1, y1) in boxes:
+    for idx, (x0, y0, x1, y1) in enumerate(boxes):
         crop = img[y0:y1, x0:x1]
         if crop.size == 0:
             continue
+        # Unique per-fruit tag so each detected fruit's filter photos get
+        # their own filenames instead of overwriting one another.
+        crop_tag = f"{stem}_fruit{idx}{extension}"
         try:
-            label, confidence = classify_crop(crop, fruit_type)
+            label, confidence, crop_filter_photos = classify_crop(crop, fruit_type, crop_tag)
         except Exception:
-            label, confidence = None, None
+            label, confidence, crop_filter_photos = None, None, {}
         if label is None:
             continue
 
-        per_fruit.append({"bbox": (x0, y0, x1, y1), "label": label, "confidence": confidence})
+        per_fruit.append({
+            "bbox": (x0, y0, x1, y1), "label": label, "confidence": confidence,
+            "filter_photos": crop_filter_photos,
+        })
         colour = _MULTI_FRUIT_BOX_COLOURS.get(label, (200, 200, 200))
         cv2.rectangle(annotated, (x0, y0), (x1, y1), colour, 3)
         cv2.putText(annotated, f"{label} {confidence * 100:.0f}%", (x0, max(y0 - 8, 0)),
@@ -605,6 +708,13 @@ def _classify_multi_fruit_photo(img, fruit_type, classify_crop, filename):
     os.makedirs(annotated_dir, exist_ok=True)
     cv2.imwrite(os.path.join(annotated_dir, filename), annotated)
 
+    filter_photos_payload = {
+        "per_fruit": [
+            {"index": i, "label": r["label"], "filter_photos": r["filter_photos"]}
+            for i, r in enumerate(per_fruit)
+        ]
+    } if any(r["filter_photos"] for r in per_fruit) else {}
+
     return {
         "label": majority_label,
         "confidence": majority_confidence_pct,
@@ -612,22 +722,26 @@ def _classify_multi_fruit_photo(img, fruit_type, classify_crop, filename):
         "annotated_path": f"annotated/{filename}",
         "per_fruit": per_fruit,
         "fruit_count": len(per_fruit),
+        "filter_photos": filter_photos_payload,
     }
 
 
-def _ensemble_crop_classify(crop, fruit_type):
+def _ensemble_crop_classify(crop, fruit_type, crop_tag):
     """classify_crop adapter for _classify_multi_fruit_photo: predict_ensemble
     returns confidence on a 0-100 scale, but the multi-fruit helper's
     contract (matching every member's predict_ripeness()) expects 0-1."""
-    label, confidence_pct, _per_member, _bbox = predict_ensemble(crop, fruit_type)
-    return label, confidence_pct / 100
+    label, confidence_pct, per_member, _bbox = predict_ensemble(crop, fruit_type)
+    cleaned_by_member = pop_member_cleaned_images(per_member)
+    filter_photos = _filter_photos_ensemble(cleaned_by_member, crop_tag)
+    return label, confidence_pct / 100, filter_photos
 
 
-def _single_model_crop_classify(entry):
+def _single_model_crop_classify(entry, model_key):
     """classify_crop adapter for a single PREDICTORS[model_choice] entry."""
-    def _classify(crop, fruit_type):
-        label, confidence, _bbox, _cleaned, _proba = entry["fn"](crop, fruit_type)
-        return label, confidence
+    def _classify(crop, fruit_type, crop_tag):
+        label, confidence, _bbox, cleaned, _proba = entry["fn"](crop, fruit_type)
+        filter_photos = _filter_photos_single(cleaned, model_key, crop_tag)
+        return label, confidence, filter_photos
     return _classify
 
 
@@ -675,6 +789,7 @@ def predict():
             blemish_percentage=surface.get("blemish_percentage"),
             quality_grade=surface.get("quality_grade"),
         )
+        filter_photos = _filter_photos_single(cleaned, "ab", f.filename)
 
         log_result(
             member=_member_tag("ab"),
@@ -689,7 +804,9 @@ def predict():
             user_id=g.user["id"] if g.user else None,
             latency_ms=latency_ms,
             flagged=_is_flagged(confidence_pct),
+            filter_photos=json.dumps(filter_photos) if filter_photos else None,
         )
+        _log_stock_result(True, fruit_type, label, marketability_status=marketability["status"], source="single")
 
         results.append({
             "filename": f.filename,
@@ -698,6 +815,7 @@ def predict():
             "confidence": round(confidence * 100, 1),
             "marketability": marketability,
             "input_validation": input_validation,
+            "filter_photos": filter_photos,
             **_surface_payload(surface),
         })
 
@@ -745,6 +863,7 @@ def predict_unified():
             label, confidence, per_member, bbox = predict_ensemble(img, fruit_type)
         except RuntimeError as e:
             return {"error": str(e), "filename": f.filename}, 422
+        cleaned_by_member = pop_member_cleaned_images(per_member)
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
         annotated_rel = _save_annotated(img, bbox, f.filename)
@@ -758,6 +877,7 @@ def predict_unified():
             blemish_percentage=surface.get("blemish_percentage"),
             quality_grade=surface.get("quality_grade"),
         )
+        filter_photos = _filter_photos_ensemble(cleaned_by_member, f.filename)
 
         log_result(
             member="ensemble_all_four",
@@ -772,7 +892,9 @@ def predict_unified():
             user_id=g.user["id"] if g.user else None,
             latency_ms=latency_ms,
             flagged=_is_flagged(confidence),
+            filter_photos=json.dumps(filter_photos) if filter_photos else None,
         )
+        _log_stock_result(True, fruit_type, label, marketability_status=marketability["status"], source="single")
 
         return {
             "model": "all_four",
@@ -783,6 +905,7 @@ def predict_unified():
             "proba": ensemble_proba,
             "marketability": marketability,
             "input_validation": input_validation,
+            "filter_photos": filter_photos,
             **_surface_payload(surface),
         }
 
@@ -808,6 +931,7 @@ def predict_unified():
         blemish_percentage=surface.get("blemish_percentage"),
         quality_grade=surface.get("quality_grade"),
     )
+    filter_photos = _filter_photos_single(cleaned, model_choice, f.filename)
 
     log_result(
         member=_member_tag(model_choice),
@@ -822,7 +946,9 @@ def predict_unified():
         user_id=g.user["id"] if g.user else None,
         latency_ms=latency_ms,
         flagged=_is_flagged(confidence_pct),
+        filter_photos=json.dumps(filter_photos) if filter_photos else None,
     )
+    _log_stock_result(True, fruit_type, label, marketability_status=marketability["status"], source="single")
 
     return {
         "model": model_choice,
@@ -833,6 +959,7 @@ def predict_unified():
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
         "marketability": marketability,
         "input_validation": input_validation,
+        "filter_photos": filter_photos,
         **_surface_payload(surface),
     }
 
@@ -871,25 +998,38 @@ def dashboard(model_key):
         active_page="classify",
     )
 
-def _log_batch_stock(add_to_stock, fruit_type, label, breakdown=None):
-    """Log one batch-analysis image's result(s) as stock movements, if the
-    'add to stock' checkbox was ticked. In multi-fruit mode, breakdown is the
-    {label: count} Counter from that one photo and logs one row per detected
-    ripeness label with that label's count as quantity; otherwise logs a
-    single +1 for the image's overall label."""
-    if not add_to_stock:
+def _log_stock_result(should_log, fruit_type, label, marketability_status=None, per_fruit=None, source="batch"):
+    """Log one prediction's result(s) as stock movements, if should_log is
+    true (the batch page's 'add to stock' checkbox, or always-on for single
+    uploads/realtime). unripe/rotten always count -- their disposition (hold
+    to ripen / remove) is already unambiguous from the raw label; a 'ripe'
+    result only counts if it's actually market-ready (see
+    core_modules.marketability.stock_eligible), so a low-confidence or
+    heavily blemished 'ripe' classification doesn't inflate the sellable
+    stock count.
+
+    In multi-fruit mode, per_fruit is the per-detection list from
+    _classify_multi_fruit_photo -- each entry is gated on its own confidence
+    (no per-fruit blemish data exists there) instead of the photo's majority
+    verdict. Otherwise marketability_status is the caller's already-computed
+    verdict (with blemish/quality folded in) for the whole image."""
+    if not should_log:
         return
     user_id = g.user["id"] if g.user else None
-    if breakdown:
-        for detected_label, count in breakdown.items():
+    if per_fruit:
+        counts = Counter()
+        for r in per_fruit:
+            if stock_eligible(fruit_type, r["label"], r["confidence"]):
+                counts[r["label"]] += 1
+        for detected_label, count in counts.items():
             stock_db.log_stock_event(
                 fruit=fruit_type, label=detected_label, quantity=count,
-                source="batch", user_id=user_id,
+                source=source, user_id=user_id,
             )
-    else:
+    elif label != "ripe" or marketability_status == "ready":
         stock_db.log_stock_event(
             fruit=fruit_type, label=label, quantity=1,
-            source="batch", user_id=user_id,
+            source=source, user_id=user_id,
         )
 
 
@@ -954,8 +1094,9 @@ def analyse():
                         flagged=_is_flagged(multi["confidence"]),
                         detection_breakdown=json.dumps(multi["breakdown"]),
                         **_marketability_db_fields(marketability),
+                        filter_photos=json.dumps(multi["filter_photos"]) if multi["filter_photos"] else None,
                     )
-                    _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
+                    _log_stock_result(add_to_stock, fruit_type, multi["label"], per_fruit=multi["per_fruit"])
                     results.append({
                         "filename": f.filename,
                         "fruit": fruit_type,
@@ -966,6 +1107,7 @@ def analyse():
                         "detection_breakdown": multi["breakdown"],
                         "fruit_count": multi["fruit_count"],
                         "marketability": marketability,
+                        "filter_photos": _filter_photos_display(multi["filter_photos"]),
                         **_surface_payload({}),
                     })
                     continue
@@ -976,6 +1118,7 @@ def analyse():
             except RuntimeError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
+            cleaned_by_member = pop_member_cleaned_images(per_member)
             latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
             annotated_rel = _save_annotated(img, bbox, f.filename)
@@ -989,6 +1132,7 @@ def analyse():
                 blemish_percentage=surface.get("blemish_percentage"),
                 quality_grade=surface.get("quality_grade"),
             )
+            filter_photos = _filter_photos_ensemble(cleaned_by_member, f.filename)
 
             log_result(
                 member=member_tag,
@@ -1003,8 +1147,9 @@ def analyse():
                 user_id=g.user["id"] if g.user else None,
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence),
+                filter_photos=json.dumps(filter_photos) if filter_photos else None,
             )
-            _log_batch_stock(add_to_stock, fruit_type, label)
+            _log_stock_result(add_to_stock, fruit_type, label, marketability_status=marketability["status"])
 
             results.append({
                 "filename": f.filename,
@@ -1016,6 +1161,7 @@ def analyse():
                 "per_member": per_member,
                 "input_validation": input_validation,
                 "marketability": marketability,
+                "filter_photos": _filter_photos_display(filter_photos),
                 **_surface_payload(surface),
             })
     else:
@@ -1042,7 +1188,7 @@ def analyse():
                 continue
 
             if multi_fruit:
-                multi = _classify_multi_fruit_photo(img, fruit_type, _single_model_crop_classify(entry), f.filename)
+                multi = _classify_multi_fruit_photo(img, fruit_type, _single_model_crop_classify(entry, model_choice), f.filename)
                 if multi:
                     confidence_pct = multi["confidence"]
                     marketability = estimate_marketability(
@@ -1062,8 +1208,9 @@ def analyse():
                         flagged=_is_flagged(confidence_pct),
                         detection_breakdown=json.dumps(multi["breakdown"]),
                         **_marketability_db_fields(marketability),
+                        filter_photos=json.dumps(multi["filter_photos"]) if multi["filter_photos"] else None,
                     )
-                    _log_batch_stock(add_to_stock, fruit_type, multi["label"], breakdown=multi["breakdown"])
+                    _log_stock_result(add_to_stock, fruit_type, multi["label"], per_fruit=multi["per_fruit"])
                     results.append({
                         "filename": f.filename,
                         "fruit": fruit_type,
@@ -1074,6 +1221,7 @@ def analyse():
                         "detection_breakdown": multi["breakdown"],
                         "fruit_count": multi["fruit_count"],
                         "marketability": marketability,
+                        "filter_photos": _filter_photos_display(multi["filter_photos"]),
                         **_surface_payload({}),
                     })
                     continue
@@ -1097,6 +1245,7 @@ def analyse():
                 blemish_percentage=surface.get("blemish_percentage"),
                 quality_grade=surface.get("quality_grade"),
             )
+            filter_photos = _filter_photos_single(cleaned, model_choice, f.filename)
 
             log_result(
                 member=member_tag,
@@ -1111,8 +1260,9 @@ def analyse():
                 user_id=g.user["id"] if g.user else None,
                 latency_ms=latency_ms,
                 flagged=_is_flagged(confidence_pct),
+                filter_photos=json.dumps(filter_photos) if filter_photos else None,
             )
-            _log_batch_stock(add_to_stock, fruit_type, label)
+            _log_stock_result(add_to_stock, fruit_type, label, marketability_status=marketability["status"])
 
             results.append({
                 "filename": f.filename,
@@ -1121,6 +1271,7 @@ def analyse():
                 "confidence": confidence_pct,
                 "annotated_path": annotated_rel,
                 "multi_fruit_fallback": multi_fruit,
+                "filter_photos": _filter_photos_display(filter_photos),
                 "input_validation": input_validation,
                 "marketability": marketability,
                 **_surface_payload(surface),
@@ -1144,6 +1295,7 @@ def analyse():
             "surface_analysis_error": r.get("surface_analysis_error"),
             "detection_breakdown": r.get("detection_breakdown"),
             "fruit_count": r.get("fruit_count"),
+            "filter_photos": _filter_photos_for_pdf(r.get("filter_photos")),
         }
         for r in results
     ]
@@ -1184,8 +1336,11 @@ def extra_export_pdf():
         "detection_breakdown": json.loads(breakdown_raw) if breakdown_raw else None,
         "fruit_count": request.form.get("fruit_count", type=int),
     }
+    filter_photos_raw = request.form.get("filter_photos_json")
+    filter_photos = _filter_photos_for_pdf(json.loads(filter_photos_raw)) if filter_photos_raw else None
     out_path = generate_pdf_report(
-        image_path, label, confidence, model_tag=model_tag, surface_data=surface_data
+        image_path, label, confidence, model_tag=model_tag, surface_data=surface_data,
+        filter_photos=filter_photos,
     )
     return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
@@ -1226,9 +1381,15 @@ def history_export_pdf(record_id):
         "quality_grade": record.get("quality_grade") or "Unknown",
         "detection_breakdown": json.loads(breakdown_raw) if breakdown_raw else None,
     }
+    filter_photos_raw = record.get("filter_photos")
+    filter_photos = (
+        _filter_photos_for_pdf(_filter_photos_display(json.loads(filter_photos_raw)))
+        if filter_photos_raw else None
+    )
     out_path = generate_pdf_report(
         image_path, record["label"], record["confidence"] / 100,
         model_tag=record["member"], surface_data=surface_data,
+        filter_photos=filter_photos,
     )
 
     if g.user:
@@ -1264,6 +1425,10 @@ def marketability_dashboard():
     review_filter = request.args.get("review") or None
     date_from = _valid_date_arg("date_from")
     date_to = _valid_date_arg("date_to")
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
 
     rows = _decorate_marketability_rows(get_all_results(
         member=model_filter,
@@ -1311,10 +1476,23 @@ def marketability_dashboard():
         for key, entry in PREDICTORS.items()
     ] + [("ensemble_all_four", ALL_FOUR_LABEL)]
 
+    # Rows are sorted worst-first (see _marketability_sort_key) so removal/
+    # inspection items surface first, but that means a hard cutoff here
+    # would silently drop every "ready"/"hold" row past it -- paginate
+    # instead so every filtered row stays reachable.
+    total = len(rows)
+    total_pages = max(1, math.ceil(total / MARKETABILITY_PAGE_SIZE))
+    page = min(page, total_pages)
+    start = (page - 1) * MARKETABILITY_PAGE_SIZE
+    page_rows = rows[start:start + MARKETABILITY_PAGE_SIZE]
+
     return render_template(
         "marketability.html",
-        results=rows[:250],
+        results=page_rows,
         summary=summary,
+        page=page,
+        total_pages=total_pages,
+        total=total,
         fruits=FRUITS,
         model_options=model_options,
         model_labels=dict(model_options),
@@ -1457,6 +1635,26 @@ def history_export_csv():
     )
 
 
+@app.route("/history/<int:record_id>")
+def history_detail(record_id):
+    record = get_by_id(record_id)
+    if not record:
+        flash("That record no longer exists.")
+        return redirect(url_for("history"))
+
+    raw = record.get("detection_breakdown")
+    record["detection_breakdown"] = json.loads(raw) if raw else None
+    input_exists = bool(record.get("filename")) and os.path.exists(os.path.join(UPLOAD_DIR, record["filename"]))
+
+    filter_photos_raw = record.get("filter_photos")
+    filter_photos = _filter_photos_display(json.loads(filter_photos_raw)) if filter_photos_raw else []
+
+    return render_template(
+        "history_detail.html", record=record, input_exists=input_exists,
+        filter_photos=filter_photos, active_page="history",
+    )
+
+
 @app.route("/history/<int:record_id>/edit", methods=["GET", "POST"])
 def history_edit(record_id):
     record = get_by_id(record_id)
@@ -1501,7 +1699,7 @@ def history_delete(record_id):
 
 # --------------------------------------------------------------------------
 # Fruit Stock — CRUD ledger of stock movements (manual entries, plus
-# automatic entries from batch analysis; see _log_batch_stock above).
+# automatic entries from batch analysis; see _log_stock_result above).
 # --------------------------------------------------------------------------
 @app.route("/stock")
 def stock():
@@ -1672,6 +1870,67 @@ def training_report(model_key):
         predictors=PREDICTORS,
         active_page="classify",
     )
+
+
+# --------------------------------------------------------------------------
+# Model Lab — compare every trained model side by side (accuracy, macro-F1,
+# balanced accuracy, weakest-class recall, latency, size), swap between
+# per-fruit confusion matrices, and set the Classify page's default model.
+# --------------------------------------------------------------------------
+def _model_lab_label(model_key):
+    entry = PREDICTORS.get(model_key)
+    return entry["label"] if entry else model_key.upper()
+
+
+@app.route("/model-lab")
+def model_lab_dashboard():
+    default_model = auth_db.get_setting("default_model", "ab")
+
+    rows = []
+    for key in model_lab.MODEL_ORDER:
+        summary = model_lab.get_model_summary(key)
+        stats = get_stats(member=_member_tag(key))
+        summary["label"] = _model_lab_label(key)
+        summary["avg_latency_ms"] = stats.get("avg_latency_ms")
+        summary["size_display"] = model_lab.format_size(summary["size_bytes"])
+        summary["is_active"] = key == default_model
+        rows.append(summary)
+
+    trained_rows = [r for r in rows if r["has_data"]]
+    recommended = max(trained_rows, key=lambda r: r["accuracy"], default=None)
+
+    confusion_data = {
+        key: {fruit: model_lab.get_confusion_matrix(key, fruit) for fruit in model_lab.FRUITS}
+        for key in model_lab.MODEL_ORDER
+    }
+    per_fruit_recall = {key: model_lab.get_per_fruit_recall(key) for key in model_lab.MODEL_ORDER}
+    yolo_history = {fruit: model_lab.get_yolo_training_history(fruit) for fruit in model_lab.FRUITS}
+
+    return render_template(
+        "model_lab.html",
+        rows=rows,
+        trained_count=len(trained_rows),
+        total_models=len(model_lab.MODEL_ORDER),
+        recommended=recommended,
+        default_model=default_model,
+        confusion_data_json=json.dumps(confusion_data),
+        per_fruit_recall_json=json.dumps(per_fruit_recall),
+        yolo_history_json=json.dumps(yolo_history),
+        fruits=model_lab.FRUITS,
+        model_order=model_lab.MODEL_ORDER,
+        active_page="model_lab",
+    )
+
+
+@app.route("/model-lab/activate", methods=["POST"])
+def model_lab_activate():
+    model_key = request.form.get("model_key")
+    if model_key not in PREDICTORS:
+        flash("Unknown model.")
+        return redirect(url_for("model_lab_dashboard"))
+    auth_db.set_setting("default_model", model_key)
+    flash(f"{_model_lab_label(model_key)} set as the active default model.")
+    return redirect(url_for("model_lab_dashboard"))
 
 
 # --------------------------------------------------------------------------

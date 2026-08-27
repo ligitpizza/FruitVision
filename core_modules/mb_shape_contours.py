@@ -1,14 +1,10 @@
 import cv2
 import numpy as np
 
-def extract_shape(cleaned_img):
-    """
-    Extracts shape descriptors via Suzuki-Abe contour tracing, from a
-    CALIBRATED image (already square, not aspect-ratio-distorted).
-
-    Returns a 5-value feature vector: [norm_area, norm_perimeter,
-    circularity, aspect_ratio, convexity].
-    """
+def _largest_contour(cleaned_img):
+    """Shared Suzuki-Abe contour tracing used by both extract_shape() and
+    visualize_shape(), from a CALIBRATED image (already square, not
+    aspect-ratio-distorted). Returns the largest contour, or None."""
     gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
@@ -25,15 +21,27 @@ def extract_shape(cleaned_img):
         thresh = cv2.bitwise_not(thresh)
 
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
     if not contours:
+        return None
+    return max(contours, key=cv2.contourArea)
+
+
+def extract_shape(cleaned_img):
+    """
+    Extracts shape descriptors via Suzuki-Abe contour tracing, from a
+    CALIBRATED image (already square, not aspect-ratio-distorted).
+
+    Returns a 5-value feature vector: [norm_area, norm_perimeter,
+    circularity, aspect_ratio, convexity].
+    """
+    c = _largest_contour(cleaned_img)
+    if c is None:
         return np.zeros(5, dtype=np.float32)
 
     img_h, img_w = cleaned_img.shape[:2]
     img_area = img_h * img_w
     img_diag = float(np.hypot(img_h, img_w))
 
-    c = max(contours, key=cv2.contourArea)
     area = cv2.contourArea(c)
     perimeter = cv2.arcLength(c, True)
     circularity = (4 * np.pi * area) / (perimeter ** 2) if perimeter > 0 else 0
@@ -54,3 +62,15 @@ def extract_shape(cleaned_img):
     return features
 
 FEATURE_NAMES = ["norm_area", "norm_perimeter", "circularity", "aspect_ratio", "convexity"]
+
+
+def visualize_shape(cleaned_img):
+    """Draws the detected contour + bounding box that extract_shape()'s
+    numbers were derived from, over a copy of the calibrated image."""
+    overlay = cleaned_img.copy()
+    c = _largest_contour(cleaned_img)
+    if c is not None:
+        cv2.drawContours(overlay, [c], -1, (0, 200, 0), 2)
+        x, y, w, h = cv2.boundingRect(c)
+        cv2.rectangle(overlay, (x, y), (x + w, y + h), (0, 165, 255), 1)
+    return overlay

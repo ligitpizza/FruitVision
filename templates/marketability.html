@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Marketability - FruitVision{% endblock %}
 {% block content %}
+{% macro page_qs(target_page) %}
+{%- set parts = [] -%}
+{%- if fruit_filter %}{% set _ = parts.append('fruit=' ~ fruit_filter) %}{% endif -%}
+{%- if model_filter %}{% set _ = parts.append('model=' ~ model_filter) %}{% endif -%}
+{%- if ripeness_filter %}{% set _ = parts.append('ripeness=' ~ ripeness_filter) %}{% endif -%}
+{%- if analysis_filter %}{% set _ = parts.append('analysis=' ~ analysis_filter) %}{% endif -%}
+{%- if status_filter %}{% set _ = parts.append('status=' ~ status_filter) %}{% endif -%}
+{%- if priority_filter %}{% set _ = parts.append('priority=' ~ priority_filter) %}{% endif -%}
+{%- if review_filter %}{% set _ = parts.append('review=' ~ review_filter) %}{% endif -%}
+{%- if date_from %}{% set _ = parts.append('date_from=' ~ date_from) %}{% endif -%}
+{%- if date_to %}{% set _ = parts.append('date_to=' ~ date_to) %}{% endif -%}
+{%- if target_page and target_page > 1 %}{% set _ = parts.append('page=' ~ target_page) %}{% endif -%}
+{%- if parts %}?{{ parts|join('&') }}{% endif -%}
+{% endmacro %}
 <div class="page-head">
   <div>
     <h1>Marketability Dashboard</h1>
@@ -39,9 +53,9 @@
     <div class="delta down">classified as rotten</div>
   </div>
   <div class="stat-tile">
-    <div class="label">Displayed Records</div>
+    <div class="label">Matching Records</div>
     <div class="value">{{ summary.total }}</div>
-    <div class="delta">maximum 250 rows shown</div>
+    <div class="delta">page {{ page }} of {{ total_pages }}</div>
   </div>
   <div class="stat-tile">
     <div class="label">Batch Results</div>
@@ -254,6 +268,26 @@
     </table>
   </div>
   <p class="field-hint" style="margin-top:12px;">Image-based operational estimates are not food-safety guarantees. Inspect produce before sale or disposal.</p>
+
+  <div class="pagination">
+    {% if page > 1 %}
+      <a href="/marketability{{ page_qs(page - 1) }}">← Prev</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == page %}
+        <span class="current">{{ p }}</span>
+      {% else %}
+        <a href="/marketability{{ page_qs(p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+      <a href="/marketability{{ page_qs(page + 1) }}">Next →</a>
+    {% endif %}
+
+    <span class="info">{{ total }} record{{ 's' if total != 1 else '' }} total · page {{ page }} of {{ total_pages }}</span>
+  </div>
 </div>
 {% else %}
 <div class="card" style="margin-top:18px;">

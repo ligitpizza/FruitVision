@@ -22,6 +22,7 @@ outputs/reports/
 outputs/training/
 outputs/realtime_snapshots/
 outputs/surface/
+outputs/filters/
 
 uploads/
 

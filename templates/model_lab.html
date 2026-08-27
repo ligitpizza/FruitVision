@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}Model Lab — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">TECHNICAL IMAGE-PROCESSING AND MODEL INSPECTION</p>
+    <h1>Model Lab</h1>
+    <p>Compare every trained model side by side, inspect per-fruit confusion matrices, and set which model is active on the Classify page.</p>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Models Trained</div>
+    <div class="value">{{ trained_count }} / {{ total_models }}</div>
+    <div class="delta">have a saved classification report</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Recommended</div>
+    <div class="value" style="font-size:1.2rem;">{{ recommended.label if recommended else '—' }}</div>
+    <div class="delta">{{ ('%.1f%% accuracy'|format(recommended.accuracy * 100)) if recommended else 'no data yet' }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Active Default</div>
+    <div class="value" style="font-size:1.2rem;">{% for r in rows %}{% if r.is_active %}{{ r.label }}{% endif %}{% endfor %}</div>
+    <div class="delta">preselected on Fruit Classification</div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Candidate Comparison</h2>
+  <p class="field-hint">Accuracy/Macro-F1/Balanced-accuracy are support-weighted across all 4 fruits — each FruitVision "model" is really 4 separate per-fruit classifiers.</p>
+  <div style="overflow-x:auto;">
+    <table>
+      <tr>
+        <th>Model</th>
+        <th>Status</th>
+        <th>Accuracy</th>
+        <th>Macro-F1</th>
+        <th>Balanced Acc.</th>
+        <th>Lowest Recall</th>
+        <th>Avg Latency</th>
+        <th>Size</th>
+        <th>Action</th>
+      </tr>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td>
+          {% if r.is_active %}<span class="model-lab-badge active">ACTIVE</span>
+          {% elif r.has_data %}<span class="model-lab-badge ready">READY</span>
+          {% else %}<span class="model-lab-badge no-data">NO DATA</span>{% endif %}
+        </td>
+        <td>{{ ('%.1f%%'|format(r.accuracy * 100)) if r.accuracy is not none else '—' }}</td>
+        <td>{{ ('%.1f%%'|format(r.macro_f1 * 100)) if r.macro_f1 is not none else '—' }}</td>
+        <td>{{ ('%.1f%%'|format(r.balanced_accuracy * 100)) if r.balanced_accuracy is not none else '—' }}</td>
+        <td>{{ ('%.1f%%'|format(r.lowest_recall * 100)) if r.lowest_recall is not none else '—' }}</td>
+        <td>{{ ('%.0f ms'|format(r.avg_latency_ms)) if r.avg_latency_ms is not none else '—' }}</td>
+        <td>{{ r.size_display }}</td>
+        <td>
+          {% if r.is_active %}
+            <span class="field-hint">Active</span>
+          {% else %}
+            <form action="/model-lab/activate" method="post" style="display:inline;">
+              <input type="hidden" name="model_key" value="{{ r.model_key }}">
+              <button type="submit" class="btn-outline btn-sm">Activate</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Model Performance Comparison</h2>
+  <p class="field-hint">Accuracy, balanced accuracy, and lowest per-class recall, on the same scale.</p>
+  <div id="perfBars" style="margin-top:14px;"></div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Confusion Matrix</h2>
+  <p class="field-hint">Rows are actual classes, columns are predicted classes. A matrix is inherently per-fruit, so pick both.</p>
+  <div class="model-lab-selectors">
+    <div>
+      <label for="cmModel">Model</label>
+      <select id="cmModel">
+        {% for key in model_order %}
+        <option value="{{ key }}">{{ (rows|selectattr('model_key', 'equalto', key)|first).label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="cmFruit">Fruit</label>
+      <select id="cmFruit">
+        {% for fruit in fruits %}
+        <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="grid grid-2" style="align-items:start;">
+    <div style="overflow-x:auto;">
+      <div id="cmContainer"></div>
+    </div>
+    <div>
+      <h3 style="margin-top:0;">Per-Fruit Recall</h3>
+      <div id="perFruitRecall"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-top:0;">Training Loss &amp; Accuracy History</h2>
+  <p class="field-hint">yolo_pure only — the other models are one-shot SVM fits with no per-epoch history to plot.</p>
+  <div class="model-lab-selectors">
+    <div>
+      <label for="yoloFruit">Fruit</label>
+      <select id="yoloFruit">
+        {% for fruit in fruits %}
+        <option value="{{ fruit }}">{{ fruit.capitalize() }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div id="yoloHistoryChart"></div>
+</div>
+
+<script>
+  const CONFUSION_DATA = {{ confusion_data_json | safe }};
+  const PER_FRUIT_RECALL = {{ per_fruit_recall_json | safe }};
+  const YOLO_HISTORY = {{ yolo_history_json | safe }};
+  const MODEL_ROWS = {{ rows | tojson }};
+
+  function pct(v) { return v === null || v === undefined ? null : Math.round(v * 1000) / 10; }
+
+  function renderPerfBars() {
+    const container = document.getElementById('perfBars');
+    const trained = MODEL_ROWS.filter(r => r.has_data);
+    if (!trained.length) {
+      container.innerHTML = '<p class="empty">No trained models with a saved classification report yet.</p>';
+      return;
+    }
+    const series = [
+      { key: 'accuracy', label: 'Accuracy', color: 'var(--ripe)' },
+      { key: 'balanced_accuracy', label: 'Balanced Accuracy', color: '#3a6ea5' },
+      { key: 'lowest_recall', label: 'Lowest Recall', color: 'var(--unripe)' },
+    ];
+    let html = '';
+    for (const s of series) {
+      html += `<div class="model-lab-bar-group"><h4>${s.label}</h4>`;
+      for (const r of trained) {
+        const value = pct(r[s.key]);
+        html += `
+          <div class="model-lab-bar-row">
+            <div class="name">${r.label.split(' (')[0]}</div>
+            <div class="model-lab-bar-track"><div class="model-lab-bar-fill" style="width:${value}%; background:${s.color};"></div></div>
+            <div class="pct">${value}%</div>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+    container.innerHTML = html;
+  }
+
+  function renderConfusionMatrix() {
+    const model = document.getElementById('cmModel').value;
+    const fruit = document.getElementById('cmFruit').value;
+    const container = document.getElementById('cmContainer');
+    const data = (CONFUSION_DATA[model] || {})[fruit];
+    if (!data || !data.matrix) {
+      container.innerHTML = '<p class="empty">No confusion matrix for this model/fruit yet.</p>';
+      return;
+    }
+    const classes = data.classes;
+    const matrix = data.matrix;
+    const maxVal = Math.max(...matrix.flat());
+    let html = '<table class="model-lab-cm-table"><tr><th>Actual \\ Predicted</th>';
+    for (const c of classes) html += `<th>${c}</th>`;
+    html += '</tr>';
+    matrix.forEach((row, i) => {
+      html += `<tr><th>${classes[i]}</th>`;
+      row.forEach((val, j) => {
+        const intensity = maxVal ? val / maxVal : 0;
+        const bg = i === j
+          ? `rgba(46,125,50,${0.15 + intensity * 0.55})`
+          : `rgba(198,40,40,${intensity * 0.35})`;
+        html += `<td class="${i === j ? 'diag' : ''}" style="background:${bg};">${val}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</table>';
+    container.innerHTML = html;
+  }
+
+  function renderPerFruitRecall() {
+    const model = document.getElementById('cmModel').value;
+    const container = document.getElementById('perFruitRecall');
+    const data = PER_FRUIT_RECALL[model] || {};
+    const fruits = Object.keys(data);
+    if (!fruits.length) {
+      container.innerHTML = '<p class="empty">No data for this model yet.</p>';
+      return;
+    }
+    let html = '';
+    for (const fruit of fruits) {
+      const value = pct(data[fruit]);
+      html += `
+        <div class="model-lab-bar-row">
+          <div class="name">${fruit.charAt(0).toUpperCase() + fruit.slice(1)}</div>
+          <div class="model-lab-bar-track"><div class="model-lab-bar-fill" style="width:${value}%; background:var(--ripe);"></div></div>
+          <div class="pct">${value}%</div>
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  }
+
+  function renderYoloHistory() {
+    const fruit = document.getElementById('yoloFruit').value;
+    const container = document.getElementById('yoloHistoryChart');
+    const history = YOLO_HISTORY[fruit];
+    if (!history || !history.length) {
+      container.innerHTML = '<p class="empty">No yolo_pure training run recorded for this fruit yet.</p>';
+      return;
+    }
+    const width = 640, height = 220, pad = 30;
+    const epochs = history.map(h => h.epoch);
+    const maxEpoch = Math.max(...epochs), minEpoch = Math.min(...epochs);
+    const lossVals = history.flatMap(h => [h.train_loss, h.val_loss]);
+    const maxLoss = Math.max(...lossVals) || 1;
+    const x = e => pad + ((e - minEpoch) / Math.max(1, maxEpoch - minEpoch)) * (width - pad * 2);
+    const yLoss = v => height - pad - (v / maxLoss) * (height - pad * 2);
+    const yAcc = v => height - pad - v * (height - pad * 2);
+    const line = (points, accessor) => points.map(h => `${x(h.epoch)},${accessor(h)}`).join(' ');
+    const trainLine = line(history, h => yLoss(h.train_loss));
+    const valLine = line(history, h => yLoss(h.val_loss));
+    const accLine = line(history, h => yAcc(h.accuracy));
+    container.innerHTML = `
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%; max-width:${width}px; height:auto;">
+        <rect x="0" y="0" width="${width}" height="${height}" fill="none" />
+        <polyline points="${trainLine}" fill="none" stroke="#3a6ea5" stroke-width="2" />
+        <polyline points="${valLine}" fill="none" stroke="var(--rotten)" stroke-width="2" />
+        <polyline points="${accLine}" fill="none" stroke="var(--ripe)" stroke-width="2" stroke-dasharray="4,3" />
+        <text x="${pad}" y="14" font-size="11" fill="var(--ink-dim)">Epochs ${minEpoch}-${maxEpoch}</text>
+      </svg>
+      <div style="display:flex; gap:16px; margin-top:6px; font-size:0.8rem; color:var(--ink-dim);">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#3a6ea5;border-radius:2px;"></span> Train loss</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--rotten);border-radius:2px;"></span> Val loss</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--ripe);border-radius:2px;"></span> Val accuracy (top-1)</span>
+      </div>
+    `;
+  }
+
+  document.getElementById('cmModel').addEventListener('change', () => { renderConfusionMatrix(); renderPerFruitRecall(); });
+  document.getElementById('cmFruit').addEventListener('change', renderConfusionMatrix);
+  document.getElementById('yoloFruit').addEventListener('change', renderYoloHistory);
+
+  renderPerfBars();
+  renderConfusionMatrix();
+  renderPerFruitRecall();
+  renderYoloHistory();
+</script>
+{% endblock %}

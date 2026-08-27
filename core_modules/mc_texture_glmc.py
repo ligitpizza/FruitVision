@@ -22,3 +22,13 @@ def extract_texture_glcm(cleaned_img):
     return features
 
 FEATURE_NAMES = ["contrast", "correlation", "energy", "homogeneity"]
+
+
+def visualize_texture(cleaned_img):
+    """Renders the quantized grayscale image actually fed into the GLCM
+    (same 64-level quantization used for feature extraction above), rescaled
+    back to the 0-255 range for display."""
+    gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY)
+    quantized = (gray / 4).astype(np.uint8)
+    rescaled = (quantized * 4).astype(np.uint8)
+    return cv2.cvtColor(rescaled, cv2.COLOR_GRAY2BGR)

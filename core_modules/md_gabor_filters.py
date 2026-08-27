@@ -26,3 +26,14 @@ def extract_gabor(cleaned_img):
     return np.array(responses, dtype=np.float32)
 
 FEATURE_NAMES = ["gabor_0deg", "gabor_45deg", "gabor_90deg", "gabor_135deg"]
+
+
+def visualize_gabor(cleaned_img):
+    """Renders the normalized magnitude of the averaged Gabor response
+    across all 4 orientations -- the same filtered signal extract_gabor()'s
+    mean-energy values are computed from."""
+    gray = cv2.cvtColor(cleaned_img, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    responses = [np.abs(cv2.filter2D(gray, cv2.CV_32F, kernel)) for kernel in _KERNELS]
+    averaged = np.mean(responses, axis=0)
+    normalized = cv2.normalize(averaged, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    return cv2.cvtColor(normalized, cv2.COLOR_GRAY2BGR)

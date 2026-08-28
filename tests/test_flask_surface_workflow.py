@@ -20,6 +20,12 @@ class DummyNotFruitError(Exception):
     pass
 
 
+class DummyMultipleFruitImageError(ValueError):
+    def __init__(self, fruit_breakdown):
+        self.fruit_breakdown = dict(fruit_breakdown)
+        super().__init__("Multiple fruits were detected. Please use Mixed-Fruit Analysis below.")
+
+
 def _predict(image, fruit_type):
     h, w = image.shape[:2]
     bbox = (5, 5, w - 5, h - 5)
@@ -105,6 +111,12 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             ),
             "core_modules.mixed_fruit_m14": _module(
                 analyze_mixed_fruit_m14=_mixed_m14_analysis,
+                validate_single_fruit_image=lambda image: {
+                    "detected_count": 1,
+                    "fruit_breakdown": {"apple": 1},
+                    "validation_method": "test",
+                },
+                MultipleFruitImageError=DummyMultipleFruitImageError,
             ),
             "database.history_db": _module(
                 log_result=lambda **kwargs: logged.append(kwargs),
@@ -185,6 +197,48 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             classify_html = classify_response.get_data(as_text=True)
             self.assertIn("Mixed-Fruit Analysis", classify_html)
             self.assertIn("M14 ONLY", classify_html)
+            self.assertIn('id="validateSingleFruit"', classify_html)
+            self.assertIn('formData.append("validate_single_fruit"', classify_html)
+            self.assertIn('id="batch-analysis"', classify_html)
+            self.assertIn('id="batchMultiFruit"', classify_html)
+            self.assertIn('id="mixed-fruit-analysis"', classify_html)
+            self.assertIn("Model Evaluation &amp; Reports", classify_html)
+            self.assertIn("Core Member Models", classify_html)
+            self.assertIn("Merged Models", classify_html)
+            self.assertIn("Independent &amp; Combined", classify_html)
+            self.assertEqual(classify_html.count('href="/dashboard/'), 9)
+            self.assertEqual(classify_html.count('href="/training-report/'), 8)
+
+            app_module.PUBLIC_PATHS.update({
+                "/dashboard/ab",
+                "/dashboard/all_four",
+                "/training-report/merged_1_4",
+            })
+            member_dashboard_response = client.get("/dashboard/ab")
+            self.assertEqual(member_dashboard_response.status_code, 200)
+            member_dashboard_html = member_dashboard_response.get_data(as_text=True)
+            self.assertIn("Model navigator", member_dashboard_html)
+            self.assertIn("Core members", member_dashboard_html)
+            self.assertIn("Merged models", member_dashboard_html)
+            self.assertIn("Independent", member_dashboard_html)
+            self.assertIn("Combined", member_dashboard_html)
+            self.assertIn('aria-label="Dashboard follow-up navigation"', member_dashboard_html)
+            self.assertIn('href="/training-report/ab"', member_dashboard_html)
+
+            all_four_dashboard_response = client.get("/dashboard/all_four")
+            self.assertEqual(all_four_dashboard_response.status_code, 200)
+            all_four_dashboard_html = all_four_dashboard_response.get_data(as_text=True)
+            self.assertIn('href="/dashboard/all_four"', all_four_dashboard_html)
+            self.assertNotIn('href="/training-report/all_four"', all_four_dashboard_html)
+
+            training_response = client.get("/training-report/merged_1_4")
+            self.assertEqual(training_response.status_code, 200)
+            training_html = training_response.get_data(as_text=True)
+            self.assertIn("Switch training report", training_html)
+            self.assertIn('aria-label="Training report follow-up navigation"', training_html)
+            self.assertIn('href="/dashboard/merged_1_4"', training_html)
+            self.assertIn('href="/history?member=merged_1_4"', training_html)
+            self.assertNotIn("Combined", training_html)
 
             app_module.PUBLIC_PATHS.add("/analyse-mixed-fruit-m14")
             mixed_response = client.post(
@@ -203,6 +257,62 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertEqual(len(mixed_logs), 3)
             self.assertTrue(all(item["member"] == "merged_1_4" for item in mixed_logs))
             self.assertTrue(all(item["source"] == "analyse_mixed_fruit_m14" for item in mixed_logs))
+
+            # Multiple-fruit validation stops before a ripeness result is
+            # logged and points the user to the dedicated mixed workflow.
+            def reject_multiple_fruits(image):
+                raise DummyMultipleFruitImageError({"apple": 1, "banana": 1})
+
+            app_module.validate_single_fruit_image = reject_multiple_fruits
+            log_count_before_rejection = len(logged)
+            rejected_response = client.post(
+                "/predict_unified",
+                data={
+                    "fruit": "apple",
+                    "model": "ab",
+                    "validate_single_fruit": "1",
+                    "image": (io.BytesIO(encoded.tobytes()), "mixed-single.png"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(rejected_response.status_code, 422)
+            rejected_payload = rejected_response.get_json()
+            self.assertEqual(rejected_payload["error_code"], "multiple_fruit_image")
+            self.assertEqual(rejected_payload["fruit_breakdown"], {"apple": 1, "banana": 1})
+            self.assertTrue(rejected_payload["suggested_url"].endswith("#mixed-fruit-analysis"))
+            self.assertEqual(len(logged), log_count_before_rejection)
+
+            # Multiple detections of one species route to the existing
+            # same-fruit batch workflow instead of mixed-species analysis.
+            def reject_same_fruit(image):
+                raise DummyMultipleFruitImageError({"banana": 2})
+
+            app_module.validate_single_fruit_image = reject_same_fruit
+            same_fruit_response = client.post(
+                "/predict_unified",
+                data={
+                    "fruit": "banana",
+                    "model": "ab",
+                    "validate_single_fruit": "1",
+                    "image": (io.BytesIO(encoded.tobytes()), "two-bananas.png"),
+                },
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(same_fruit_response.status_code, 422)
+            same_fruit_payload = same_fruit_response.get_json()
+            self.assertEqual(
+                same_fruit_payload["error_code"],
+                "multiple_same_fruit_image",
+            )
+            self.assertEqual(same_fruit_payload["fruit_breakdown"], {"banana": 2})
+            self.assertTrue(same_fruit_payload["suggested_url"].endswith("#batch-analysis"))
+            self.assertEqual(len(logged), log_count_before_rejection)
+
+            app_module.validate_single_fruit_image = lambda image: {
+                "detected_count": 1,
+                "fruit_breakdown": {"apple": 1},
+                "validation_method": "test",
+            }
 
             # --- single upload automatically counts a ready ripe result
             # into stock, no "add to stock" checkbox needed (unlike batch) ---

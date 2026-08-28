@@ -43,6 +43,12 @@ class DummyNotFruitError(Exception):
     pass
 
 
+class DummyMultipleFruitImageError(ValueError):
+    def __init__(self, fruit_breakdown):
+        self.fruit_breakdown = dict(fruit_breakdown)
+        super().__init__("Multiple fruits were detected.")
+
+
 def _module(**attributes):
     module = types.ModuleType("stub")
     for name, value in attributes.items():
@@ -91,6 +97,12 @@ def _app_import_stubs():
         ),
         "core_modules.mixed_fruit_m14": _module(
             analyze_mixed_fruit_m14=lambda image: {},
+            validate_single_fruit_image=lambda image: {
+                "detected_count": 1,
+                "fruit_breakdown": {"apple": 1},
+                "validation_method": "test",
+            },
+            MultipleFruitImageError=DummyMultipleFruitImageError,
         ),
         # These four aren't stubbed by tests/test_flask_surface_workflow.py
         # (it exercises real image analysis), but nothing here does -- and

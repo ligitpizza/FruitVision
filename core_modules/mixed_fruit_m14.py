@@ -31,6 +31,29 @@ ANNOTATION_COLOURS = {
 }
 
 
+class MultipleFruitImageError(ValueError):
+    """Raised when a single-fruit upload contains several YOLO fruit boxes."""
+
+    def __init__(self, fruit_breakdown):
+        self.fruit_breakdown = dict(fruit_breakdown)
+        details = ", ".join(
+            f"{count} {fruit}{'' if count == 1 else 's'}"
+            for fruit, count in sorted(self.fruit_breakdown.items())
+        )
+        if len(self.fruit_breakdown) == 1:
+            guidance = (
+                "Please use Batch Analysis below and select "
+                "'This photo may contain multiple fruits'."
+            )
+        else:
+            guidance = "Please use Mixed-Fruit Analysis below."
+        super().__init__(
+            "Multiple fruits were detected"
+            f" ({details}). Single Fruit Analysis accepts one fruit only. "
+            f"{guidance}"
+        )
+
+
 def _get_m14_predictor():
     """Lazy import keeps this helper independently testable.
 
@@ -93,6 +116,25 @@ def detect_mixed_fruit_boxes(image, detector=None):
             "bbox": (x0, y0, x1, y1),
         })
     return detections
+
+
+def validate_single_fruit_image(image, detector=None):
+    """Reject a single-analysis input when YOLO sees multiple fruit boxes.
+
+    This is an optional routing validation only. It uses the existing,
+    unchanged apple/banana/orange detector and does not call or alter any
+    ripeness predictor. Zero or one supported detection is allowed so the
+    existing selected-fruit validator remains responsible for type matching.
+    """
+    detections = detect_mixed_fruit_boxes(image, detector=detector)
+    breakdown = Counter(item["fruit"] for item in detections)
+    if len(detections) > 1:
+        raise MultipleFruitImageError(breakdown)
+    return {
+        "detected_count": len(detections),
+        "fruit_breakdown": dict(breakdown),
+        "validation_method": "yolov8n_single_fruit_count",
+    }
 
 
 def _crop_with_padding(image, bbox, padding_ratio=0.03):

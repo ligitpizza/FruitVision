@@ -69,7 +69,11 @@ from core_modules.blemish_analysis import analyze_surface
 from core_modules.marketability import estimate_marketability, average_member_probabilities, stock_eligible
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
-from core_modules.mixed_fruit_m14 import analyze_mixed_fruit_m14
+from core_modules.mixed_fruit_m14 import (
+    MultipleFruitImageError,
+    analyze_mixed_fruit_m14,
+    validate_single_fruit_image,
+)
 from core_modules.filter_photos import (
     FILTER_LABELS,
     ENSEMBLE_MEMBER_TO_MODEL_KEY,
@@ -903,6 +907,7 @@ def predict_unified():
     fruit_type = request.form.get("fruit", "apple")
     model_choice = request.form.get("model", "ab")
     validate_upload = request.form.get("validate", "1") != "0"
+    validate_single_fruit = request.form.get("validate_single_fruit", "1") != "0"
     files = request.files.getlist("image")
     if not files or files[0].filename == "":
         return {"error": "No image uploaded"}, 400
@@ -913,6 +918,32 @@ def predict_unified():
     img = cv2.imread(path)
     if img is None:
         return {"error": "Uploaded image could not be read", "filename": f.filename}, 400
+    if validate_single_fruit:
+        try:
+            single_fruit_validation = validate_single_fruit_image(img)
+        except MultipleFruitImageError as e:
+            multiple_types = len(e.fruit_breakdown) > 1
+            error_code = (
+                "multiple_fruit_image"
+                if multiple_types
+                else "multiple_same_fruit_image"
+            )
+            destination = (
+                "#mixed-fruit-analysis" if multiple_types else "#batch-analysis"
+            )
+            return {
+                "error": str(e),
+                "error_code": error_code,
+                "fruit_breakdown": e.fruit_breakdown,
+                "suggested_url": url_for("classify") + destination,
+                "filename": f.filename,
+            }, 422
+    else:
+        single_fruit_validation = {
+            "detected_count": None,
+            "fruit_breakdown": {},
+            "validation_method": "skipped",
+        }
     if validate_upload:
         try:
             input_validation = validate_selected_fruit(img, fruit_type)
@@ -974,6 +1005,7 @@ def predict_unified():
             "proba": ensemble_proba,
             "marketability": marketability,
             "input_validation": input_validation,
+            "single_fruit_validation": single_fruit_validation,
             "filter_photos": filter_photos,
             **_surface_payload(surface),
         }
@@ -1028,6 +1060,7 @@ def predict_unified():
         "proba": {cls: round(p * 100, 1) for cls, p in proba_dict.items()},
         "marketability": marketability,
         "input_validation": input_validation,
+        "single_fruit_validation": single_fruit_validation,
         "filter_photos": filter_photos,
         **_surface_payload(surface),
     }
@@ -2094,6 +2127,7 @@ def training_report(model_key):
         per_fruit_time=per_fruit_time_display,
         model_key=model_key,
         model_label=entry["label"],
+        history_member_tag=_member_tag(model_key),
         predictors=PREDICTORS,
         active_page="classify",
     )

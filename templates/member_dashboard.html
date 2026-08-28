@@ -1,14 +1,23 @@
 {% extends "base.html" %}
 {% block title %}{{ model_label }} — Dashboard — FruitVision{% endblock %}
 {% block content %}
-<h1>Data Analysis Dashboard</h1>
-<p class="subtitle">{{ model_label }}</p>
-
-<div class="nav-tabs">
-  {% for key, entry in predictors.items() %}
-    <a href="/dashboard/{{ key }}" class="{{ 'active' if key == model_choice }}">{{ entry.label }}</a>
-  {% endfor %}
+<div class="page-head">
+  <div>
+    <h1>Data Analysis Dashboard</h1>
+    <p class="subtitle">{{ model_label }}</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/history?member={{ history_member_tag }}">Model History</a>
+    {% if model_choice != 'all_four' %}
+      <a class="btn btn-outline" href="/training-report/{{ model_choice }}">Training Report</a>
+    {% endif %}
+    <a class="btn" href="/classify">New Classification</a>
+  </div>
 </div>
+
+{% set model_nav_view = 'dashboard' %}
+{% set model_nav_current = model_choice %}
+{% include '_model_page_nav.html' %}
 
 <div class="card">
   <h2 style="margin-top:0; border:none;">Batch Analysis</h2>
@@ -143,10 +152,18 @@
   {% endif %}
 </div>
 
-<p style="margin-top:20px;">
-  <a href="/history?member={{ history_member_tag }}">View {{ model_choice|upper }} history</a> ·
-  <a href="/training-report/{{ model_choice }}">Training report</a> ·
-  <a href="/analytics">All-time analytics (all members)</a> ·
-  <a href="/classify">← Back to classification</a>
-</p>
+<nav class="model-page-footer-nav" aria-label="Dashboard follow-up navigation">
+  <div>
+    <strong>Continue from {{ model_choice|upper }}</strong>
+    <span>Open related evidence or return to classification.</span>
+  </div>
+  <div class="model-page-footer-actions">
+    <a class="btn btn-sm btn-outline" href="/history?member={{ history_member_tag }}">History</a>
+    {% if model_choice != 'all_four' %}
+      <a class="btn btn-sm btn-outline" href="/training-report/{{ model_choice }}">Training Report</a>
+    {% endif %}
+    <a class="btn btn-sm btn-outline" href="/analytics">All Analytics</a>
+    <a class="btn btn-sm" href="/classify">Back to Classification</a>
+  </div>
+</nav>
 {% endblock %}

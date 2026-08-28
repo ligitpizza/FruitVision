@@ -1228,6 +1228,20 @@ def analyse_mixed_fruit_m14():
     )
 
 
+def _validate_or_skip(img, fruit_type, validate_upload):
+    """Runs validate_selected_fruit() unless the batch form's "skip
+    validation" checkbox opted out -- still raises FruitValidationError like
+    the real check would, so callers keep one try/except regardless."""
+    if not validate_upload:
+        return {
+            "selected_fruit": fruit_type,
+            "detected_fruit": None,
+            "confidence": None,
+            "validation_method": "skipped",
+        }
+    return validate_selected_fruit(img, fruit_type)
+
+
 @app.route("/analyse", methods=["POST"])
 def analyse():
     """Multi-image batch analysis. `model` is one of ab/bc/cd/da/yolo_pure for
@@ -1235,6 +1249,13 @@ def analyse():
     fruit_type = request.form.get("fruit_type", "apple")
     model_choice = request.form.get("model", "ab")
     files = request.files.getlist("images")
+    # Framed as "skip" (unchecked by default = validation runs) rather than
+    # "validate" (which would need to default checked) -- a plain HTML
+    # checkbox can't distinguish "present but unchecked" from "never
+    # rendered", so defaulting an opt-OUT checkbox to unchecked is the only
+    # way to keep this route's previous always-on behavior as the default
+    # without a fragile hidden-field-ordering trick.
+    validate_upload = request.form.get("skip_validation") != "on"
     # "This photo may contain multiple fruits" -- see core_modules/multi_fruit_detect.py.
     # Only apple/banana/orange support it (no COCO mango class); a mango
     # photo silently keeps using the existing single-fruit path below.
@@ -1254,7 +1275,7 @@ def analyse():
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": "Uploaded image could not be read"})
                 continue
             try:
-                input_validation = validate_selected_fruit(img, fruit_type)
+                input_validation = _validate_or_skip(img, fruit_type, validate_upload)
             except FruitValidationError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue
@@ -1367,7 +1388,7 @@ def analyse():
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": "Uploaded image could not be read"})
                 continue
             try:
-                input_validation = validate_selected_fruit(img, fruit_type)
+                input_validation = _validate_or_skip(img, fruit_type, validate_upload)
             except FruitValidationError as e:
                 results.append({"filename": f.filename, "label": None, "confidence": None, "error": str(e)})
                 continue

@@ -103,6 +103,12 @@
       Add these results to Fruit Stock
     </label>
     <p class="field-hint">Counts each analysed image (or each detected fruit, in multi-fruit mode) into the stock ledger. Leave unchecked when re-running a batch for testing.</p>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" name="skip_validation" style="width:auto;">
+      Skip fruit-match validation for this batch
+    </label>
+    <p class="field-hint">Validation runs by default and rejects images that don't match the selected fruit. Check this to skip it (e.g. testing with mismatched or unusual photos).</p>
     <button type="submit" style="margin-top:8px;">Analyse Batch</button>
   </form>
 </div>

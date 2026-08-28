@@ -2,9 +2,33 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
   warnings.warn(
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
-[ WARN:0@739.905] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgnÇÑ250GÇï_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg'): can't open/read file: check file path/integrity
-[ WARN:0@772.475] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgGÇï_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg'): can't open/read file: check file path/integrity
-[ WARN:0@772.475] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgGÇï_png.rf.Jd9En5JfkFaniemeIfvP.png'): can't open/read file: check file path/integrity
+[ WARN:0@246.651] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgnÇÑ250GÇï_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@276.139] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\bunch-unripe-green-bananas-bunch-unripe-green-bananas-tree-101253605-jpgGÇï_jpg.rf.LiGkuYCgWXE89EvgyIjC.jpg'): can't open/read file: check file path/integrity
+[ WARN:0@276.139] global loadsave.cpp:278 cv::findDecoder imread_('D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\green-bananas-3_medium-jpgGÇï_png.rf.Jd9En5JfkFaniemeIfvP.png'): can't open/read file: check file path/integrity
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
+C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
+  warnings.warn(
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
   warnings.warn(
 C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn\svm\_base.py:239: FutureWarning: The `probability` parameter was deprecated in 1.9 and will be removed in version 1.11. Use `CalibratedClassifierCV(SVC(), ensemble=False)` instead of `SVC(probability=True)`
@@ -19,20 +43,20 @@ C:\Users\pizza\AppData\Local\Programs\Python\Python311\Lib\site-packages\sklearn
   warnings.warn(
 
 Building feature dataset for apple (m14v2: A colour + B shape + D gabor + C texture)...
-Loaded 7608 samples for apple across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Loaded 7593 samples for apple across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
 Test set performance for apple:
               precision    recall  f1-score   support
 
-        ripe       0.79      0.86      0.83       423
-      rotten       0.93      0.91      0.92       635
-      unripe       0.92      0.88      0.90       464
+        ripe       0.79      0.84      0.82       416
+      rotten       0.93      0.92      0.92       635
+      unripe       0.91      0.88      0.89       468
 
-    accuracy                           0.89      1522
-   macro avg       0.88      0.88      0.88      1522
-weighted avg       0.89      0.89      0.89      1522
+    accuracy                           0.88      1519
+   macro avg       0.88      0.88      0.88      1519
+weighted avg       0.89      0.88      0.89      1519
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\apple_m14v2.pkl
-[time] apple took 7m 16.1s
+[time] apple took 2m 22.9s
 
 Building feature dataset for banana (m14v2: A colour + B shape + D gabor + C texture)...
 Skipping D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn��250G��_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg: Could not read image: D:\MainProject\ImageProcessingFruit\FruitVision\datasets\fruit_ripeness\banana\unripe\8682524-jpgn��250G��_jpg.rf.8fdLwb9GKpe4wc4aCMTn.jpg
@@ -42,50 +66,146 @@ Loaded 7714 samples for banana across classes: {np.str_('ripe'), np.str_('rotten
 Test set performance for banana:
               precision    recall  f1-score   support
 
-        ripe       0.89      0.93      0.91       445
-      rotten       0.93      0.93      0.93       613
-      unripe       0.96      0.91      0.93       485
+        ripe       0.88      0.94      0.91       445
+      rotten       0.95      0.93      0.94       613
+      unripe       0.96      0.93      0.94       485
 
     accuracy                           0.93      1543
    macro avg       0.93      0.93      0.93      1543
 weighted avg       0.93      0.93      0.93      1543
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\banana_m14v2.pkl
-[time] banana took 5m 47.5s
+[time] banana took 2m 22.9s
 
 Building feature dataset for orange (m14v2: A colour + B shape + D gabor + C texture)...
 Loaded 5818 samples for orange across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
 Test set performance for orange:
               precision    recall  f1-score   support
 
-        ripe       0.87      0.94      0.90       392
-      rotten       0.94      0.88      0.91       468
-      unripe       0.94      0.94      0.94       304
+        ripe       0.88      0.94      0.91       392
+      rotten       0.94      0.89      0.91       468
+      unripe       0.95      0.94      0.95       304
 
-    accuracy                           0.91      1164
+    accuracy                           0.92      1164
    macro avg       0.92      0.92      0.92      1164
-weighted avg       0.92      0.91      0.91      1164
+weighted avg       0.92      0.92      0.92      1164
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\orange_m14v2.pkl
-[time] orange took 4m 28.7s
+[time] orange took 1m 57.3s
 
 Building feature dataset for mango (m14v2: A colour + B shape + D gabor + C texture)...
 Loaded 4955 samples for mango across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
 Test set performance for mango:
               precision    recall  f1-score   support
 
-        ripe       0.70      0.82      0.76       226
-      rotten       0.84      0.79      0.82       364
-      unripe       0.94      0.90      0.92       401
+        ripe       0.76      0.84      0.80       226
+      rotten       0.85      0.83      0.84       364
+      unripe       0.94      0.91      0.92       401
 
-    accuracy                           0.84       991
-   macro avg       0.83      0.84      0.83       991
-weighted avg       0.85      0.84      0.84       991
+    accuracy                           0.86       991
+   macro avg       0.85      0.86      0.85       991
+weighted avg       0.87      0.86      0.86       991
 
 Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\mango_m14v2.pkl
-[time] mango took 4m 13.2s
+[time] mango took 1m 26.9s
 
-[time] Total training run took 21m 45.5s
+Building feature dataset for pear (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 510 samples for pear across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for pear:
+              precision    recall  f1-score   support
+
+        ripe       0.73      0.83      0.78        23
+      rotten       1.00      0.98      0.99        45
+      unripe       0.84      0.79      0.82        34
+
+    accuracy                           0.88       102
+   macro avg       0.86      0.87      0.86       102
+weighted avg       0.89      0.88      0.88       102
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\pear_m14v2.pkl
+[time] pear took 8.2s
+
+Building feature dataset for peach (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 743 samples for peach across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for peach:
+              precision    recall  f1-score   support
+
+        ripe       0.55      0.90      0.68        39
+      rotten       0.94      0.89      0.92        38
+      unripe       0.90      0.61      0.73        72
+
+    accuracy                           0.76       149
+   macro avg       0.80      0.80      0.78       149
+weighted avg       0.82      0.76      0.76       149
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\peach_m14v2.pkl
+[time] peach took 11.0s
+
+Building feature dataset for strawberry (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 16077 samples for strawberry across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for strawberry:
+              precision    recall  f1-score   support
+
+        ripe       0.84      0.86      0.85      1124
+      rotten       0.90      0.87      0.88      1565
+      unripe       0.91      0.96      0.94       527
+
+    accuracy                           0.88      3216
+   macro avg       0.88      0.90      0.89      3216
+weighted avg       0.88      0.88      0.88      3216
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\strawberry_m14v2.pkl
+[time] strawberry took 4m 29.4s
+
+Building feature dataset for tomato (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 851 samples for tomato across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for tomato:
+              precision    recall  f1-score   support
+
+        ripe       0.86      0.72      0.78        75
+      rotten       0.45      0.69      0.55        29
+      unripe       0.91      0.87      0.89        67
+
+    accuracy                           0.77       171
+   macro avg       0.74      0.76      0.74       171
+weighted avg       0.81      0.77      0.78       171
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\tomato_m14v2.pkl
+[time] tomato took 15.9s
+
+Building feature dataset for lemon (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 913 samples for lemon across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for lemon:
+              precision    recall  f1-score   support
+
+        ripe       0.97      0.93      0.95        97
+      rotten       0.80      0.89      0.84        36
+      unripe       0.96      0.96      0.96        50
+
+    accuracy                           0.93       183
+   macro avg       0.91      0.93      0.92       183
+weighted avg       0.93      0.93      0.93       183
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\lemon_m14v2.pkl
+[time] lemon took 15.8s
+
+Building feature dataset for guava (m14v2: A colour + B shape + D gabor + C texture)...
+Loaded 2016 samples for guava across classes: {np.str_('ripe'), np.str_('rotten'), np.str_('unripe')}
+Test set performance for guava:
+              precision    recall  f1-score   support
+
+        ripe       1.00      0.99      0.99       149
+      rotten       0.72      0.77      0.74        92
+      unripe       0.87      0.84      0.85       163
+
+    accuracy                           0.88       404
+   macro avg       0.86      0.87      0.86       404
+weighted avg       0.88      0.88      0.88       404
+
+Model saved to D:\MainProject\ImageProcessingFruit\FruitVision\trained_models\m14v2\guava_m14v2.pkl
+[time] guava took 36.1s
+
+[time] Total training run took 14m 6.4s
 
 All graphs saved to outputs/training/m14v2/
 Accuracy summary: D:\MainProject\ImageProcessingFruit\FruitVision\outputs\training\m14v2\accuracy_summary.png

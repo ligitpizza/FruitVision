@@ -318,6 +318,13 @@ img.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; bo
 .marketability-review-original strong { text-transform: capitalize; }
 .marketability-review-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .marketability-review-actions { display: flex; justify-content: flex-end; gap: 9px; flex-wrap: wrap; margin-top: 18px; }
+.mixed-fruit-m14-card { border-left: 4px solid var(--accent-2); }
+.mixed-m14-overview { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.25fr); gap: 20px; align-items: start; }
+.mixed-m14-overview img { width: 100%; max-height: 520px; object-fit: contain; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--paper); }
+.mixed-m14-breakdowns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.mixed-m14-table-card { min-width: 0; }
+.mixed-m14-table-wrap { overflow-x: auto; }
+.mixed-m14-table-wrap table { min-width: 1050px; }
 .badge.marketability-ready, .badge.priority-normal { background: var(--ripe-bg); color: var(--ripe); }
 .badge.marketability-hold, .badge.priority-high { background: var(--unripe-bg); color: var(--unripe); }
 .badge.marketability-sort { background: var(--unripe-bg); color: var(--unripe); }
@@ -335,6 +342,9 @@ img.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; bo
   .marketability-review-fields { grid-template-columns: 1fr; }
   .marketability-review-actions { justify-content: stretch; }
   .marketability-review-actions .btn, .marketability-review-actions button { flex: 1 1 100%; }
+}
+@media (max-width: 820px) {
+  .mixed-m14-overview { grid-template-columns: 1fr; }
 }
 
 .pagination { margin-top: 20px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Mixed Fruit YOLOv8n + M14 — FruitVision{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow"><span class="dot"></span> Mixed-fruit analysis</div>
+    <h1>Mixed Fruit — YOLOv8n + Merged 1+4</h1>
+    <p>YOLOv8n detects each apple, banana, and orange; M14 determines the ripeness of every detected crop.</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/classify">Analyse another image</a>
+    <a class="btn" href="/marketability">Open Marketability</a>
+  </div>
+</div>
+
+{% if result.error %}
+<div class="card" style="margin-top:20px;">
+  <h3>Analysis could not be completed</h3>
+  <p class="error-row">{{ result.error }}</p>
+</div>
+{% elif result.detected_count == 0 %}
+<div class="card" style="margin-top:20px;">
+  <h3>No supported fruit detected</h3>
+  <p>No apple, banana, or orange box was found. Try a clearer image where the fruits are visible and not heavily obstructed.</p>
+</div>
+{% else %}
+<div class="grid grid-3 mixed-m14-summary" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Detected Fruit</div>
+    <div class="value">{{ result.detected_count }}</div>
+    <div class="delta">apple, banana, and orange</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">M14 Classified</div>
+    <div class="value">{{ result.classified_count }}</div>
+    <div class="delta">ripeness result available</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Needs Review</div>
+    <div class="value {{ 'marketability-urgent-text' if result.needs_review_count else '' }}">{{ result.needs_review_count }}</div>
+    <div class="delta {{ 'down' if result.needs_review_count else '' }}">crop could not be classified</div>
+  </div>
+</div>
+
+<div class="card mixed-m14-overview" style="margin-top:18px;">
+  <div>
+    <h3>{{ result.filename }}</h3>
+    <p class="field-hint">Pipeline: {{ result.model_label }} · Processing time: {{ result.latency_ms }} ms</p>
+    <div class="mixed-m14-breakdowns">
+      {% for fruit, count in result.fruit_breakdown.items() %}
+      <span class="badge neutral">{{ count }} {{ fruit }}</span>
+      {% endfor %}
+      {% for label, count in result.ripeness_breakdown.items() %}
+      <span class="badge {{ label }}">{{ count }} {{ label }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% if result.annotated_path %}
+  <img src="/outputs/{{ result.annotated_path }}" alt="Mixed fruit detections labelled with M14 ripeness results">
+  {% endif %}
+</div>
+
+<div class="card mixed-m14-table-card" style="margin-top:18px;">
+  <h3>Per-fruit results</h3>
+  <p class="field-hint">Fruit confidence comes from localisation; ripeness confidence comes from M14. They are intentionally reported separately.</p>
+  <div class="mixed-m14-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Detected fruit</th>
+          <th>Fruit confidence</th>
+          <th>M14 ripeness</th>
+          <th>M14 confidence</th>
+          <th>Marketability</th>
+          <th>Handling guidance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for detection in result.detections %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><strong>{{ detection.fruit.capitalize() }}</strong></td>
+          <td>{{ detection.fruit_confidence }}%</td>
+          {% if detection.label %}
+          <td><span class="badge {{ detection.label }}">{{ detection.label.upper() }}</span></td>
+          <td>{{ detection.ripeness_confidence }}%</td>
+          <td><span class="badge marketability-{{ detection.marketability.status }}">{{ detection.marketability.status.upper() }}</span></td>
+          <td class="marketability-action-cell">
+            {{ detection.marketability.action }}
+            <div class="field-hint">{{ detection.marketability.reliability.capitalize() }} reliability</div>
+          </td>
+          {% else %}
+          <td><span class="badge review-needs_review">NEEDS REVIEW</span></td>
+          <td>—</td>
+          <td><span class="badge marketability-inspect">INSPECT</span></td>
+          <td class="error-row">{{ detection.error }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="field-hint" style="margin-top:12px;">A failed crop is never assigned a made-up ripeness state. Inspect it manually or capture a clearer image.</p>
+</div>
+{% endif %}
+{% endblock %}

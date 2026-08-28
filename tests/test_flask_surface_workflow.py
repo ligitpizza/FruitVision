@@ -26,6 +26,34 @@ def _predict(image, fruit_type):
     return "ripe", 0.92, bbox, image.copy(), {"ripe": 0.92, "unripe": 0.06, "rotten": 0.02}
 
 
+def _mixed_m14_analysis(image):
+    detections = []
+    for fruit, label, confidence, bbox in (
+        ("apple", "ripe", 91.0, (5, 5, 35, 45)),
+        ("banana", "unripe", 87.0, (40, 5, 75, 45)),
+        ("orange", "rotten", 94.0, (80, 5, 115, 45)),
+    ):
+        probabilities = {"ripe": 0.03, "unripe": 0.03, "rotten": 0.03}
+        probabilities[label] = confidence / 100
+        detections.append({
+            "fruit": fruit, "fruit_confidence": 95.0, "bbox": bbox,
+            "label": label, "ripeness_confidence": confidence,
+            "probabilities": probabilities, "error": None,
+        })
+    return {
+        "model_key": "merged_1_4",
+        "model_label": "YOLOv8n Detection + Merged 1+4 (M14) Ripeness",
+        "detections": detections,
+        "detected_count": 3,
+        "classified_count": 3,
+        "needs_review_count": 0,
+        "fruit_breakdown": {"apple": 1, "banana": 1, "orange": 1},
+        "ripeness_breakdown": {"ripe": 1, "unripe": 1, "rotten": 1},
+        "annotated_image": image.copy(),
+        "latency_ms": 12.3,
+    }
+
+
 def _module(**attributes):
     module = types.ModuleType("stub")
     for name, value in attributes.items():
@@ -73,6 +101,9 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                     "validation_method": "test",
                 },
                 FruitValidationError=DummyNotFruitError,
+            ),
+            "core_modules.mixed_fruit_m14": _module(
+                analyze_mixed_fruit_m14=_mixed_m14_analysis,
             ),
             "database.history_db": _module(
                 log_result=lambda **kwargs: logged.append(kwargs),
@@ -147,6 +178,30 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertEqual(logged[0]["quality_grade"], payload["quality_grade"])
             self.assertEqual(logged[0]["marketability_status"], "ready")
             self.assertEqual(logged[0]["marketability_min_days"], payload["marketability"]["min_days"])
+
+            app_module.PUBLIC_PATHS.add("/classify")
+            classify_response = client.get("/classify")
+            classify_html = classify_response.get_data(as_text=True)
+            self.assertIn("Mixed-Fruit Analysis", classify_html)
+            self.assertIn("M14 ONLY", classify_html)
+
+            app_module.PUBLIC_PATHS.add("/analyse-mixed-fruit-m14")
+            mixed_response = client.post(
+                "/analyse-mixed-fruit-m14",
+                data={"image": (io.BytesIO(encoded.tobytes()), "mixed.png")},
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(mixed_response.status_code, 200)
+            mixed_html = mixed_response.get_data(as_text=True)
+            self.assertIn("Mixed Fruit — YOLOv8n + Merged 1+4", mixed_html)
+            self.assertIn("Per-fruit results", mixed_html)
+            self.assertIn("Apple", mixed_html)
+            self.assertIn("Banana", mixed_html)
+            self.assertIn("Orange", mixed_html)
+            mixed_logs = logged[1:]
+            self.assertEqual(len(mixed_logs), 3)
+            self.assertTrue(all(item["member"] == "merged_1_4" for item in mixed_logs))
+            self.assertTrue(all(item["source"] == "analyse_mixed_fruit_m14" for item in mixed_logs))
 
             # --- single upload automatically counts a ready ripe result
             # into stock, no "add to stock" checkbox needed (unlike batch) ---

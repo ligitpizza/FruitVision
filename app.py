@@ -69,6 +69,7 @@ from core_modules.blemish_analysis import analyze_surface
 from core_modules.marketability import estimate_marketability, average_member_probabilities, stock_eligible
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
 from core_modules.multi_fruit_detect import supports_multi_fruit, detect_fruit_boxes
+from core_modules.mixed_fruit_m14 import analyze_mixed_fruit_m14
 from core_modules.filter_photos import (
     FILTER_LABELS,
     ENSEMBLE_MEMBER_TO_MODEL_KEY,
@@ -411,7 +412,10 @@ def _decorate_marketability_rows(rows):
         item["detection_breakdown"] = breakdown
 
         source = item.get("source") or ""
-        if source == "analyse_multi_fruit":
+        if source == "analyse_mixed_fruit_m14":
+            item["analysis_type"] = "YOLOv8n + M14 mixed fruit"
+            item["analysis_kind"] = "mixed_fruit_m14"
+        elif source == "analyse_multi_fruit":
             item["analysis_type"] = "Multi-fruit batch"
             item["analysis_kind"] = "multi_fruit_batch"
         elif source == "analyse":
@@ -1058,6 +1062,89 @@ ALL_FOUR_KEY = "all_four"
 PREDICTORS_WITH_ENSEMBLE = dict(PREDICTORS)
 PREDICTORS_WITH_ENSEMBLE[ALL_FOUR_KEY] = {"label": ALL_FOUR_LABEL}
 
+
+@app.route("/analyse-mixed-fruit-m14", methods=["POST"])
+def analyse_mixed_fruit_m14():
+    """Detect apple/banana/orange together and route every crop through M14."""
+    uploaded = request.files.get("image")
+    if not uploaded or not uploaded.filename:
+        flash("Choose an image containing apple, banana, or orange fruit.")
+        return redirect(url_for("classify"))
+
+    original_name = secure_filename(uploaded.filename) or "mixed_fruit.jpg"
+    stem, extension = os.path.splitext(original_name)
+    extension = extension if extension.lower() in {".jpg", ".jpeg", ".png", ".webp"} else ".jpg"
+    unique_tag = time.time_ns()
+    stored_name = f"{stem}_mixed_m14_{unique_tag}{extension}"
+    upload_path = os.path.join(UPLOAD_DIR, stored_name)
+    uploaded.save(upload_path)
+    image = cv2.imread(upload_path)
+    if image is None:
+        flash("The uploaded mixed-fruit image could not be read.")
+        return redirect(url_for("classify"))
+
+    try:
+        analysis = analyze_mixed_fruit_m14(image)
+    except Exception as exc:
+        return render_template(
+            "mixed_fruit_m14.html",
+            result={"filename": original_name, "error": str(exc)},
+            active_page="classify",
+        )
+
+    annotated_name = f"{stem}_mixed_m14_{unique_tag}_annotated{extension}"
+    annotated_dir = os.path.join(OUTPUTS_DIR, "annotated")
+    os.makedirs(annotated_dir, exist_ok=True)
+    annotated_path = os.path.join(annotated_dir, annotated_name)
+    annotated_rel = None
+    if cv2.imwrite(annotated_path, analysis["annotated_image"]):
+        annotated_rel = f"annotated/{annotated_name}"
+
+    add_to_stock = request.form.get("add_to_stock") == "on"
+    for detection in analysis["detections"]:
+        if not detection.get("label"):
+            detection["marketability"] = None
+            continue
+
+        marketability = estimate_marketability(
+            fruit=detection["fruit"],
+            ripeness=detection["label"],
+            confidence=detection["ripeness_confidence"],
+            probabilities=detection.get("probabilities"),
+        )
+        detection["marketability"] = marketability
+        log_result(
+            member="merged_1_4",
+            fruit=detection["fruit"],
+            label=detection["label"],
+            confidence=detection["ripeness_confidence"],
+            filename=original_name,
+            annotated_path=annotated_rel,
+            source="analyse_mixed_fruit_m14",
+            user_id=g.user["id"] if g.user else None,
+            latency_ms=analysis["latency_ms"],
+            flagged=_is_flagged(detection["ripeness_confidence"]),
+            **_marketability_db_fields(marketability),
+        )
+        _log_stock_result(
+            add_to_stock,
+            detection["fruit"],
+            detection["label"],
+            marketability_status=marketability["status"],
+            source="mixed_fruit_m14",
+        )
+
+    analysis.update({
+        "filename": original_name,
+        "annotated_path": annotated_rel,
+    })
+    return render_template(
+        "mixed_fruit_m14.html",
+        result=analysis,
+        active_page="classify",
+    )
+
+
 @app.route("/analyse", methods=["POST"])
 def analyse():
     """Multi-image batch analysis. `model` is one of ab/bc/cd/da/yolo_pure for
@@ -1479,7 +1566,7 @@ def marketability_dashboard():
         ),
         "remove": sum(row["marketability"].get("status") == "remove" for row in rows),
         "batch": sum(
-            row.get("analysis_kind") in {"batch", "multi_fruit_batch"}
+            row.get("analysis_kind") in {"batch", "multi_fruit_batch", "mixed_fruit_m14"}
             for row in rows
         ),
         "needs_review": sum(

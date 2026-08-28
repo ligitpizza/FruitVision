@@ -101,6 +101,29 @@
   </form>
 </div>
 
+<h2>Mixed-Fruit Analysis</h2>
+<p>Analyse one image containing apples, bananas, and oranges together.</p>
+<div class="card mixed-fruit-m14-card">
+  <div class="row-between" style="align-items:flex-start;">
+    <div>
+      <div class="eyebrow"><span class="dot"></span> Dedicated workflow</div>
+      <h3 style="margin-top:5px;">Mixed Fruit — YOLOv8n + Merged 1+4</h3>
+      <p class="field-hint">YOLOv8n detects each fruit type and location. Every detected crop is then classified for ripeness only by the original Merged 1+4 colour + shape + Gabor SVM.</p>
+    </div>
+    <span class="badge neutral">M14 ONLY</span>
+  </div>
+  <form action="/analyse-mixed-fruit-m14" method="post" enctype="multipart/form-data" style="margin-top:14px;">
+    <label for="mixed_m14_image">Upload one mixed-fruit image</label>
+    <input type="file" id="mixed_m14_image" name="image" accept="image/*" required>
+    <p class="field-hint">Supported fruit detection: apple, banana, and orange. Mango is not included because the existing COCO detector has no mango class.</p>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" name="add_to_stock" style="width:auto;">
+      Add successfully classified fruits to Fruit Stock
+    </label>
+    <button type="submit" style="margin-top:12px;">Analyse with YOLOv8n + M14</button>
+  </form>
+</div>
+
 <h2>Per-Member Dashboards</h2>
 <p class="dashboard-links">
   {% for key, entry in predictors.items() %}

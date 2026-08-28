@@ -60,7 +60,7 @@
   <div class="stat-tile">
     <div class="label">Batch Results</div>
     <div class="value">{{ summary.batch }}</div>
-    <div class="delta">batch and multi-fruit analyses</div>
+    <div class="delta">batch and mixed-fruit analyses</div>
   </div>
   <div class="stat-tile">
     <div class="label">Needs Review</div>
@@ -102,7 +102,7 @@
       <label for="marketability-analysis">Analysis type</label>
       <select id="marketability-analysis" name="analysis">
         <option value="">All analysis types</option>
-        {% for value, label in [('single', 'Single classification'), ('batch', 'Batch analysis'), ('multi_fruit_batch', 'Multi-fruit batch'), ('realtime', 'Real-time')] %}
+        {% for value, label in [('single', 'Single classification'), ('batch', 'Batch analysis'), ('multi_fruit_batch', 'Multi-fruit batch'), ('mixed_fruit_m14', 'YOLOv8n + M14 mixed fruit'), ('realtime', 'Real-time')] %}
         <option value="{{ value }}" {{ 'selected' if analysis_filter == value }}>{{ label }}</option>
         {% endfor %}
       </select>

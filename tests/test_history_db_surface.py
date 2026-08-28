@@ -118,6 +118,25 @@ class HistoryDatabaseSurfaceTests(unittest.TestCase):
         self.assertEqual(row["review_status"], "corrected")
         self.assertEqual(row["review_label"], "ripe")
 
+    def test_fruit_label_breakdown_counts_each_pair(self):
+        history_db.init_db()
+        history_db.log_result(member="ensemble_ab", fruit="apple", label="ripe", confidence=90.0)
+        history_db.log_result(member="ensemble_ab", fruit="apple", label="ripe", confidence=88.0)
+        history_db.log_result(member="ensemble_ab", fruit="apple", label="rotten", confidence=95.0)
+        history_db.log_result(member="ensemble_ab", fruit="banana", label="unripe", confidence=70.0)
+
+        breakdown = history_db.get_fruit_label_breakdown()
+        self.assertEqual(breakdown["apple"], {"ripe": 2, "rotten": 1})
+        self.assertEqual(breakdown["banana"], {"unripe": 1})
+
+    def test_fruit_label_breakdown_respects_member_filter(self):
+        history_db.init_db()
+        history_db.log_result(member="ensemble_ab", fruit="apple", label="ripe", confidence=90.0)
+        history_db.log_result(member="ensemble_bc", fruit="apple", label="rotten", confidence=90.0)
+
+        breakdown = history_db.get_fruit_label_breakdown(member="ensemble_ab")
+        self.assertEqual(breakdown["apple"], {"ripe": 1})
+
 
 if __name__ == "__main__":
     unittest.main()

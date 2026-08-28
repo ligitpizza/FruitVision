@@ -8,13 +8,16 @@
 </head>
 <body class="{{ 'dark-mode' if g.user and g.user.dark_mode }}">
   <div class="app-shell">
-    <aside class="sidebar">
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+    <aside class="sidebar" id="sidebar">
       <div class="brand"><span class="logo">FV</span> FruitVision</div>
       <nav>
         <a href="/" class="{{ 'active' if active_page == 'dashboard' }}">Dashboard</a>
         <a href="/marketability" class="{{ 'active' if active_page == 'marketability' }}">Marketability</a>
         <a href="/classify" class="{{ 'active' if active_page == 'classify' }}">Fruit Classification</a>
+        <a href="/model-lab" class="{{ 'active' if active_page == 'model_lab' }}">Model Lab</a>
         <a href="/history" class="{{ 'active' if active_page == 'history' }}">Harvest Records</a>
+        <a href="/stock" class="{{ 'active' if active_page == 'stock' }}">Fruit Stock</a>
         {% if g.user and g.user.role == 'admin' %}
         <a href="/admin" class="{{ 'active' if active_page == 'admin' }}">Admin Panel</a>
         {% endif %}
@@ -29,6 +32,7 @@
 
     <div class="main-area">
       <div class="topbar">
+        <button type="button" class="sidebar-toggle" id="sidebarToggle" onclick="openSidebar()" aria-label="Open navigation">☰</button>
         <div class="search"><span>Search predictions, models…</span></div>
         <div class="right">
           {% if g.user %}
@@ -57,5 +61,34 @@
       </div>
     </div>
   </div>
+  <script>
+    // The .sidebar.open CSS rule (in a @media block) drives this normally,
+    // but some browser/viewport-emulation combinations don't reliably
+    // re-run the cascade for a class change scoped inside a media query.
+    // Setting the width/padding directly guarantees the visual state
+    // changes everywhere, while the class stays too so :hover/CSS-only
+    // concerns and the backdrop's .open selector keep working normally.
+    function openSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      sidebar.classList.add('open');
+      backdrop.classList.add('open');
+      sidebar.style.width = '240px';
+      sidebar.style.paddingLeft = '14px';
+      sidebar.style.paddingRight = '14px';
+      backdrop.style.display = 'block';
+    }
+    function closeSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('open');
+      sidebar.style.width = '';
+      sidebar.style.paddingLeft = '';
+      sidebar.style.paddingRight = '';
+      backdrop.style.display = '';
+    }
+    document.querySelectorAll('.sidebar nav a').forEach(a => a.addEventListener('click', closeSidebar));
+  </script>
 </body>
 </html>

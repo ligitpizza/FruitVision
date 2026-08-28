@@ -65,6 +65,14 @@ code { font-family: var(--font-mono); background: var(--paper); padding: 1px 5px
   width: 240px; flex-shrink: 0; background: var(--sidebar); color: var(--sidebar-text);
   display: flex; flex-direction: column; padding: 20px 14px; position: sticky; top: 0; height: 100vh;
 }
+.sidebar-toggle {
+  display: none; width: 38px; height: 38px; flex-shrink: 0; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--card); color: var(--ink); border-radius: var(--radius-sm);
+  font-size: 1.1rem; cursor: pointer;
+}
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 199;
+}
 .sidebar .brand {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px 22px; font-weight: 800; font-size: 1.15rem; color: #fff;
 }
@@ -153,7 +161,29 @@ select:focus, input:focus, textarea:focus { outline: 2px solid var(--accent-2); 
 .grid { display: grid; gap: 18px; }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-2 { grid-template-columns: 2fr 1fr; }
-@media (max-width: 900px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+
+  /* Off-canvas sidebar -- a fixed 240px sidebar next to flexed content
+     squeezes the main area down to near-nothing on tablet/mobile widths
+     (measured ~135px wide at a 375px viewport), so below this breakpoint
+     it becomes a collapsible drawer instead of a permanent flex column.
+     Expands via width (not left/transform) -- deliberately, since a
+     position:fixed element's left/transform can get stuck mid-toggle
+     under some viewport/device-emulation setups; width is the property
+     that's reliably verified to update immediately in every environment
+     this was tested in. */
+  .sidebar {
+    position: fixed; top: 0; left: 0; z-index: 200; width: 0; padding: 20px 0;
+    overflow: hidden; transition: width 0.25s ease, padding 0.25s ease;
+    box-shadow: 2px 0 16px rgba(0,0,0,0.25);
+  }
+  .sidebar.open { width: 240px; padding: 20px 14px; }
+  .sidebar-toggle { display: flex; }
+  .sidebar-backdrop.open { display: block; }
+  .topbar { padding-left: 16px; padding-right: 16px; gap: 10px; }
+  .page { padding: 20px 16px 60px; }
+}
 
 .card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
@@ -375,6 +405,44 @@ table.time-table th, table.time-table td { padding: 6px 14px; }
 }
 .controls { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; margin-top: 16px; }
 .control-group { flex: 1; min-width: 200px; }
+
+/* ---------- Dashboard ripeness charts ---------- */
+.dash-bar-chart { display: flex; align-items: flex-end; gap: 22px; height: 200px; padding: 10px 6px 0; }
+.dash-bar-group { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; height: 100%; }
+.dash-bar-cols { display: flex; align-items: flex-end; gap: 4px; flex: 1; width: 100%; justify-content: center; }
+.dash-bar-col { width: 16px; border-radius: 4px 4px 0 0; min-height: 2px; transition: opacity 0.15s; }
+.dash-bar-col:hover { opacity: 0.75; }
+.dash-bar-fruit-label { font-size: 0.78rem; color: var(--ink-dim); font-weight: 600; }
+.dash-chart-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 0.8rem; color: var(--ink-dim); }
+.dash-chart-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+.dash-pie-row { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.dash-pie { width: 160px; height: 160px; border-radius: 50%; flex-shrink: 0; }
+.dash-pie-legend { display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; }
+.dash-pie-legend .row { display: flex; align-items: center; gap: 8px; }
+.dash-pie-legend .count { color: var(--ink-dim); font-size: 0.8rem; }
+
+/* ---------- Model Lab ---------- */
+.model-lab-badge { font-size: 0.7rem; padding: 3px 9px; border-radius: 999px; font-weight: 700; }
+.model-lab-badge.active { background: var(--accent-2); color: var(--accent-2-ink); }
+.model-lab-badge.ready { background: var(--paper); color: var(--ink-dim); border: 1px solid var(--border); }
+.model-lab-badge.no-data { background: var(--unripe-bg); color: var(--unripe); }
+
+.model-lab-bar-group { margin-bottom: 18px; }
+.model-lab-bar-group h4 { margin: 0 0 8px; font-size: 0.92rem; }
+.model-lab-bar-row { display: grid; grid-template-columns: 90px 1fr 52px; align-items: center; gap: 10px; margin-bottom: 6px; }
+.model-lab-bar-row .name { font-size: 0.8rem; color: var(--ink-dim); }
+.model-lab-bar-track { height: 10px; border-radius: 999px; background: var(--paper); border: 1px solid var(--border); overflow: hidden; }
+.model-lab-bar-fill { height: 100%; border-radius: 999px; }
+.model-lab-bar-row .pct { font-size: 0.8rem; text-align: right; color: var(--ink-dim); }
+
+.model-lab-cm-table { width: auto; min-width: 260px; }
+.model-lab-cm-table th, .model-lab-cm-table td { padding: 8px 12px; text-align: center; border: 1px solid var(--border); font-size: 0.82rem; }
+.model-lab-cm-table th { background: var(--paper); color: var(--ink-dim); font-weight: 700; }
+.model-lab-cm-table td.diag { font-weight: 700; }
+
+.model-lab-selectors { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.model-lab-selectors label { display: block; margin-bottom: 4px; font-size: 0.8rem; color: var(--ink-dim); }
 
 /* ---------- Dark mode (realtime page only) ----------
    A bright white page next to/behind a webcam during live detection can

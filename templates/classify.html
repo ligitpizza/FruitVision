@@ -24,6 +24,12 @@
     <input type="file" id="imageInput" accept="image/*">
     <img id="preview" style="max-width:100%; margin-top:14px; border-radius:10px; display:none;">
 
+    <label style="display:flex; align-items:center; gap:8px; margin-top:14px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" id="validateFruit" checked style="width:auto;">
+      Validate that the photo matches the selected fruit
+    </label>
+    <p class="field-hint">Uncheck to skip the fruit-match check (e.g. testing with mismatched or unusual photos).</p>
+
     <button onclick="submitImage()" style="margin-top:16px;">Check Ripeness</button>
 
     <div id="result" style="margin-top:18px; padding:16px; border-radius:10px; font-size:1rem; display:none;"></div>
@@ -85,6 +91,12 @@
       This photo may contain multiple fruits (e.g. a bag/bunch with mixed ripeness)
     </label>
     <p class="field-hint">Apple, banana, and orange only — YOLO detects each fruit in the photo individually. Mango falls back to single-fruit detection.</p>
+
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" name="add_to_stock" style="width:auto;">
+      Add these results to Fruit Stock
+    </label>
+    <p class="field-hint">Counts each analysed image (or each detected fruit, in multi-fruit mode) into the stock ledger. Leave unchecked when re-running a batch for testing.</p>
     <button type="submit" style="margin-top:8px;">Analyse Batch</button>
   </form>
 </div>
@@ -100,6 +112,34 @@
 
 <script>
   let selectedModel = "{{ default_model }}";
+  const FILTER_TECHNIQUE_LABELS = {{ filter_technique_labels_json | safe }};
+  const ENSEMBLE_MEMBER_MAP = {{ ensemble_member_map_json | safe }};
+  const PREDICTOR_LABELS = {{ predictor_labels_json | safe }};
+
+  function memberLabel(memberKey) {
+    const modelKey = ENSEMBLE_MEMBER_MAP[memberKey] || memberKey;
+    return PREDICTOR_LABELS[modelKey] || memberKey;
+  }
+
+  function renderFilterPhotos(filterPhotos) {
+    if (!filterPhotos || Object.keys(filterPhotos).length === 0) return "";
+    let html = `<div class="per-member" style="margin-top:14px;"><strong>Filter Technique Photos</strong>`;
+    for (const [memberKey, techniques] of Object.entries(filterPhotos)) {
+      html += `<div style="margin-top:8px;"><small>${memberLabel(memberKey)}</small><div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">`;
+      for (const [technique, path] of Object.entries(techniques)) {
+        const label = FILTER_TECHNIQUE_LABELS[technique] || technique;
+        html += `
+          <div style="width:120px;">
+            <img src="/outputs/${encodeURI(path)}" alt="${label} filtered photo" style="width:100%; border-radius:8px; border:1px solid var(--border);">
+            <div class="field-hint" style="text-align:center; margin-top:2px;">${label}</div>
+          </div>
+        `;
+      }
+      html += `</div></div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
 
   function selectModel(model) {
     selectedModel = model;
@@ -127,10 +167,13 @@
 
     if (!file) { alert("Please select an image first."); return; }
 
+    const validateFruit = document.getElementById("validateFruit").checked;
+
     const formData = new FormData();
     formData.append("fruit", fruit);
     formData.append("model", selectedModel);
     formData.append("image", file);
+    formData.append("validate", validateFruit ? "1" : "0");
 
     resultDiv.style.display = "none";
     resultDiv.className = "";
@@ -202,6 +245,7 @@
             </div>
           `;
         }
+        html += renderFilterPhotos(data.filter_photos);
         resultDiv.innerHTML = html;
       }
     } catch (err) {

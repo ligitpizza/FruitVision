@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Fruit Stock — FruitVision{% endblock %}
+{% block content %}
+{% macro filter_qs(fruit, label, source, date_from, date_to, page=none) %}
+{%- set parts = [] -%}
+{%- if fruit %}{% set _ = parts.append('fruit=' ~ fruit) %}{% endif -%}
+{%- if label %}{% set _ = parts.append('label=' ~ label) %}{% endif -%}
+{%- if source %}{% set _ = parts.append('source=' ~ source) %}{% endif -%}
+{%- if date_from %}{% set _ = parts.append('date_from=' ~ date_from) %}{% endif -%}
+{%- if date_to %}{% set _ = parts.append('date_to=' ~ date_to) %}{% endif -%}
+{%- if page %}{% set _ = parts.append('page=' ~ page) %}{% endif -%}
+{%- if parts %}?{{ parts|join('&') }}{% endif -%}
+{% endmacro %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">INVENTORY LEDGER</p>
+    <h1>Fruit Stock</h1>
+    <p>On-hand counts by fruit and ripeness, built from batch-analysis scans plus manual entries.</p>
+  </div>
+</div>
+
+<div class="grid grid-3" style="margin-top:20px;">
+  <div class="stat-tile">
+    <div class="label">Total On Hand</div>
+    <div class="value">{{ summary.grand_total }}</div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Ripe / Unripe / Rotten</div>
+    <div class="value" style="font-size:1.2rem;">
+      {{ summary.by_label.get('ripe', 0) }} / {{ summary.by_label.get('unripe', 0) }} / {{ summary.by_label.get('rotten', 0) }}
+    </div>
+  </div>
+  <div class="stat-tile">
+    <div class="label">Fruits Tracked</div>
+    <div class="value">{{ summary.by_fruit|length }}</div>
+  </div>
+</div>
+
+{% if summary.matrix %}
+<div class="card" style="margin-top:20px;">
+  <h3>By Fruit</h3>
+  <table>
+    <tr>
+      <th>Fruit</th>
+      <th>Ripe</th>
+      <th>Unripe</th>
+      <th>Rotten</th>
+      <th>Total</th>
+    </tr>
+    {% for fruit, counts in summary.matrix.items() %}
+    <tr>
+      <td>{{ fruit.capitalize() }}</td>
+      <td>{{ counts.get('ripe', 0) }}</td>
+      <td>{{ counts.get('unripe', 0) }}</td>
+      <td>{{ counts.get('rotten', 0) }}</td>
+      <td><strong>{{ summary.by_fruit.get(fruit, 0) }}</strong></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:20px; max-width:640px;">
+  <h3>Add Stock Entry</h3>
+  <p class="field-hint">Manual adjustment — use a negative quantity to record stock leaving (sold, discarded, correction).</p>
+  <form method="post" action="/stock/add">
+    <div class="grid grid-3" style="align-items:end;">
+      <div>
+        <label for="add_fruit">Fruit</label>
+        <select name="fruit" id="add_fruit">
+          {% for f in fruits %}
+          <option value="{{ f }}">{{ f.capitalize() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="add_label">Ripeness</label>
+        <select name="label" id="add_label">
+          {% for c in classes %}
+          <option value="{{ c }}">{{ c.capitalize() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="add_quantity">Quantity</label>
+        <input type="number" step="1" name="quantity" id="add_quantity" value="1" required>
+      </div>
+    </div>
+    <label for="add_note" style="margin-top:12px;">Note (optional)</label>
+    <input type="text" name="note" id="add_note" placeholder="e.g. crate recount, spoilage removed">
+    <button type="submit" style="margin-top:12px;">Add Entry</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:20px;">
+  <div class="filters">
+    <div class="group">
+      Fruit:
+      <a href="/stock{{ filter_qs(none, label_filter, source_filter, date_from, date_to) }}" class="{{ 'active' if not fruit_filter }}">All</a>
+      {% for fruit in fruits %}
+        <a href="/stock{{ filter_qs(fruit, label_filter, source_filter, date_from, date_to) }}" class="{{ 'active' if fruit_filter == fruit }}">{{ fruit.capitalize() }}</a>
+      {% endfor %}
+    </div>
+    <div class="group">
+      Ripeness:
+      <a href="/stock{{ filter_qs(fruit_filter, none, source_filter, date_from, date_to) }}" class="{{ 'active' if not label_filter }}">All</a>
+      {% for c in classes %}
+        <a href="/stock{{ filter_qs(fruit_filter, c, source_filter, date_from, date_to) }}" class="{{ 'active' if label_filter == c }}">{{ c.capitalize() }}</a>
+      {% endfor %}
+    </div>
+    <div class="group">
+      Source:
+      <a href="/stock{{ filter_qs(fruit_filter, label_filter, none, date_from, date_to) }}" class="{{ 'active' if not source_filter }}">All</a>
+      {% for s in ['manual', 'single', 'batch', 'realtime'] %}
+        <a href="/stock{{ filter_qs(fruit_filter, label_filter, s, date_from, date_to) }}" class="{{ 'active' if source_filter == s }}">{{ s.capitalize() }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <form method="get" action="/stock" style="margin-top:14px; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+    {% if fruit_filter %}<input type="hidden" name="fruit" value="{{ fruit_filter }}">{% endif %}
+    {% if label_filter %}<input type="hidden" name="label" value="{{ label_filter }}">{% endif %}
+    {% if source_filter %}<input type="hidden" name="source" value="{{ source_filter }}">{% endif %}
+    <div>
+      <label for="date_from" style="margin:0 0 4px;">Logged from</label>
+      <input type="date" id="date_from" name="date_from" value="{{ date_from or '' }}">
+    </div>
+    <div>
+      <label for="date_to" style="margin:0 0 4px;">to</label>
+      <input type="date" id="date_to" name="date_to" value="{{ date_to or '' }}">
+    </div>
+    <button type="submit" class="btn-sm">Apply</button>
+    {% if date_from or date_to %}
+      <a class="btn-outline btn-sm" href="/stock{{ filter_qs(fruit_filter, label_filter, source_filter, none, none) }}">Clear dates</a>
+    {% endif %}
+  </form>
+
+  {% if results %}
+  <div style="overflow-x:auto;">
+  <table>
+    <tr>
+      <th>Time</th>
+      <th>Fruit</th>
+      <th>Ripeness</th>
+      <th>Quantity</th>
+      <th>Source</th>
+      <th>Note</th>
+      <th>Actions</th>
+    </tr>
+    {% for r in results %}
+    <tr>
+      <td>{{ r.created_at }}</td>
+      <td>{{ r.fruit.capitalize() }}</td>
+      <td><span class="badge {{ r.label }}">{{ r.label.upper() }}</span></td>
+      <td>{{ '+' if r.quantity > 0 }}{{ r.quantity }}</td>
+      <td>{{ r.source }}</td>
+      <td>{{ r.note or '—' }}{% if r.track_tag %} <span class="field-hint">({{ r.track_tag }})</span>{% endif %}</td>
+      <td class="actions">
+        <a href="/stock/{{ r.id }}/edit">Edit</a>
+        <form action="/stock/{{ r.id }}/delete" method="post" style="display:inline;"
+              onsubmit="return confirm('Delete this stock entry? This cannot be undone.');">
+          <input type="hidden" name="page" value="{{ page }}">
+          <button type="submit" class="btn-danger btn-sm">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+
+  <div class="pagination">
+    {% if page > 1 %}
+      <a href="/stock{{ filter_qs(fruit_filter, label_filter, source_filter, date_from, date_to, page - 1) }}">← Prev</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+      {% if p == page %}
+        <span class="current">{{ p }}</span>
+      {% else %}
+        <a href="/stock{{ filter_qs(fruit_filter, label_filter, source_filter, date_from, date_to, p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %}
+      <a href="/stock{{ filter_qs(fruit_filter, label_filter, source_filter, date_from, date_to, page + 1) }}">Next →</a>
+    {% endif %}
+
+    <span class="info">{{ total }} entr{{ 'y' if total == 1 else 'ies' }} total · page {{ page }} of {{ total_pages }}</span>
+  </div>
+
+  {% else %}
+  <p class="empty">No stock entries yet. Add one above, or run a batch analysis with "Add these results to Fruit Stock" checked.</p>
+  {% endif %}
+</div>
+
+<p style="margin-top:20px;"><a href="/classify">← Back to classification</a> · <a href="/history">View harvest records →</a></p>
+{% endblock %}

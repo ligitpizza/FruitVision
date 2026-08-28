@@ -215,6 +215,41 @@ def get_stats_since(hours=24, member=None, user_id=None):
     """Convenience wrapper: stats for the rolling window, e.g. 'last 24h'."""
     return get_stats(member=member, user_id=user_id, since_hours=hours)
 
+
+def get_fruit_label_breakdown(member=None, fruit=None, user_id=None, since_hours=None, date_from=None, date_to=None):
+    """{fruit: {label: count}} -- the same filters as get_stats(), but
+    counted per (fruit, label) pair instead of each dimension separately,
+    for the dashboard's grouped ripeness-by-fruit chart."""
+    conn = _connect()
+    where_clauses = []
+    params = []
+    if member:
+        where_clauses.append("member = ?")
+        params.append(member)
+    if fruit:
+        where_clauses.append("fruit = ?")
+        params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    if since_hours is not None:
+        cutoff = (datetime.now() - timedelta(hours=since_hours)).isoformat(timespec="seconds")
+        where_clauses.append("created_at >= ?")
+        params.append(cutoff)
+    _add_date_filters(where_clauses, params, date_from, date_to)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    rows = conn.execute(
+        f"SELECT fruit, label, COUNT(*) as cnt FROM results {where_sql} GROUP BY fruit, label",
+        tuple(params),
+    ).fetchall()
+    conn.close()
+
+    breakdown = {}
+    for row in rows:
+        breakdown.setdefault(row["fruit"], {})[row["label"]] = row["cnt"]
+    return breakdown
+
 def init_db():
     os.makedirs(DB_DIR, exist_ok=True)
     conn = _connect()
@@ -281,6 +316,7 @@ def init_db():
         "review_reason": "TEXT",
         "reviewed_by": "TEXT",
         "reviewed_at": "TEXT",
+        "filter_photos": "TEXT",
     }
     for column, data_type in migrations.items():
         if column not in existing_columns:
@@ -313,6 +349,7 @@ def log_result(
     marketability_action=None,
     marketability_reliability=None,
     marketability_storage_assumption=None,
+    filter_photos=None,
 ):
     """Insert one prediction result. Call this right after predict_ripeness() returns.
 
@@ -320,6 +357,10 @@ def log_result(
     "rotten": 1}', set only by the multi-fruit-per-photo batch path (see
     app.py's /analyse) when one photo's majority label is being logged as a
     single row -- None for every ordinary single-fruit prediction.
+
+    filter_photos: optional JSON string shaped {model_key: {technique:
+    output_path}}, one sub-dict per member (or just the one model, for a
+    single-model prediction) -- see app.py's FILTER_STEPS.
     """
     conn = _connect()
     conn.execute(
@@ -331,8 +372,8 @@ def log_result(
                marketability_status, dispatch_priority,
                marketability_min_days, marketability_max_days,
                marketability_action, marketability_reliability,
-               marketability_storage_assumption
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               marketability_storage_assumption, filter_photos
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             member, filename, fruit, label, confidence, annotated_path,
             fruit_area_px, blemish_area_px, blemish_percentage,
@@ -342,7 +383,7 @@ def log_result(
             marketability_status, dispatch_priority,
             marketability_min_days, marketability_max_days,
             marketability_action, marketability_reliability,
-            marketability_storage_assumption,
+            marketability_storage_assumption, filter_photos,
         ),
     )
     conn.commit()

@@ -4,6 +4,7 @@ from core_modules.marketability import (
     MARKETABLE_LIFE_DAYS,
     average_member_probabilities,
     estimate_marketability,
+    stock_eligible,
 )
 
 
@@ -106,6 +107,24 @@ class EnsembleProbabilityTests(unittest.TestCase):
         averaged = average_member_probabilities(members)
         self.assertEqual(averaged, {"unripe": 17.5, "ripe": 70.0, "rotten": 12.5})
         self.assertEqual(members, original)
+
+
+class StockEligibilityTests(unittest.TestCase):
+    def test_unripe_and_rotten_always_count_regardless_of_confidence(self):
+        self.assertTrue(stock_eligible("apple", "unripe", 0.10))
+        self.assertTrue(stock_eligible("apple", "rotten", 0.10))
+
+    def test_high_confidence_ripe_is_eligible(self):
+        self.assertTrue(stock_eligible("apple", "ripe", 0.95))
+
+    def test_low_confidence_ripe_is_not_eligible(self):
+        self.assertFalse(stock_eligible("apple", "ripe", 0.40))
+
+    def test_accepts_both_0_to_1_and_0_to_100_confidence_scales(self):
+        self.assertTrue(stock_eligible("apple", "ripe", 0.95))
+        self.assertTrue(stock_eligible("apple", "ripe", 95))
+        self.assertFalse(stock_eligible("apple", "ripe", 0.40))
+        self.assertFalse(stock_eligible("apple", "ripe", 40))
 
 
 if __name__ == "__main__":

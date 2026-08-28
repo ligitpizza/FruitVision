@@ -13,6 +13,7 @@ must show Member 2 alone, not secretly the full 4-member vote.
 """
 import os
 import sys
+import json
 import time
 from collections import deque, Counter
 import cv2
@@ -30,6 +31,9 @@ from member_apps.member_2_bc.m2_preprocessing import clean
 from member_apps.member_2_bc.m2_detection import detect as classical_detect
 
 from database.history_db import log_result
+from database.stock_db import log_stock_event
+from core_modules.filter_photos import filter_photos_single
+from core_modules.marketability import stock_eligible
 from .tracker_config import (
     YOLO_WEIGHTS_PATH,
     YOLO_IMGSZ,
@@ -55,6 +59,7 @@ MIN_FRAME_CONFIDENCE = 0.35
 CROP_PAD = 15
 
 _track_state = {}
+_counted_tracks = set()  # track_ids already logged into the stock ledger, once per physical fruit
 _mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []
 
@@ -106,12 +111,13 @@ def _update_rolling_vote(state, label, confidence):
     return top_label, top_confidence, True
 
 
-def _record_classification(crop, fruit_type, label, confidence, tag):
+def _record_classification(crop, fruit_type, label, confidence, tag, cleaned_img=None):
     if label is None:
         return
 
     snapshot_path = _save_snapshot(crop, tag)
     confidence_pct = round(confidence * 100, 1) if confidence <= 1.0 else round(confidence, 1)
+    filter_photos = filter_photos_single(cleaned_img, "bc", os.path.basename(snapshot_path), OUTPUTS_DIR)
 
     log_result(
         member="ensemble_bc_realtime",
@@ -121,6 +127,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         filename=os.path.basename(snapshot_path),
         annotated_path=os.path.relpath(snapshot_path, OUTPUTS_DIR),
         source="realtime_ensemble_bc",
+        filter_photos=json.dumps(filter_photos) if filter_photos else None,
     )
 
     _session_log.append({
@@ -129,6 +136,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag):
         "label": label,
         "confidence": confidence_pct,
         "image_path": snapshot_path,
+        "filter_photos": filter_photos,
     })
 
 
@@ -137,12 +145,12 @@ def _classify_crop(crop, fruit_type):
     svm_yolo_tracker.py's predict_ensemble() call -- this file is
     single-member only, on purpose."""
     try:
-        label, confidence, _bbox, _cleaned, _proba = m2_predict_ripeness(crop, fruit_type)
-        return label, float(confidence)
+        label, confidence, _bbox, cleaned, _proba = m2_predict_ripeness(crop, fruit_type)
+        return label, float(confidence), cleaned
     except NotAFruitError:
-        return None, None
+        return None, None, None
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def _process_mango_fallback(frame, fruit_type, frame_idx):
@@ -155,15 +163,20 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
 
     frame_label, frame_confidence = None, None
     if frame_idx - _mango_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
-        frame_label, frame_confidence = _classify_crop(cropped, fruit_type)
+        frame_label, frame_confidence, frame_cleaned = _classify_crop(cropped, fruit_type)
         _mango_state["last_frame"] = frame_idx
+        if frame_cleaned is not None:
+            _mango_state["cleaned_img"] = frame_cleaned
 
     prev_label = _mango_state["label"]
     committed_label, committed_confidence, stable = _update_rolling_vote(_mango_state, frame_label, frame_confidence)
     _mango_state["label"], _mango_state["confidence"] = committed_label, committed_confidence
 
     if stable and committed_label != prev_label:
-        _record_classification(cropped, fruit_type, committed_label, committed_confidence, tag=f"mango_frame{frame_idx}")
+        _record_classification(
+            cropped, fruit_type, committed_label, committed_confidence,
+            tag=f"mango_frame{frame_idx}", cleaned_img=_mango_state.get("cleaned_img"),
+        )
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
@@ -220,15 +233,25 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
 
     frame_label, frame_confidence = None, None
     if frame_idx - state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
-        frame_label, frame_confidence = _classify_crop(crop, fruit_type)
+        frame_label, frame_confidence, frame_cleaned = _classify_crop(crop, fruit_type)
         state["last_frame"] = frame_idx
+        if frame_cleaned is not None:
+            state["cleaned_img"] = frame_cleaned
 
     prev_label = state["label"]
     committed_label, committed_confidence, stable = _update_rolling_vote(state, frame_label, frame_confidence)
     state["label"], state["confidence"] = committed_label, committed_confidence
 
+    if stable and tid not in _counted_tracks:
+        _counted_tracks.add(tid)
+        if stock_eligible(fruit_type, committed_label, committed_confidence):
+            log_stock_event(fruit=fruit_type, label=committed_label, quantity=1, source="realtime", track_tag=f"track{tid}")
+
     if stable and committed_label != prev_label:
-        _record_classification(crop, fruit_type, committed_label, committed_confidence, tag=f"track{tid}_frame{frame_idx}")
+        _record_classification(
+            crop, fruit_type, committed_label, committed_confidence,
+            tag=f"track{tid}_frame{frame_idx}", cleaned_img=state.get("cleaned_img"),
+        )
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))

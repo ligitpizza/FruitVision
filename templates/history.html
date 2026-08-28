@@ -78,6 +78,7 @@
   </form>
 
   {% if results %}
+  <div style="overflow-x:auto;">
   <table>
     <tr>
       <th>Time</th>
@@ -96,11 +97,11 @@
       <td>{{ r.created_at }}</td>
       <td>
         {% if r.surface_path %}
-          <img class="thumb" src="/outputs/{{ r.surface_path }}" alt="Surface analysis overlay">
+          <a href="/history/{{ r.id }}"><img class="thumb" src="/outputs/{{ r.surface_path }}" alt="Surface analysis overlay"></a>
         {% elif r.annotated_path %}
-          <img class="thumb" src="/outputs/{{ r.annotated_path }}" alt="">
+          <a href="/history/{{ r.id }}"><img class="thumb" src="/outputs/{{ r.annotated_path }}" alt=""></a>
         {% else %}
-          {{ r.filename or '—' }}
+          <a href="/history/{{ r.id }}">{{ r.filename or '—' }}</a>
         {% endif %}
       </td>
       <td>{{ r.member.replace('ensemble_', '')|upper }}</td>
@@ -120,6 +121,7 @@
       <td>{{ r.quality_grade or ('n/a' if r.detection_breakdown else 'Unknown') }}</td>
       <td>{{ r.source }}</td>
       <td class="actions">
+        <a href="/history/{{ r.id }}">View</a>
         <a href="/history/{{ r.id }}/edit">Edit</a>
         <form action="/history/{{ r.id }}/export_pdf" method="post" style="display:inline;">
           <button type="submit" class="btn-outline btn-sm">Export PDF</button>
@@ -133,6 +135,7 @@
     </tr>
     {% endfor %}
   </table>
+  </div>
 
   <div class="pagination">
     {% if page > 1 %}

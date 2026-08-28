@@ -7,7 +7,9 @@
     <p>Live overview across every model's predictions.</p>
   </div>
   <div class="actions">
-    <a class="btn btn-outline" href="/analytics">View full analytics →</a>
+    <a class="btn btn-outline" href="/model-lab">Model Lab</a>
+    <a class="btn btn-outline" href="/training-report">Training Report</a>
+    <a class="btn btn-outline" href="/analytics">View full analytics</a>
     <a class="btn" href="/classify">+ New Classification</a>
   </div>
 </div>
@@ -60,18 +62,21 @@
     </div>
 
     <div id="dash-view-charts" class="tab-panel active" style="border:none; padding:0; margin-top:14px;">
-      {% if fruit_chart or history_chart or confidence_chart %}
-        <div class="charts">
-          {% if fruit_chart %}
-            <img src="/outputs/reports/fruit_breakdown_chart_{{ chart_tag }}.png" alt="Fruit breakdown">
-          {% endif %}
-          {% if history_chart %}
-            <img src="/outputs/reports/history_chart_{{ chart_tag }}.png" alt="Ripeness distribution">
-          {% endif %}
-          {% if confidence_chart %}
-            <img src="/outputs/reports/confidence_trend_chart_{{ chart_tag }}.png" alt="Confidence trend">
-          {% endif %}
+      {% if stats.total %}
+        <div>
+          <p class="field-hint" style="margin:0 0 4px;">Ripeness Breakdown by Fruit (All-Time)</p>
+          <div id="dashBarChart"></div>
+          <div id="dashBarLegend" class="dash-chart-legend"></div>
         </div>
+        <div style="margin-top:26px;">
+          <p class="field-hint" style="margin:0 0 4px;">All-Time Ripeness Distribution</p>
+          <div id="dashPieChart" class="dash-pie-row"></div>
+        </div>
+        {% if confidence_chart %}
+        <div class="charts" style="margin-top:18px;">
+          <img src="/outputs/reports/confidence_trend_chart_{{ chart_tag }}.png" alt="Confidence trend">
+        </div>
+        {% endif %}
       {% else %}
         <p class="empty">Not enough data yet.</p>
       {% endif %}
@@ -124,6 +129,82 @@
 {% endif %}
 
 <script>
+  const DASH_FRUITS = {{ fruits | tojson }};
+  const DASH_FRUIT_LABEL_BREAKDOWN = {{ fruit_label_breakdown_json | safe }};
+  const DASH_BY_LABEL = {{ by_label_json | safe }};
+  const DASH_LABEL_ORDER = ['ripe', 'unripe', 'rotten'];
+  const DASH_LABEL_COLOR = { ripe: 'var(--ripe)', unripe: 'var(--unripe)', rotten: 'var(--rotten)' };
+
+  function renderDashBarChart() {
+    const container = document.getElementById('dashBarChart');
+    const legend = document.getElementById('dashBarLegend');
+    if (!container) return;
+
+    let maxCount = 0;
+    for (const fruit of DASH_FRUITS) {
+      const row = DASH_FRUIT_LABEL_BREAKDOWN[fruit] || {};
+      for (const label of DASH_LABEL_ORDER) maxCount = Math.max(maxCount, row[label] || 0);
+    }
+    maxCount = maxCount || 1;
+
+    let html = '<div class="dash-bar-chart">';
+    for (const fruit of DASH_FRUITS) {
+      const row = DASH_FRUIT_LABEL_BREAKDOWN[fruit] || {};
+      html += '<div class="dash-bar-group"><div class="dash-bar-cols">';
+      for (const label of DASH_LABEL_ORDER) {
+        const count = row[label] || 0;
+        const heightPct = Math.max(count > 0 ? 3 : 0, (count / maxCount) * 100);
+        html += `<div class="dash-bar-col" style="height:${heightPct}%; background:${DASH_LABEL_COLOR[label]};" title="${fruit}: ${count} ${label}"></div>`;
+      }
+      html += `</div><div class="dash-bar-fruit-label">${fruit.charAt(0).toUpperCase() + fruit.slice(1)}</div></div>`;
+    }
+    html += '</div>';
+    container.innerHTML = html;
+
+    legend.innerHTML = DASH_LABEL_ORDER.map(label =>
+      `<span><span class="swatch" style="background:${DASH_LABEL_COLOR[label]};"></span>${label}</span>`
+    ).join('');
+  }
+
+  function renderDashPieChart() {
+    const container = document.getElementById('dashPieChart');
+    if (!container) return;
+
+    const total = DASH_LABEL_ORDER.reduce((sum, label) => sum + (DASH_BY_LABEL[label] || 0), 0);
+    if (!total) {
+      container.innerHTML = '<p class="empty">Not enough data yet.</p>';
+      return;
+    }
+
+    let cumulative = 0;
+    const stops = [];
+    for (const label of DASH_LABEL_ORDER) {
+      const count = DASH_BY_LABEL[label] || 0;
+      if (!count) continue;
+      const start = (cumulative / total) * 360;
+      cumulative += count;
+      const end = (cumulative / total) * 360;
+      stops.push(`${DASH_LABEL_COLOR[label]} ${start}deg ${end}deg`);
+    }
+
+    const pie = `<div class="dash-pie" style="background: conic-gradient(${stops.join(', ')});"></div>`;
+    const legendRows = DASH_LABEL_ORDER.filter(label => DASH_BY_LABEL[label]).map(label => {
+      const count = DASH_BY_LABEL[label];
+      const pct = Math.round((count / total) * 1000) / 10;
+      return `
+        <div class="row">
+          <span class="swatch" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${DASH_LABEL_COLOR[label]};"></span>
+          <strong>${label}</strong> <span class="count">${count} (${pct}%)</span>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = `${pie}<div class="dash-pie-legend">${legendRows}</div>`;
+  }
+
+  renderDashBarChart();
+  renderDashPieChart();
+
   function dismissMarketabilityAlert() {
     const alert = document.getElementById('marketability-alert');
     if (!alert) return;

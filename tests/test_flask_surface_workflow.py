@@ -202,6 +202,43 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             self.assertIn('id="batch-analysis"', classify_html)
             self.assertIn('id="batchMultiFruit"', classify_html)
             self.assertIn('id="mixed-fruit-analysis"', classify_html)
+            self.assertIn("Model Evaluation &amp; Reports", classify_html)
+            self.assertIn("Core Member Models", classify_html)
+            self.assertIn("Merged Models", classify_html)
+            self.assertIn("Independent &amp; Combined", classify_html)
+            self.assertEqual(classify_html.count('href="/dashboard/'), 9)
+            self.assertEqual(classify_html.count('href="/training-report/'), 8)
+
+            app_module.PUBLIC_PATHS.update({
+                "/dashboard/ab",
+                "/dashboard/all_four",
+                "/training-report/merged_1_4",
+            })
+            member_dashboard_response = client.get("/dashboard/ab")
+            self.assertEqual(member_dashboard_response.status_code, 200)
+            member_dashboard_html = member_dashboard_response.get_data(as_text=True)
+            self.assertIn("Model navigator", member_dashboard_html)
+            self.assertIn("Core members", member_dashboard_html)
+            self.assertIn("Merged models", member_dashboard_html)
+            self.assertIn("Independent", member_dashboard_html)
+            self.assertIn("Combined", member_dashboard_html)
+            self.assertIn('aria-label="Dashboard follow-up navigation"', member_dashboard_html)
+            self.assertIn('href="/training-report/ab"', member_dashboard_html)
+
+            all_four_dashboard_response = client.get("/dashboard/all_four")
+            self.assertEqual(all_four_dashboard_response.status_code, 200)
+            all_four_dashboard_html = all_four_dashboard_response.get_data(as_text=True)
+            self.assertIn('href="/dashboard/all_four"', all_four_dashboard_html)
+            self.assertNotIn('href="/training-report/all_four"', all_four_dashboard_html)
+
+            training_response = client.get("/training-report/merged_1_4")
+            self.assertEqual(training_response.status_code, 200)
+            training_html = training_response.get_data(as_text=True)
+            self.assertIn("Switch training report", training_html)
+            self.assertIn('aria-label="Training report follow-up navigation"', training_html)
+            self.assertIn('href="/dashboard/merged_1_4"', training_html)
+            self.assertIn('href="/history?member=merged_1_4"', training_html)
+            self.assertNotIn("Combined", training_html)
 
             app_module.PUBLIC_PATHS.add("/analyse-mixed-fruit-m14")
             mixed_response = client.post(

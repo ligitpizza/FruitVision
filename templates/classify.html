@@ -130,14 +130,79 @@
   </form>
 </div>
 
-<h2>Per-Member Dashboards</h2>
-<p class="dashboard-links">
-  {% for key, entry in predictors.items() %}
-    <a href="/dashboard/{{ key }}">{{ entry.label }} — Dashboard</a>
-    <a href="/training-report/{{ key }}">{{ key|upper }} — Training Report</a>
-  {% endfor %}
-  <a href="/dashboard/all_four">Ensemble (All 4) — Dashboard</a>
-</p>
+{% macro model_report_item(key, short_name, description, training=true) %}
+  <article class="model-report-item" title="{{ predictors[key].label if key in predictors else short_name }}">
+    <div class="model-report-copy">
+      <strong>{{ short_name }}</strong>
+      <span>{{ description }}</span>
+    </div>
+    <div class="model-report-actions">
+      <a class="btn btn-sm" href="/dashboard/{{ key }}">Dashboard</a>
+      {% if training %}
+        <a class="btn btn-sm btn-outline" href="/training-report/{{ key }}">Training</a>
+      {% endif %}
+    </div>
+  </article>
+{% endmacro %}
+
+<section class="model-report-section" aria-labelledby="model-report-heading">
+  <div class="row-between model-report-heading">
+    <div>
+      <h2 id="model-report-heading">Model Evaluation &amp; Reports</h2>
+      <p>Review predictor results and open the corresponding training evidence.</p>
+    </div>
+    <span class="badge neutral">9 DASHBOARDS</span>
+  </div>
+
+  <div class="model-report-grid">
+    <section class="model-report-group" aria-labelledby="core-model-heading">
+      <div class="model-report-group-head">
+        <span class="model-report-index">01</span>
+        <div>
+          <h3 id="core-model-heading">Core Member Models</h3>
+          <p>Complementary handcrafted feature pairs.</p>
+        </div>
+      </div>
+      <div class="model-report-list">
+        {{ model_report_item('ab', 'AB', 'Colour + Shape') }}
+        {{ model_report_item('bc', 'BC', 'Shape + Texture') }}
+        {{ model_report_item('cd', 'CD', 'Texture + Gabor') }}
+        {{ model_report_item('da', 'DA', 'Gabor + Colour') }}
+      </div>
+    </section>
+
+    <section class="model-report-group" aria-labelledby="merged-model-heading">
+      <div class="model-report-group-head">
+        <span class="model-report-index">02</span>
+        <div>
+          <h3 id="merged-model-heading">Merged Models</h3>
+          <p>Merged 1+4 model variants.</p>
+        </div>
+      </div>
+      <div class="model-report-list">
+        {{ model_report_item('merged_1_4', 'M14', 'Colour + Shape + Gabor') }}
+        {{ model_report_item('m14v2', 'M14 v2', 'Adds Texture') }}
+        {{ model_report_item('m14v3', 'M14 v3', 'Union Detection + Deskew') }}
+      </div>
+    </section>
+
+    <section class="model-report-group" aria-labelledby="other-model-heading">
+      <div class="model-report-group-head">
+        <span class="model-report-index">03</span>
+        <div>
+          <h3 id="other-model-heading">Independent &amp; Combined</h3>
+          <p>Standalone CNN and combined ensemble views.</p>
+        </div>
+      </div>
+      <div class="model-report-list">
+        <div class="model-report-subtype">Independent model</div>
+        {{ model_report_item('yolo_pure', 'YOLOv8', 'Pure CNN Classification') }}
+        <div class="model-report-subtype">Combined ensemble</div>
+        {{ model_report_item('all_four', 'All Four', 'Four-Member Soft Vote', false) }}
+      </div>
+    </section>
+  </div>
+</section>
 
 <div id="classify-config"
      data-default-model="{{ default_model }}"

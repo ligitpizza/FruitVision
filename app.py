@@ -2127,6 +2127,7 @@ def training_report(model_key):
         per_fruit_time=per_fruit_time_display,
         model_key=model_key,
         model_label=entry["label"],
+        history_member_tag=_member_tag(model_key),
         predictors=PREDICTORS,
         active_page="classify",
     )

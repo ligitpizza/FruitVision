@@ -20,7 +20,10 @@ fruitvision.db
 
 outputs/annotated/
 outputs/reports/
-outputs/training/
+outputs/training/*.json
+outputs/training/*.csv
+outputs/training/*/*.json
+outputs/training/*/*.csv
 outputs/realtime_snapshots/
 outputs/surface/
 outputs/filters/

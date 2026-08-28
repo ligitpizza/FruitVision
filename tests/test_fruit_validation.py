@@ -53,18 +53,31 @@ class FruitValidationTests(unittest.TestCase):
             )
 
     def test_mango_rejects_confident_non_fruit(self):
-        with self.assertRaisesRegex(FruitValidationError, "not a mango"):
+        with self.assertRaisesRegex(FruitValidationError, "not Mango"):
             validate_selected_fruit(
                 self.image, "mango", detections=[detection("remote", 0.8)]
             )
 
     def test_mango_without_coco_object_uses_fallback(self):
         result = validate_selected_fruit(self.image, "mango", detections=[])
-        self.assertEqual(result["validation_method"], "classical_mango_fallback")
+        self.assertEqual(result["validation_method"], "classical_shape_fallback")
+
+    def test_strawberry_rejects_known_wrong_fruit(self):
+        # strawberry has no COCO class either -- same fallback path as mango,
+        # but the rejection message must name the actually-selected fruit
+        # instead of hardcoding "Mango" (a real bug this guards against).
+        with self.assertRaisesRegex(FruitValidationError, "Selected fruit is Strawberry.*contain Banana"):
+            validate_selected_fruit(
+                self.image, "strawberry", detections=[detection("banana", 0.8)]
+            )
+
+    def test_strawberry_without_coco_object_uses_fallback(self):
+        result = validate_selected_fruit(self.image, "strawberry", detections=[])
+        self.assertEqual(result["validation_method"], "classical_shape_fallback")
 
     def test_unsupported_fruit_is_rejected(self):
         with self.assertRaisesRegex(FruitValidationError, "Unsupported fruit type"):
-            validate_selected_fruit(self.image, "pear", detections=[])
+            validate_selected_fruit(self.image, "kiwi", detections=[])
 
 
 if __name__ == "__main__":

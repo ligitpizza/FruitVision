@@ -17,8 +17,14 @@ PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_WEIGHTS_PATH = os.path.join(
     PROJECT_ROOT, "trained_models", "svm_yolo", "yolov8n.pt"
 )
-SUPPORTED_FRUITS = {"apple", "banana", "orange", "mango"}
-COCO_FRUITS = {"apple", "banana", "orange"}  # COCO has no mango class.
+SUPPORTED_FRUITS = {
+    "apple", "banana", "orange", "mango",
+    "pear", "peach", "strawberry", "tomato", "lemon", "guava",
+}
+# COCO's 80 classes only cover these 3 -- every other supported fruit
+# (mango, and the 6 added later) uses the classical shape/contour fallback
+# below instead of COCO detection.
+COCO_FRUITS = {"apple", "banana", "orange"}
 DETECTION_CONFIDENCE = 0.25
 NON_FRUIT_CONFIDENCE = 0.35
 INFERENCE_SIZE = 640
@@ -79,9 +85,10 @@ def validate_selected_fruit(
     """Validate an upload before ripeness prediction.
 
     Apple, banana, and orange are strict because COCO can identify them.
-    COCO has no mango class, so mango is rejected when another known fruit or
-    a confident non-fruit object is detected; otherwise its existing
-    classical shape validation remains the fallback.
+    Every other supported fruit (mango, pear, peach, strawberry, tomato,
+    lemon, guava) has no COCO class, so it's rejected when another known
+    fruit or a confident non-fruit object is detected; otherwise its
+    existing classical shape validation remains the fallback.
     """
     selected = str(selected_fruit or "").strip().lower()
     if selected not in SUPPORTED_FRUITS:
@@ -125,14 +132,15 @@ def validate_selected_fruit(
             "single fruit that matches the selected fruit type."
         )
 
-    # Mango fallback: reject known wrong fruits and confidently detected
-    # objects, but allow an object-class-inconclusive image to continue to the
-    # member pipelines' existing shape/contour sanity checks.
+    # Non-COCO-fruit fallback (mango, pear, peach, strawberry, tomato, lemon,
+    # guava): reject known wrong fruits and confidently detected objects, but
+    # allow an object-class-inconclusive image to continue to the member
+    # pipelines' existing shape/contour sanity checks.
     if other_fruits:
         best = max(other_fruits, key=lambda item: item.confidence)
         raise FruitValidationError(
-            f"Selected fruit is Mango, but the uploaded image appears to "
-            f"contain {_fruit_name(best.label)} "
+            f"Selected fruit is {_fruit_name(selected)}, but the uploaded "
+            f"image appears to contain {_fruit_name(best.label)} "
             f"({best.confidence * 100:.1f}% detection confidence)."
         )
     non_fruits = [
@@ -142,11 +150,12 @@ def validate_selected_fruit(
     if non_fruits:
         best = max(non_fruits, key=lambda item: item.confidence)
         raise FruitValidationError(
-            f"The image appears to contain {_fruit_name(best.label)}, not a mango."
+            f"The image appears to contain {_fruit_name(best.label)}, "
+            f"not {_fruit_name(selected)}."
         )
     return {
         "selected_fruit": selected,
         "detected_fruit": None,
         "confidence": None,
-        "validation_method": "classical_mango_fallback",
+        "validation_method": "classical_shape_fallback",
     }

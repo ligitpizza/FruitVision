@@ -98,7 +98,7 @@ from database.history_db import (
 )
 from database import auth_db, stock_db
 
-FRUITS = ["apple", "banana", "orange", "mango"]
+FRUITS = ["apple", "banana", "orange", "mango", "pear", "peach", "strawberry", "tomato", "lemon", "guava"]
 RIPENESS_CLASSES = ["ripe", "unripe", "rotten"]
 HISTORY_PAGE_SIZE = 15
 STOCK_PAGE_SIZE = 15

@@ -8,11 +8,11 @@ pipeline/pure_yolo/runs/ (per-epoch results.csv from ultralytics), so the
 Model Lab dashboard always reflects whatever is actually on disk instead of
 a cached/stale snapshot.
 
-Every FruitVision "model" is really 4 separate per-fruit classifiers, not
-one flat multi-class model -- there's no single native "accuracy" for e.g.
-"ab", only "ab for apple", "ab for banana", etc. get_model_summary()
-combines those into one support-weighted overall row per model so the
-comparison table still reads as one row per model.
+Every FruitVision "model" is really one separate per-fruit classifier per
+entry in FRUITS, not one flat multi-class model -- there's no single native
+"accuracy" for e.g. "ab", only "ab for apple", "ab for banana", etc.
+get_model_summary() combines those into one support-weighted overall row
+per model so the comparison table still reads as one row per model.
 """
 import csv
 import json
@@ -24,7 +24,7 @@ TRAINING_DIR = os.path.join(PROJECT_ROOT, "outputs", "training")
 TRAINED_MODELS_DIR = os.path.join(PROJECT_ROOT, "trained_models")
 YOLO_RUNS_DIR = os.path.join(PROJECT_ROOT, "pipeline", "pure_yolo", "runs")
 
-FRUITS = ["apple", "banana", "orange", "mango"]
+FRUITS = ["apple", "banana", "orange", "mango", "pear", "peach", "strawberry", "tomato", "lemon", "guava"]
 
 # outputs/training/<key>/ already matches every model's PREDICTORS key
 # (ab/bc/cd/da/merged_1_4/m14v2/m14v3/yolo_pure), but trained_models/'s own

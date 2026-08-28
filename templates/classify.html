@@ -30,6 +30,12 @@
     </label>
     <p class="field-hint">Uncheck to skip the fruit-match check (e.g. testing with mismatched or unusual photos).</p>
 
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-weight:600; font-size:0.88rem;">
+      <input type="checkbox" id="validateSingleFruit" checked style="width:auto;">
+      Check that the image contains only one fruit
+    </label>
+    <p class="field-hint">If YOLOv8n detects multiple apples, bananas, or oranges, this analysis stops and directs you to Mixed-Fruit Analysis. Mango and other non-COCO fruits cannot be counted by this check.</p>
+
     <button onclick="submitImage()" style="margin-top:16px;">Check Ripeness</button>
 
     <div id="result" style="margin-top:18px; padding:16px; border-radius:10px; font-size:1rem; display:none;"></div>
@@ -59,7 +65,7 @@
   </div>
 </div>
 
-<h2>Batch Analysis</h2>
+<h2 id="batch-analysis">Batch Analysis</h2>
 <p>Upload multiple photos of the same fruit to see a distribution chart and export a PDF report.</p>
 <div class="card">
   <form action="/analyse" method="post" enctype="multipart/form-data">
@@ -87,7 +93,7 @@
       </div>
     </div>
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; font-weight:600; font-size:0.88rem;">
-      <input type="checkbox" name="multi_fruit" style="width:auto;">
+      <input type="checkbox" id="batchMultiFruit" name="multi_fruit" style="width:auto;">
       This photo may contain multiple fruits (e.g. a bag/bunch with mixed ripeness)
     </label>
     <p class="field-hint">Apple, banana, and orange only — YOLO detects each fruit in the photo individually. Mango falls back to single-fruit detection.</p>
@@ -101,7 +107,7 @@
   </form>
 </div>
 
-<h2>Mixed-Fruit Analysis</h2>
+<h2 id="mixed-fruit-analysis">Mixed-Fruit Analysis</h2>
 <p>Analyse one image containing apples, bananas, and oranges together.</p>
 <div class="card mixed-fruit-m14-card">
   <div class="row-between" style="align-items:flex-start;">
@@ -133,11 +139,19 @@
   <a href="/dashboard/all_four">Ensemble (All 4) — Dashboard</a>
 </p>
 
+<div id="classify-config"
+     data-default-model="{{ default_model }}"
+     data-filter-technique-labels="{{ filter_technique_labels_json | forceescape }}"
+     data-ensemble-member-map="{{ ensemble_member_map_json | forceescape }}"
+     data-predictor-labels="{{ predictor_labels_json | forceescape }}"
+     hidden></div>
+
 <script>
-  let selectedModel = "{{ default_model }}";
-  const FILTER_TECHNIQUE_LABELS = {{ filter_technique_labels_json | safe }};
-  const ENSEMBLE_MEMBER_MAP = {{ ensemble_member_map_json | safe }};
-  const PREDICTOR_LABELS = {{ predictor_labels_json | safe }};
+  const classifyConfig = document.getElementById("classify-config");
+  let selectedModel = classifyConfig.dataset.defaultModel;
+  const FILTER_TECHNIQUE_LABELS = JSON.parse(classifyConfig.dataset.filterTechniqueLabels);
+  const ENSEMBLE_MEMBER_MAP = JSON.parse(classifyConfig.dataset.ensembleMemberMap);
+  const PREDICTOR_LABELS = JSON.parse(classifyConfig.dataset.predictorLabels);
 
   function memberLabel(memberKey) {
     const modelKey = ENSEMBLE_MEMBER_MAP[memberKey] || memberKey;
@@ -191,12 +205,14 @@
     if (!file) { alert("Please select an image first."); return; }
 
     const validateFruit = document.getElementById("validateFruit").checked;
+    const validateSingleFruit = document.getElementById("validateSingleFruit").checked;
 
     const formData = new FormData();
     formData.append("fruit", fruit);
     formData.append("model", selectedModel);
     formData.append("image", file);
     formData.append("validate", validateFruit ? "1" : "0");
+    formData.append("validate_single_fruit", validateSingleFruit ? "1" : "0");
 
     resultDiv.style.display = "none";
     resultDiv.className = "";
@@ -208,7 +224,34 @@
       const data = await res.json();
       if (data.error) {
         resultDiv.className = "";
-        resultDiv.textContent = `Error: ${data.error}`;
+        resultDiv.textContent = "";
+        const message = document.createElement("strong");
+        message.textContent = `Error: ${data.error}`;
+        resultDiv.appendChild(message);
+        if (
+          data.error_code === "multiple_fruit_image" ||
+          data.error_code === "multiple_same_fruit_image"
+        ) {
+          const action = document.createElement("div");
+          action.style.marginTop = "12px";
+          const link = document.createElement("a");
+          link.className = "btn btn-sm";
+          if (data.error_code === "multiple_same_fruit_image") {
+            const detectedFruit = Object.keys(data.fruit_breakdown || {})[0];
+            const batchFruitSelect = document.getElementById("fruit_type");
+            if (detectedFruit && batchFruitSelect) {
+              batchFruitSelect.value = detectedFruit;
+            }
+            document.getElementById("batchMultiFruit").checked = true;
+            link.href = "#batch-analysis";
+            link.textContent = "Go to Multi-Fruit Batch Analysis";
+          } else {
+            link.href = "#mixed-fruit-analysis";
+            link.textContent = "Go to Mixed-Fruit Analysis";
+          }
+          action.appendChild(link);
+          resultDiv.appendChild(action);
+        }
       } else {
         resultDiv.className = data.ripeness + "-bg";
         resultDiv.style.background = data.ripeness === "ripe" ? "var(--ripe-bg)" : data.ripeness === "unripe" ? "var(--unripe-bg)" : "var(--rotten-bg)";

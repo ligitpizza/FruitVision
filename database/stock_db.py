@@ -66,7 +66,7 @@ def log_stock_event(fruit, label, quantity, source, note=None, track_tag=None, u
     conn.close()
 
 
-def get_paginated(fruit=None, label=None, source=None, date_from=None, date_to=None, page=1, per_page=20):
+def get_paginated(fruit=None, label=None, source=None, user_id=None, date_from=None, date_to=None, page=1, per_page=20):
     page = max(page, 1)
     per_page = max(per_page, 1)
     offset = (page - 1) * per_page
@@ -83,6 +83,9 @@ def get_paginated(fruit=None, label=None, source=None, date_from=None, date_to=N
     if source:
         where_clauses.append("source = ?")
         params.append(source)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
     _add_date_filters(where_clauses, params, date_from, date_to)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -97,6 +100,32 @@ def get_paginated(fruit=None, label=None, source=None, date_from=None, date_to=N
 
     conn.close()
     return [dict(r) for r in rows], total
+
+
+def get_all(fruit=None, label=None, source=None, user_id=None, date_from=None, date_to=None):
+    """Unpaginated fetch, for CSV/PDF export. Same filters as get_paginated."""
+    conn = _connect()
+    where_clauses = []
+    params = []
+    if fruit:
+        where_clauses.append("fruit = ?")
+        params.append(fruit)
+    if label:
+        where_clauses.append("label = ?")
+        params.append(label)
+    if source:
+        where_clauses.append("source = ?")
+        params.append(source)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
+    _add_date_filters(where_clauses, params, date_from, date_to)
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    rows = conn.execute(
+        f"SELECT * FROM stock_events {where_sql} ORDER BY id DESC", params
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def get_by_id(event_id):
@@ -134,7 +163,7 @@ def delete_stock_event(event_id):
     return deleted
 
 
-def get_summary(fruit=None, date_from=None, date_to=None):
+def get_summary(fruit=None, user_id=None, date_from=None, date_to=None):
     """On-hand totals grouped by fruit and ripeness label, summed from the
     ledger (never a stored running total). Returns:
       {
@@ -150,6 +179,9 @@ def get_summary(fruit=None, date_from=None, date_to=None):
     if fruit:
         where_clauses.append("fruit = ?")
         params.append(fruit)
+    if user_id is not None:
+        where_clauses.append("user_id = ?")
+        params.append(user_id)
     _add_date_filters(where_clauses, params, date_from, date_to)
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 

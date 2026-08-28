@@ -5,8 +5,6 @@ history_db.py, same DB file.
 """
 import os
 import sqlite3
-import secrets
-import string
 from datetime import datetime, timedelta
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -50,6 +48,9 @@ def init_db():
     # next page load after toggling it.
     if not _column_exists(conn, "users", "dark_mode"):
         conn.execute("ALTER TABLE users ADD COLUMN dark_mode INTEGER DEFAULT 0")
+
+    if not _column_exists(conn, "users", "is_active"):
+        conn.execute("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS activity_log (
@@ -132,11 +133,6 @@ def create_user(name, email, password, role="farmer"):
     return user_id
 
 
-def generate_temp_password(length=10):
-    alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
-
-
 def get_user_by_id(user_id):
     conn = _connect()
     row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -152,8 +148,11 @@ def get_user_by_email(email):
 
 
 def verify_login(email, password):
-    """Returns the user dict on success, else None."""
+    """Returns the user dict on success, else None. Deactivated accounts
+    always fail login, even with the correct password."""
     user = get_user_by_email(email)
+    if user and not user["is_active"]:
+        return None
     if user and check_password_hash(user["password_hash"], password):
         return user
     return None
@@ -201,6 +200,17 @@ def update_user_role(user_id, role):
     return updated
 
 
+def set_active(user_id, active):
+    conn = _connect()
+    cur = conn.execute(
+        "UPDATE users SET is_active = ? WHERE id = ?", (int(bool(active)), user_id)
+    )
+    conn.commit()
+    updated = cur.rowcount > 0
+    conn.close()
+    return updated
+
+
 def delete_user(user_id):
     conn = _connect()
     cur = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -224,6 +234,15 @@ def admin_count():
     conn = _connect()
     count = conn.execute(
         "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+    ).fetchone()[0]
+    conn.close()
+    return count
+
+
+def active_admin_count():
+    conn = _connect()
+    count = conn.execute(
+        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1"
     ).fetchone()[0]
     conn.close()
     return count

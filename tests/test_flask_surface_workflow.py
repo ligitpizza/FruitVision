@@ -86,6 +86,7 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             "core_modules.pdf_report": _module(
                 generate_pdf_report=lambda *args, **kwargs: "report.pdf",
                 generate_pdf_report_batch=lambda *args, **kwargs: "report.pdf",
+                generate_stock_report_pdf=lambda *args, **kwargs: "stock_report.pdf",
             ),
             "core_modules.dashboard_charts": _module(
                 generate_trend_chart=lambda *args, **kwargs: None,
@@ -366,6 +367,22 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
                 "id": record_id, "fruit": "banana", "label": "rotten", "confidence": 76.1,
             }
             app_module.update_result = lambda record_id, **fields: review_updates.append((record_id, fields)) or True
+            # app_module.auth_db IS database.auth_db (never stubbed/replaced
+            # in sys.modules by this test, unlike history_db/stock_db above)
+            # -- overwriting its functions mutates that shared singleton
+            # module for the rest of the test *process*, not just this app
+            # instance, so restore them once this test ends or a later test
+            # file (e.g. test_auth.py) can silently get these fakes instead
+            # of the real DB-backed functions depending on run order.
+            original_get_user_by_id = app_module.auth_db.get_user_by_id
+            original_log_activity = app_module.auth_db.log_activity
+
+            def _restore_auth_db_functions():
+                app_module.auth_db.get_user_by_id = original_get_user_by_id
+                app_module.auth_db.log_activity = original_log_activity
+
+            self.addCleanup(_restore_auth_db_functions)
+
             app_module.auth_db.get_user_by_id = lambda user_id: {
                 "id": user_id, "name": "Test Farmer", "email": "farmer@example.test",
                 "role": "farmer", "dark_mode": 0,

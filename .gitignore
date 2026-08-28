@@ -16,6 +16,7 @@ member_apps/member_3_cd/uploads/
 member_apps/member_4_da/uploads/
 
 fruitvision.db
+.secret_key
 
 outputs/annotated/
 outputs/reports/

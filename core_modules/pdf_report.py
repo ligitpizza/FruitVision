@@ -278,6 +278,82 @@ def generate_pdf_report(
     return out_path
 
 
+def _table_row(pdf, values, col_widths, height=7, header=False, truncate=40):
+    if header:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(*BORDER)
+        pdf.set_text_color(*INK)
+    else:
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(*INK)
+    for value, w in zip(values, col_widths):
+        text = _pdf_safe(str(value))
+        if len(text) > truncate:
+            text = text[: truncate - 3] + "..."
+        pdf.cell(w, height, text, border=1, align="C" if header else "L", fill=header)
+    pdf.ln(height)
+
+
+def generate_stock_report_pdf(summary, rows, output_dir=None):
+    """
+    summary: a database/stock_db.py get_summary() dict --
+        {"grand_total", "by_fruit": {fruit: qty}, "by_label": {label: qty},
+         "matrix": {fruit: {label: qty}}}
+    rows: list of stock_events dicts (already filtered/scoped by the
+        caller), each like {"created_at", "fruit", "label", "quantity",
+        "source", "note"}
+    """
+    output_dir = output_dir or DEFAULT_OUTPUT_DIR
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = os.path.join(output_dir, f"stock_report_{timestamp}.pdf")
+
+    pdf = _new_pdf("Fruit Stock Report")
+
+    _section_title(pdf, "Summary")
+    by_label = summary.get("by_label") or {}
+    _kv_row(pdf, "Total on hand", str(summary.get("grand_total", 0)))
+    _kv_row(
+        pdf, "Ripe / Unripe / Rotten",
+        f"{by_label.get('ripe', 0)} / {by_label.get('unripe', 0)} / {by_label.get('rotten', 0)}",
+    )
+    _kv_row(pdf, "Fruits tracked", str(len(summary.get("by_fruit") or {})))
+    pdf.ln(4)
+
+    matrix = summary.get("matrix") or {}
+    if matrix:
+        _section_title(pdf, "By Fruit")
+        col_widths = [50, 30, 30, 30, 30]
+        _table_row(pdf, ["Fruit", "Ripe", "Unripe", "Rotten", "Total"], col_widths, header=True)
+        for fruit, counts in matrix.items():
+            total = (summary.get("by_fruit") or {}).get(fruit, 0)
+            _table_row(pdf, [
+                fruit.capitalize(), counts.get("ripe", 0), counts.get("unripe", 0),
+                counts.get("rotten", 0), total,
+            ], col_widths)
+        pdf.ln(4)
+
+    if rows:
+        _section_title(pdf, f"Entries ({len(rows)})")
+        col_widths = [34, 26, 24, 18, 24, 44]
+        _table_row(pdf, ["Time", "Fruit", "Ripeness", "Qty", "Source", "Note"], col_widths, header=True)
+        for r in rows:
+            if pdf.get_y() + 7 > pdf.page_break_trigger:
+                pdf.add_page()
+            quantity = r.get("quantity", 0)
+            _table_row(pdf, [
+                (r.get("created_at") or "")[:16],
+                (r.get("fruit") or "").capitalize(),
+                (r.get("label") or "").upper(),
+                f"{'+' if quantity > 0 else ''}{quantity}",
+                r.get("source") or "",
+                r.get("note") or "-",
+            ], col_widths, truncate=28)
+
+    pdf.output(out_path)
+    return out_path
+
+
 def generate_pdf_report_batch(results, model_tag="ab", output_dir=None):
     """
     results: list of dicts, each like

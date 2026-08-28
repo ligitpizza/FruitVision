@@ -1,21 +1,23 @@
 """
-analyze_member_performance.py — consolidates each SVM member's per-fruit,
+analyze_member_performance.py — consolidates every member's per-fruit,
 per-class classification_report JSON (written by save_classification_report()
-in mX_train_report.py) into one side-by-side comparison.
+in mX_train_report.py / yolo_cls_train_report.py) into one side-by-side
+comparison.
 
 Place this file at the PROJECT ROOT (same level as train_all.py).
 
 Run this AFTER train_all.py, once every member's *_classification_report.json
-exists under outputs/training/{ab,bc,cd,da,merged_1_4,m14v2,m14v3}/.
+exists under outputs/training/{ab,bc,cd,da,merged_1_4,m14v2,m14v3,yolo_pure}/.
 
-Scope: the 4-member SVM ensemble (ab/bc/cd/da) plus the three feature-fusion
+Scope: the 4-member SVM ensemble (ab/bc/cd/da), the three feature-fusion
 experiments -- merged_1_4 (member 1 + member 4: colour+shape+gabor),
 m14v2 (the same plus texture: colour+shape+gabor+texture), and m14v3
 (same 4 features as v2, but detection combines member 1's Otsu box +
 member 4's HSV-saturation box via union, and calibration uses member 4's
-deskew). The pure-YOLOv8-cls pipeline is intentionally excluded -- it's a
-fully independent 5th predictor, not part of the soft-voted ensemble this
-data is meant to support.
+deskew) -- plus the pure-YOLOv8-cls pipeline (yolo_pure). yolo_pure is a
+fully independent 5th predictor, not part of the soft-voted ensemble --
+it's included here for side-by-side accuracy/recall comparison only, same
+as every other row in this table.
 
 Usage:
     python analyze_member_performance.py
@@ -27,7 +29,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 TRAINING_DIR = PROJECT_ROOT / "outputs" / "training"
 
-MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4", "m14v2", "m14v3"]
+MEMBER_TAGS = ["ab", "bc", "cd", "da", "merged_1_4", "m14v2", "m14v3", "yolo_pure"]
 # Short codes for the console tables (kept narrow on purpose -- see
 # MEMBER_LABELS below for the full descriptive names, printed once as a
 # legend instead of repeated in every column header).
@@ -39,6 +41,7 @@ MEMBER_SHORT = {
     "merged_1_4": "M1+4",
     "m14v2": "M1+4v2",
     "m14v3": "M1+4v3",
+    "yolo_pure": "YOLO",
 }
 MEMBER_LABELS = {
     "ab": "M1 (colour+shape)",
@@ -48,17 +51,20 @@ MEMBER_LABELS = {
     "merged_1_4": "M1+4 (colour+shape+gabor)",
     "m14v2": "M1+4v2 (colour+shape+gabor+texture)",
     "m14v3": "M1+4v3 (Otsu+HSV union detect, deskew calibrate, colour+shape+gabor+texture)",
+    "yolo_pure": "YOLO (YOLOv8-cls, pure CNN, independent 5th predictor)",
 }
-# Folder name under outputs/training/ -- NOT the same as MEMBER_FOLDER below
-# (that one is the member_apps/ source folder, used only in the "run this
-# script" hint). This must match mX_train_report.py's TRAINING_OUT_DIR for
-# each model, e.g. merged_1_4's is outputs/training/merged_1_4/, not m14/.
+# Source folder for each model's train script, relative to PROJECT_ROOT --
+# used only in the "run this script" hint below, NOT the same as
+# outputs/training/<tag>/ (which must match mX_train_report.py's
+# TRAINING_OUT_DIR for each model, e.g. merged_1_4's is
+# outputs/training/merged_1_4/, not m14/).
 MEMBER_FOLDER = {
-    "ab": "member_1_ab", "bc": "member_2_bc",
-    "cd": "member_3_cd", "da": "member_4_da",
-    "merged_1_4": "merged_member_1_4",
-    "m14v2": "merged_member_1_4_v2",
-    "m14v3": "merged_member_1_4_v3",
+    "ab": "member_apps/member_1_ab", "bc": "member_apps/member_2_bc",
+    "cd": "member_apps/member_3_cd", "da": "member_apps/member_4_da",
+    "merged_1_4": "member_apps/merged_member_1_4",
+    "m14v2": "member_apps/merged_member_1_4_v2",
+    "m14v3": "member_apps/merged_member_1_4_v3",
+    "yolo_pure": "pipeline/pure_yolo",
 }
 MEMBER_SCRIPT = {
     "ab": "m1_train.py", "bc": "m2_train.py",
@@ -66,12 +72,13 @@ MEMBER_SCRIPT = {
     "merged_1_4": "m14_train.py",
     "m14v2": "m14v2_train.py",
     "m14v3": "m14v3_train.py",
+    "yolo_pure": "yolo_cls_train.py",
 }
 # Column width derived from the short codes, not the full labels -- keeps
 # the console tables narrow enough to not wrap in a normal terminal
 # regardless of how long a future model's descriptive label gets.
 COL_WIDTH = max(10, max(len(s) for s in MEMBER_SHORT.values()) + 3)
-FRUITS = ["apple", "banana", "orange", "mango"]
+FRUITS = ["apple", "banana", "orange", "mango", "pear", "peach", "strawberry", "tomato", "lemon", "guava"]
 CLASSES = ["ripe", "rotten", "unripe"]  # matches CLASSES in every mX_train.py
 
 
@@ -141,7 +148,7 @@ def main():
         print("\n[warning] Missing classification_report.json for:")
         for tag, fruit in missing:
             print(f"  - member {tag}, fruit {fruit} "
-                  f"(run member_apps/{MEMBER_FOLDER[tag]}/{MEMBER_SCRIPT[tag]})")
+                  f"(run {MEMBER_FOLDER[tag]}/{MEMBER_SCRIPT[tag]})")
 
     # --- save consolidated JSON (full detail: precision/recall/f1/support) ---
     out_json = TRAINING_DIR / "member_performance_summary.json"

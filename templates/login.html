@@ -13,9 +13,9 @@
       <h1>FruitVision</h1>
       <p class="tagline">Fruit ripeness detection &amp; analytics.</p>
 
-      {% with messages = get_flashed_messages() %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+          {% for category, m in messages %}<div class="flash {{ 'error' if category == 'error' }}">{{ m }}</div>{% endfor %}
         {% endif %}
       {% endwith %}
 

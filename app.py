@@ -64,7 +64,7 @@ from pipeline.pure_yolo.yolo_cls_predict import predict_ripeness as yolo_pure_pr
 from member_apps.predict_ensemble import predict_ensemble
 
 # --- Shared infrastructure (used to live inside member_1_ab) -----------
-from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch
+from core_modules.pdf_report import generate_pdf_report, generate_pdf_report_batch, generate_stock_report_pdf
 from core_modules.blemish_analysis import analyze_surface
 from core_modules.marketability import estimate_marketability, average_member_probabilities, stock_eligible
 from core_modules.fruit_validation import validate_selected_fruit, FruitValidationError
@@ -104,8 +104,28 @@ HISTORY_PAGE_SIZE = 15
 STOCK_PAGE_SIZE = 15
 MARKETABILITY_PAGE_SIZE = 25
 
+def _load_or_create_secret_key():
+    """The secret key signs session cookies (not just flash()) -- a
+    hardcoded value here would let anyone who reads the source forge a
+    session cookie for any user_id, including an admin, without ever
+    knowing a password. Persist a random one outside git instead."""
+    import secrets as _secrets
+    key_path = os.path.join(BASE_DIR, ".secret_key")
+    if os.path.exists(key_path):
+        with open(key_path, "r") as fh:
+            key = fh.read().strip()
+        if key:
+            return key
+    key = _secrets.token_hex(32)
+    with open(key_path, "w") as fh:
+        fh.write(key)
+    return key
+
+
 app = Flask(__name__)
-app.secret_key = "fruitivision-dev-key"  # only used for flash(); replace for real deployment
+app.secret_key = _load_or_create_secret_key()
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -128,6 +148,12 @@ def load_logged_in_user():
     user_id = session.get("user_id")
     g.user = auth_db.get_user_by_id(user_id) if user_id else None
 
+    if g.user is not None and not g.user.get("is_active", 1):
+        # Deactivated mid-session: drop them immediately instead of
+        # honoring a still-valid session cookie for a disabled account.
+        session.clear()
+        g.user = None
+
     if request.path.startswith("/static/") or request.path.startswith("/outputs/") or request.path.startswith("/uploads/"):
         return
     if request.path in PUBLIC_PATHS:
@@ -146,6 +172,29 @@ def admin_required(view):
     return wrapped
 
 
+def _scope_user_id():
+    """Farmers only ever see their own predictions/stock; admins see
+    everything across every account (system-wide oversight, same as the
+    Admin Panel's stats). Returns the id to filter records by, or None for
+    "no filter"."""
+    if g.user and g.user["role"] != "admin":
+        return g.user["id"]
+    return None
+
+
+def _owns_record(record):
+    """True if the current user may view/edit/delete this history or stock
+    row. Admins always can. A farmer can if it's theirs, or if it predates
+    per-user tracking (user_id is NULL) so old data isn't suddenly
+    inaccessible to everyone -- but never if it belongs to someone else."""
+    if not g.user:
+        return False
+    if g.user["role"] == "admin":
+        return True
+    owner_id = record.get("user_id")
+    return owner_id is None or owner_id == g.user["id"]
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if g.user:
@@ -160,7 +209,7 @@ def login():
             auth_db.touch_last_active(user["id"])
             auth_db.log_activity(user["id"], "login")
             return redirect(url_for("dashboard_home"))
-        flash("Invalid email or password.")
+        flash("Invalid email or password.", "error")
 
     show_seed_hint = len(auth_db.list_users()) == 2
     return render_template("login.html", show_seed_hint=show_seed_hint)
@@ -470,13 +519,14 @@ def _decorate_marketability_rows(rows):
 # --------------------------------------------------------------------------
 @app.route("/", methods=["GET"])
 def dashboard_home():
-    stats = get_stats()
-    stats_today = get_stats_since(hours=24)
-    recent = get_recent(limit=5)
+    scope = _scope_user_id()
+    stats = get_stats(user_id=scope)
+    stats_today = get_stats_since(hours=24, user_id=scope)
+    recent = get_recent(limit=5, user_id=scope)
 
     confidence_chart = generate_confidence_trend_chart(None, file_tag="all")
-    fruit_label_breakdown = get_fruit_label_breakdown()
-    marketability_rows = _decorate_marketability_rows(get_recent(limit=100))
+    fruit_label_breakdown = get_fruit_label_breakdown(user_id=scope)
+    marketability_rows = _decorate_marketability_rows(get_recent(limit=100, user_id=scope))
     marketability_alert_count = sum(
         row["marketability"].get("dispatch_priority") in {"urgent", "remove"}
         for row in marketability_rows
@@ -1467,7 +1517,7 @@ def history_export_pdf(record_id):
     prediction -- the only difference is the image/surface paths and
     metrics come from the stored DB row instead of an in-request result."""
     record = get_by_id(record_id)
-    if not record:
+    if not record or not _owns_record(record):
         flash("That record no longer exists.")
         return redirect(url_for("history"))
 
@@ -1535,6 +1585,7 @@ def marketability_dashboard():
     rows = _decorate_marketability_rows(get_all_results(
         member=model_filter,
         fruit=fruit_filter,
+        user_id=_scope_user_id(),
         date_from=date_from,
         date_to=date_to,
     ))
@@ -1671,8 +1722,9 @@ def history():
     except ValueError:
         page = 1
 
+    scope = _scope_user_id()
     rows, total = get_paginated(
-        member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to,
+        member=member_filter, fruit=fruit_filter, user_id=scope, date_from=date_from, date_to=date_to,
         page=page, per_page=HISTORY_PAGE_SIZE,
     )
     total_pages = max(1, math.ceil(total / HISTORY_PAGE_SIZE))
@@ -1688,7 +1740,7 @@ def history():
     # member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo"] do not remove
     member_options = [_member_tag(k) for k in PREDICTORS] + ["ensemble_all_four", "realtime_yolo", "yolo_pure_realtime"]
 
-    stats = get_stats(member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to)
+    stats = get_stats(member=member_filter, fruit=fruit_filter, user_id=scope, date_from=date_from, date_to=date_to)
 
     return render_template(
         "history.html",
@@ -1713,7 +1765,10 @@ def history_export_csv():
     member_filter = request.args.get("member") or None
     date_from = _valid_date_arg("date_from")
     date_to = _valid_date_arg("date_to")
-    rows = get_all_results(member=member_filter, fruit=fruit_filter, date_from=date_from, date_to=date_to)
+    rows = get_all_results(
+        member=member_filter, fruit=fruit_filter, user_id=_scope_user_id(),
+        date_from=date_from, date_to=date_to,
+    )
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -1740,7 +1795,7 @@ def history_export_csv():
 @app.route("/history/<int:record_id>")
 def history_detail(record_id):
     record = get_by_id(record_id)
-    if not record:
+    if not record or not _owns_record(record):
         flash("That record no longer exists.")
         return redirect(url_for("history"))
 
@@ -1772,7 +1827,7 @@ def history_detail(record_id):
 @app.route("/history/<int:record_id>/edit", methods=["GET", "POST"])
 def history_edit(record_id):
     record = get_by_id(record_id)
-    if not record:
+    if not record or not _owns_record(record):
         flash("That record no longer exists.")
         return redirect(url_for("history"))
 
@@ -1806,8 +1861,13 @@ def history_edit(record_id):
 
 @app.route("/history/<int:record_id>/delete", methods=["POST"])
 def history_delete(record_id):
-    deleted = delete_result(record_id)
-    flash("Record deleted." if deleted else "Record not found.")
+    record = get_by_id(record_id)
+    if not record or not _owns_record(record):
+        flash("Record not found.")
+        return redirect(url_for("history", page=request.form.get("page", 1)))
+
+    delete_result(record_id)
+    flash("Record deleted.")
     return redirect(url_for("history", page=request.form.get("page", 1)))
 
 
@@ -1827,14 +1887,15 @@ def stock():
     except ValueError:
         page = 1
 
+    scope = _scope_user_id()
     rows, total = stock_db.get_paginated(
-        fruit=fruit_filter, label=label_filter, source=source_filter,
+        fruit=fruit_filter, label=label_filter, source=source_filter, user_id=scope,
         date_from=date_from, date_to=date_to, page=page, per_page=STOCK_PAGE_SIZE,
     )
     total_pages = max(1, math.ceil(total / STOCK_PAGE_SIZE))
     page = min(page, total_pages)
 
-    summary = stock_db.get_summary(fruit=fruit_filter, date_from=date_from, date_to=date_to)
+    summary = stock_db.get_summary(fruit=fruit_filter, user_id=scope, date_from=date_from, date_to=date_to)
 
     return render_template(
         "stock.html",
@@ -1852,6 +1913,53 @@ def stock():
         summary=summary,
         active_page="stock",
     )
+
+
+def _stock_filters_from_args():
+    return {
+        "fruit": request.args.get("fruit") or None,
+        "label": request.args.get("label") or None,
+        "source": request.args.get("source") or None,
+        "date_from": _valid_date_arg("date_from"),
+        "date_to": _valid_date_arg("date_to"),
+    }
+
+
+@app.route("/stock/export.csv")
+def stock_export_csv():
+    rows = stock_db.get_all(user_id=_scope_user_id(), **_stock_filters_from_args())
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "created_at", "fruit", "label", "quantity", "source", "note"])
+    for r in rows:
+        writer.writerow([
+            r["id"], r["created_at"], r["fruit"], r["label"], r["quantity"],
+            r["source"], r.get("note") or "",
+        ])
+
+    if g.user:
+        auth_db.log_activity(g.user["id"], "export_stock_csv", detail=f"{len(rows)} entries")
+
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=fruit_stock.csv"},
+    )
+
+
+@app.route("/stock/export_pdf")
+def stock_export_pdf():
+    filters = _stock_filters_from_args()
+    scope = _scope_user_id()
+    rows = stock_db.get_all(user_id=scope, **filters)
+    summary = stock_db.get_summary(fruit=filters["fruit"], user_id=scope, date_from=filters["date_from"], date_to=filters["date_to"])
+    out_path = generate_stock_report_pdf(summary, rows)
+
+    if g.user:
+        auth_db.log_activity(g.user["id"], "export_stock_pdf", detail=f"{len(rows)} entries")
+
+    return send_from_directory(os.path.dirname(out_path), os.path.basename(out_path), as_attachment=True)
 
 
 @app.route("/stock/add", methods=["POST"])
@@ -1879,7 +1987,7 @@ def stock_add():
 @app.route("/stock/<int:event_id>/edit", methods=["GET", "POST"])
 def stock_edit(event_id):
     record = stock_db.get_by_id(event_id)
-    if not record:
+    if not record or not _owns_record(record):
         flash("That stock entry no longer exists.")
         return redirect(url_for("stock"))
 
@@ -1908,8 +2016,13 @@ def stock_edit(event_id):
 
 @app.route("/stock/<int:event_id>/delete", methods=["POST"])
 def stock_delete(event_id):
-    deleted = stock_db.delete_stock_event(event_id)
-    flash("Stock entry deleted." if deleted else "Stock entry not found.")
+    record = stock_db.get_by_id(event_id)
+    if not record or not _owns_record(record):
+        flash("Stock entry not found.")
+        return redirect(url_for("stock", page=request.form.get("page", 1)))
+
+    stock_db.delete_stock_event(event_id)
+    flash("Stock entry deleted.")
     return redirect(url_for("stock", page=request.form.get("page", 1)))
 
 
@@ -2074,21 +2187,24 @@ def admin_panel():
 def admin_invite_user():
     name = request.form.get("name", "").strip()
     email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
     role = request.form.get("role", "farmer")
 
     if not name or not email:
         flash("Name and email are required.")
         return redirect(url_for("admin_panel"))
+    if len(password) < 8:
+        flash("Password must be at least 8 characters.")
+        return redirect(url_for("admin_panel"))
 
-    temp_password = auth_db.generate_temp_password()
     try:
-        auth_db.create_user(name, email, temp_password, role=role)
+        auth_db.create_user(name, email, password, role=role)
     except Exception:
-        flash(f"Could not invite {email} — that email may already be in use.")
+        flash(f"Could not create {email} — that email may already be in use.")
         return redirect(url_for("admin_panel"))
 
     auth_db.log_activity(g.user["id"], "invite_user", detail=email)
-    flash(f"Invited {name} ({email}). Temporary password: {temp_password}")
+    flash(f"Created {name} ({email}).")
     return redirect(url_for("admin_panel"))
 
 
@@ -2103,6 +2219,34 @@ def admin_update_role(user_id):
     auth_db.update_user_role(user_id, role)
     auth_db.log_activity(g.user["id"], "change_role", detail=f"user {user_id} -> {role}")
     flash("Role updated.")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/users/<int:user_id>/deactivate", methods=["POST"])
+@admin_required
+def admin_deactivate_user(user_id):
+    if user_id == g.user["id"]:
+        flash("You can't deactivate your own account.")
+        return redirect(url_for("admin_panel"))
+
+    target = auth_db.get_user_by_id(user_id)
+    if target and target["role"] == "admin" and auth_db.active_admin_count() <= 1:
+        flash("Can't deactivate the only remaining active admin.")
+        return redirect(url_for("admin_panel"))
+
+    auth_db.set_active(user_id, False)
+    auth_db.log_activity(g.user["id"], "deactivate_user", detail=target["email"] if target else str(user_id))
+    flash("User deactivated.")
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/users/<int:user_id>/reactivate", methods=["POST"])
+@admin_required
+def admin_reactivate_user(user_id):
+    target = auth_db.get_user_by_id(user_id)
+    auth_db.set_active(user_id, True)
+    auth_db.log_activity(g.user["id"], "reactivate_user", detail=target["email"] if target else str(user_id))
+    flash("User reactivated.")
     return redirect(url_for("admin_panel"))
 
 

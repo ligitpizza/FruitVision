@@ -15,7 +15,7 @@ so yolo_cls_predict.py has a stable, predictable path to load from
 is not stable across repeated runs).
 
 Usage:
-    python yolo_cls_train.py                  # trains all 4 fruits
+    python yolo_cls_train.py                  # trains every fruit in FRUITS
     python yolo_cls_train.py --fruit mango    # trains a single fruit
     python yolo_cls_train.py --epochs 30 --imgsz 224 --model yolov8n-cls.pt
 """
@@ -32,6 +32,7 @@ from yolo_cls_train_report import (
     plot_confusion_matrix,
     plot_class_distribution,
     plot_accuracy_summary,
+    save_classification_report,
     save_training_time,
     format_duration,
 )
@@ -44,7 +45,7 @@ DATASET_ROOT = os.path.join(PROJECT_ROOT, "datasets", "yolo_cls")
 MODEL_OUT_DIR = os.path.join(PROJECT_ROOT, "trained_models", "yolo_pure")
 RUNS_DIR = os.path.join(BASE_DIR, "runs")  # keep Ultralytics' own run artifacts local to this pipeline folder
 
-FRUITS = ["apple", "banana", "orange", "mango"]
+FRUITS = ["apple", "banana", "orange", "mango", "pear", "peach", "strawberry", "tomato", "lemon", "guava"]
 CLASSES = ["ripe", "rotten", "unripe"]  # matches the class-name ordering used by every m{n}_train.py
 
 
@@ -136,6 +137,7 @@ def train_one_fruit(fruit, base_model="yolov8n-cls.pt", epochs=25, imgsz=224, ba
         accuracy = float(np.mean([t == p for t, p in zip(y_true, y_pred)]))
         print(f"Validation accuracy for {fruit}: {accuracy:.3f}")
         plot_confusion_matrix(y_true, y_pred, classes=CLASSES, fruit=fruit)
+        save_classification_report(y_true, y_pred, classes=CLASSES, fruit=fruit)
 
     os.makedirs(MODEL_OUT_DIR, exist_ok=True)
     out_path = os.path.join(MODEL_OUT_DIR, f"{fruit}_cls.pt")

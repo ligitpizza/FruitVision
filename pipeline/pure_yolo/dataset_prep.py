@@ -22,7 +22,7 @@ PROJECT_ROOT = os.path.normpath(os.path.join(BASE_DIR, "..", ".."))
 SRC_ROOT = os.path.join(PROJECT_ROOT, "datasets", "fruit_ripeness")
 DST_ROOT = os.path.join(PROJECT_ROOT, "datasets", "yolo_cls")
 
-FRUITS = ["apple", "banana", "orange", "mango"]
+FRUITS = ["apple", "banana", "orange", "mango", "pear", "peach", "strawberry", "tomato", "lemon", "guava"]
 CLASSES = ["ripe", "rotten", "unripe"]
 VAL_SPLIT = 0.15  # 15% held out for validation, matches train_test_split(test_size=0.2)-ish
 SEED = 42

@@ -5,9 +5,11 @@ Plot generators for yolo_cls_train.py.
 
 Mirrors member_apps/member_1_ab/m1_train_report.py function-for-function
 (plot_confusion_matrix, plot_class_distribution, plot_accuracy_summary,
-save_training_time, load_training_time, format_duration) so app.py's
-training_report route and the dashboard templates can treat "yolo_pure"
-exactly like ab/bc/cd/da without any special-casing.
+save_training_time, load_training_time, format_duration,
+save_classification_report) so app.py's training_report route and the
+dashboard templates can treat "yolo_pure" exactly like ab/bc/cd/da without
+any special-casing -- and so analyze_member_performance.py can fold it into
+the same per-fruit, per-class comparison as every SVM member.
 
 Everything gets saved under outputs/training/yolo_pure/, matching the
 per-model folder convention used by every other member.
@@ -17,7 +19,7 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 from collections import Counter
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -114,3 +116,38 @@ def format_duration(seconds):
     if minutes >= 1:
         return f"{int(minutes)}m {secs:.1f}s"
     return f"{secs:.1f}s"
+
+
+def save_classification_report(y_true, y_pred, classes, fruit):
+    """
+    Saves precision/recall/f1/support per class (plus the raw confusion
+    matrix as numbers, not just the PNG) to JSON, so per-member per-fruit
+    per-class performance can be read programmatically later -- e.g. by
+    analyze_member_performance.py alongside every SVM member.
+    """
+    out_dir = _ensure_out_dir()
+    report_dict = classification_report(
+        y_true, y_pred, labels=classes, output_dict=True, zero_division=0
+    )
+    cm = confusion_matrix(y_true, y_pred, labels=classes)
+
+    payload = {
+        "fruit": fruit,
+        "classes": classes,
+        "confusion_matrix": cm.tolist(),
+        "accuracy": report_dict["accuracy"],
+        "per_class": {
+            cls: {
+                "precision": report_dict[cls]["precision"],
+                "recall": report_dict[cls]["recall"],
+                "f1_score": report_dict[cls]["f1-score"],
+                "support": report_dict[cls]["support"],
+            }
+            for cls in classes
+        },
+    }
+
+    out_path = os.path.join(out_dir, f"{fruit}_classification_report.json")
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return out_path

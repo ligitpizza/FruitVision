@@ -144,6 +144,8 @@ button:disabled { background: #cfd6cc; color: #82897f; cursor: not-allowed; }
 .btn-outline:hover { background: var(--paper); }
 .btn-danger { background: var(--rotten-bg); color: var(--rotten); border-color: #f3c9c5; }
 .btn-danger:hover { background: #fbdedc; }
+.btn-warning { background: var(--unripe-bg); color: var(--unripe); border-color: #f0dba6; }
+.btn-warning:hover { background: #ffe9bd; }
 .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: var(--radius-sm); }
 .btn-block { display: flex; width: 100%; }
 
@@ -354,10 +356,12 @@ img.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; bo
 .pagination span.current { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pagination span.info { margin-left: 8px; color: var(--ink-faint); font-size: 0.85rem; }
 
+td.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .actions a, .actions button { font-size: 0.8rem; }
 
 /* ---------- Flash ---------- */
 .flash { background: var(--ripe-bg); color: var(--ripe); padding: 11px 16px; border-radius: var(--radius-sm); margin: 16px 0; font-size: 0.88rem; }
+.flash.error { background: var(--rotten-bg); color: var(--rotten); }
 
 /* ---------- Charts ---------- */
 .charts { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; }

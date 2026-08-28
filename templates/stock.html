@@ -17,6 +17,10 @@
     <h1>Fruit Stock</h1>
     <p>On-hand counts by fruit and ripeness, built from batch-analysis scans plus manual entries.</p>
   </div>
+  <div class="actions">
+    <a class="btn btn-outline" href="/stock/export.csv{{ filter_qs(fruit_filter, label_filter, source_filter, date_from, date_to) }}">Export CSV</a>
+    <a class="btn btn-outline" href="/stock/export_pdf{{ filter_qs(fruit_filter, label_filter, source_filter, date_from, date_to) }}">Export PDF</a>
+  </div>
 </div>
 
 <div class="grid grid-3" style="margin-top:20px;">
@@ -156,7 +160,7 @@
       <td>{{ r.source }}</td>
       <td>{{ r.note or '—' }}{% if r.track_tag %} <span class="field-hint">({{ r.track_tag }})</span>{% endif %}</td>
       <td class="actions">
-        <a href="/stock/{{ r.id }}/edit">Edit</a>
+        <a href="/stock/{{ r.id }}/edit" class="btn-warning btn-sm">Edit</a>
         <form action="/stock/{{ r.id }}/delete" method="post" style="display:inline;"
               onsubmit="return confirm('Delete this stock entry? This cannot be undone.');">
           <input type="hidden" name="page" value="{{ page }}">

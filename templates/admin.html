@@ -69,29 +69,35 @@
         <h3 style="margin:0;">Personnel Access</h3>
       </div>
 
-      <form method="post" action="/admin/users/invite" class="grid grid-3" style="align-items:end; margin-top:10px;">
-        <div>
-          <label for="inv-name">Name</label>
-          <input type="text" id="inv-name" name="name" required>
+      <form method="post" action="/admin/users/invite" style="margin-top:10px;">
+        <div class="grid grid-3" style="align-items:end;">
+          <div>
+            <label for="inv-name">Name</label>
+            <input type="text" id="inv-name" name="name" required>
+          </div>
+          <div>
+            <label for="inv-email">Email</label>
+            <input type="email" id="inv-email" name="email" required>
+          </div>
+          <div>
+            <label for="inv-password">Password</label>
+            <input type="password" id="inv-password" name="password" minlength="8" required placeholder="At least 8 characters">
+          </div>
         </div>
-        <div>
-          <label for="inv-email">Email</label>
-          <input type="email" id="inv-email" name="email" required>
-        </div>
-        <div style="display:flex; gap:8px; align-items:end;">
-          <div style="flex:1;">
+        <div style="display:flex; gap:8px; align-items:end; margin-top:10px;">
+          <div style="flex:1; max-width:200px;">
             <label for="inv-role">Role</label>
             <select id="inv-role" name="role">
               <option value="farmer">Farmer</option>
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button type="submit" class="btn-sm" style="margin-bottom:1px;">Invite</button>
+          <button type="submit" class="btn-sm" style="margin-bottom:1px;">Create user</button>
         </div>
       </form>
 
       <table>
-        <tr><th>User</th><th>Role</th><th>Last Active</th><th></th></tr>
+        <tr><th>User</th><th>Role</th><th>Status</th><th>Last Active</th><th></th></tr>
         {% for u in users %}
         <tr>
           <td>
@@ -106,10 +112,26 @@
               </select>
             </form>
           </td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge ripe">Active</span>
+            {% else %}
+            <span class="badge rotten">Deactivated</span>
+            {% endif %}
+          </td>
           <td>{{ u.last_active or '—' }}</td>
           <td class="actions">
             {% if u.id != g.user.id %}
-            <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('Remove {{ u.name }}?');" style="display:inline;">
+            {% if u.is_active %}
+            <form method="post" action="/admin/users/{{ u.id }}/deactivate" onsubmit="return confirm('Deactivate {{ u.name }}? They will not be able to log in until reactivated.');" style="display:inline;">
+              <button type="submit" class="btn-sm">Deactivate</button>
+            </form>
+            {% else %}
+            <form method="post" action="/admin/users/{{ u.id }}/reactivate" style="display:inline;">
+              <button type="submit" class="btn-sm">Reactivate</button>
+            </form>
+            {% endif %}
+            <form method="post" action="/admin/users/{{ u.id }}/delete" onsubmit="return confirm('Permanently remove {{ u.name }}? This cannot be undone.');" style="display:inline;">
               <button type="submit" class="btn-danger btn-sm">Remove</button>
             </form>
             {% else %}

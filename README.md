@@ -160,6 +160,21 @@ which `requirements.txt` installs directly from the official Ultralytics
 GitHub repository. Git and network access are therefore required during the
 first dependency installation.
 
+> **Do not `pip install clip`.** The plain `clip` package on PyPI is an
+> unrelated CLI clipboard manager, not OpenAI/Ultralytics CLIP — it has no
+> `load()` or `tokenize()`. Both packages install as the same top-level
+> `clip` module, so whichever one lands last in `site-packages` silently
+> wins, and pulling in the wrong one produces
+> `module 'clip' has no attribute 'load'` at runtime. Only
+> `git+https://github.com/ultralytics/CLIP.git` (already pinned above)
+> should ever be installed. If you hit that error:
+> ```bash
+> pip uninstall clip
+> pip install git+https://github.com/ultralytics/CLIP.git
+> ```
+> Then restart the Flask dev server — it caches the import in memory, so a
+> package swap alone won't fix an already-running process.
+
 ### Dataset Setup
 Download the base dataset from Kaggle: https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten
 

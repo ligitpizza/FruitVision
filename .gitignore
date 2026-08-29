@@ -19,7 +19,7 @@ fruitvision.db
 .secret_key
 
 outputs/annotated/
-outputs/reports/
+outputs/reports/*.pdf
 outputs/training/*.json
 outputs/training/*.csv
 outputs/training/*/*.json
@@ -33,3 +33,5 @@ uploads/
 pipeline/pure_yolo/runs/
 
 datasets/yolo_cls/
+
+.superpowers/

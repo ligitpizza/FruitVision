@@ -1,0 +1,60 @@
+<nav class="model-page-nav" aria-label="Model {{ 'training report' if model_nav_view == 'training' else 'dashboard' }} navigation">
+  <div class="model-page-nav-head">
+    <div>
+      <span class="model-page-nav-eyebrow">Model navigator</span>
+      <strong>Switch {{ 'training report' if model_nav_view == 'training' else 'data dashboard' }}</strong>
+    </div>
+    <div class="model-view-switch" aria-label="Current model views">
+      <a href="/dashboard/{{ model_nav_current }}"
+         class="{{ 'active' if model_nav_view == 'dashboard' }}">Dashboard</a>
+      {% if model_nav_current != 'all_four' %}
+        <a href="/training-report/{{ model_nav_current }}"
+           class="{{ 'active' if model_nav_view == 'training' }}">Training Report</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="model-nav-groups">
+    <div class="model-nav-group">
+      <span>Core members</span>
+      <div>
+        {% for key, label in [('ab', 'AB'), ('bc', 'BC'), ('cd', 'CD'), ('da', 'DA')] %}
+          <a href="/{{ 'training-report' if model_nav_view == 'training' else 'dashboard' }}/{{ key }}"
+             class="{{ 'active' if key == model_nav_current }}"
+             aria-current="{{ 'page' if key == model_nav_current else 'false' }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="model-nav-group">
+      <span>Merged models</span>
+      <div>
+        {% for key, label in [('merged_1_4', 'M14'), ('m14v2', 'M14 v2'), ('m14v3', 'M14 v3')] %}
+          <a href="/{{ 'training-report' if model_nav_view == 'training' else 'dashboard' }}/{{ key }}"
+             class="{{ 'active' if key == model_nav_current }}"
+             aria-current="{{ 'page' if key == model_nav_current else 'false' }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="model-nav-group">
+      <span>Independent</span>
+      <div>
+        <a href="/{{ 'training-report' if model_nav_view == 'training' else 'dashboard' }}/yolo_pure"
+           class="{{ 'active' if model_nav_current == 'yolo_pure' }}"
+           aria-current="{{ 'page' if model_nav_current == 'yolo_pure' else 'false' }}">YOLOv8</a>
+      </div>
+    </div>
+
+    {% if model_nav_view == 'dashboard' %}
+      <div class="model-nav-group">
+        <span>Combined</span>
+        <div>
+          <a href="/dashboard/all_four"
+             class="{{ 'active' if model_nav_current == 'all_four' }}"
+             aria-current="{{ 'page' if model_nav_current == 'all_four' else 'false' }}">All Four</a>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</nav>

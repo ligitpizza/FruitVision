@@ -38,6 +38,26 @@ class _FakeDetector:
         ))]
 
 
+class _SingleFruitDetector(_FakeDetector):
+    def predict(self, image, **kwargs):
+        self.calls.append(kwargs)
+        return [_FakeResult(_FakeBoxes(
+            boxes=[[10, 10, 80, 90]],
+            classes=[0],
+            confidences=[0.91],
+        ))]
+
+
+class _SameFruitDetector(_FakeDetector):
+    def predict(self, image, **kwargs):
+        self.calls.append(kwargs)
+        return [_FakeResult(_FakeBoxes(
+            boxes=[[10, 10, 80, 90], [90, 15, 165, 100]],
+            classes=[1, 1],
+            confidences=[0.91, 0.87],
+        ))]
+
+
 class MixedFruitM14Tests(unittest.TestCase):
     def setUp(self):
         self.image = np.full((200, 280, 3), 220, dtype=np.uint8)
@@ -93,6 +113,37 @@ class MixedFruitM14Tests(unittest.TestCase):
             self.image, detector=self.detector
         )
         self.assertEqual([item["fruit"] for item in detections], ["apple", "banana", "orange"])
+
+    def test_single_analysis_validation_rejects_multiple_supported_fruits(self):
+        with self.assertRaises(mixed_fruit_m14.MultipleFruitImageError) as context:
+            mixed_fruit_m14.validate_single_fruit_image(
+                self.image, detector=self.detector
+            )
+
+        self.assertEqual(
+            context.exception.fruit_breakdown,
+            {"apple": 1, "banana": 1, "orange": 1},
+        )
+        self.assertIn("Mixed-Fruit Analysis below", str(context.exception))
+
+    def test_single_analysis_validation_allows_one_supported_fruit(self):
+        result = mixed_fruit_m14.validate_single_fruit_image(
+            self.image, detector=_SingleFruitDetector()
+        )
+
+        self.assertEqual(result["detected_count"], 1)
+        self.assertEqual(result["fruit_breakdown"], {"apple": 1})
+        self.assertEqual(result["validation_method"], "yolov8n_single_fruit_count")
+
+    def test_single_analysis_validation_routes_same_species_to_batch(self):
+        with self.assertRaises(mixed_fruit_m14.MultipleFruitImageError) as context:
+            mixed_fruit_m14.validate_single_fruit_image(
+                self.image, detector=_SameFruitDetector()
+            )
+
+        self.assertEqual(context.exception.fruit_breakdown, {"banana": 2})
+        self.assertIn("Batch Analysis below", str(context.exception))
+        self.assertNotIn("Mixed-Fruit Analysis below", str(context.exception))
 
 
 if __name__ == "__main__":

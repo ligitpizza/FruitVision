@@ -9,8 +9,6 @@ from ultralytics import YOLO
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "member_apps"))
 from member_apps.predict_ensemble import predict_ensemble
-from member_apps.member_1_ab.m1_preprocessing import clean
-from member_apps.member_1_ab.m1_detection import detect as classical_detect
 
 from database.history_db import log_result
 from database.stock_db import log_stock_event
@@ -19,6 +17,7 @@ from core_modules.filter_photos import filter_photos_ensemble, pop_member_cleane
 from core_modules.marketability import stock_eligible
 from .tracker_config import (
     YOLO_WEIGHTS_PATH,
+    FRUIT_YOLO_WEIGHTS_PATH,
     YOLO_IMGSZ,
     YOLO_CONF_THRESHOLD,
     YOLO_IOU_THRESHOLD,
@@ -35,6 +34,7 @@ os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(YOLO_WEIGHTS_PATH), exist_ok=True)
 
 _yolo = YOLO(YOLO_WEIGHTS_PATH)
+_fruit_yolo = YOLO(FRUIT_YOLO_WEIGHTS_PATH)
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
 CLASSIFY_EVERY_N_FRAMES = 5
 
@@ -55,7 +55,6 @@ CROP_PAD = 15
 
 _track_state = {}
 _counted_tracks = set()  # track_ids already logged into the stock ledger, once per physical fruit
-_fallback_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []  # every *committed* (post-smoothing) classification made during the current session
 
 # --- MUST-DO #4 step 1: baseline FPS benchmarking ---------------------------
@@ -170,48 +169,25 @@ def _record_classification(crop, fruit_type, label, confidence, tag, cleaned_by_
     })
 
 
-def _process_fallback_classification(frame, fruit_type, frame_idx):
-    enhanced = clean(frame)
-    cropped, bbox = classical_detect(enhanced)
-    if bbox is None or cropped.size == 0:
-        return frame, False
-
-    x0, y0, x1, y1 = bbox
-
-    frame_label, frame_confidence = None, None
-    if frame_idx - _fallback_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
-        try:
-            frame_label, frame_confidence, per_member, _ = predict_ensemble(cropped, fruit_type)
-            _fallback_state["cleaned_by_member"] = pop_member_cleaned_images(per_member)
-        except Exception:
-            pass
-        _fallback_state["last_frame"] = frame_idx
-
-    prev_label = _fallback_state["label"]
-    committed_label, committed_confidence, stable = _update_rolling_vote(_fallback_state, frame_label, frame_confidence)
-    _fallback_state["label"], _fallback_state["confidence"] = committed_label, committed_confidence
-
-    if stable and committed_label != prev_label:
-        _record_classification(
-            cropped, fruit_type, committed_label, committed_confidence,
-            tag=f"{fruit_type}_frame{frame_idx}", cleaned_by_member=_fallback_state.get("cleaned_by_member"),
-        )
-
-    display_label = committed_label if stable else "analysing..."
-    colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
-    conf_str = f"{committed_confidence * 100:.1f}%" if stable and committed_confidence else ""
-    cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
-    cv2.putText(frame, f"{fruit_type} {display_label} {conf_str}", (x0, max(y0 - 8, 0)),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)
-    return frame, True
-
-
 def process_frame(frame, fruit_type, frame_idx):
     _frame_start = time.time()
     detected_any = False
 
     if fruit_type not in COCO_FRUIT_CLASSES:
-        frame, detected_any = _process_fallback_classification(frame, fruit_type, frame_idx)
+        results = _fruit_yolo.track(
+            frame,
+            persist=True,
+            verbose=False,
+            tracker=TRACKER_CONFIG,
+            conf=YOLO_CONF_THRESHOLD,
+            iou=YOLO_IOU_THRESHOLD,
+            imgsz=YOLO_IMGSZ,
+        )[0]
+        if results.boxes.id is not None:
+            for box, track_id, cls_id in zip(results.boxes.xyxy, results.boxes.id, results.boxes.cls):
+                class_name = _fruit_yolo.names[int(cls_id)]
+                detected_any = True
+                _draw_tracked_box(frame, box, int(track_id), class_name, fruit_type, frame_idx)
     else:
         results = _yolo.track(
             frame,

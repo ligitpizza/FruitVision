@@ -55,3 +55,14 @@ TRACKER_CONFIG = "botsort.yaml"
 # NOTE: this value is a reconstructed default (30) -- if you remember
 # setting this differently originally, change it back.
 FPS_LOG_EVERY_N_FRAMES = 30
+
+# --- Custom fruit detector (non-COCO fruits) --------------------------------
+# Single-class "fruit" detector fine-tuned on auto-labeled crops (see
+# pipeline/fruit_detector/). Used as the tracking lens for fruit types that
+# aren't COCO classes (everything except apple/banana/orange) -- ripeness
+# classification still goes through each engine's own SVM; this only
+# replaces the classical per-frame blob detector with real detection +
+# persistent tracking, matching apple/banana/orange's behaviour.
+FRUIT_YOLO_WEIGHTS_PATH = os.path.normpath(
+    os.path.join(PROJECT_ROOT, "trained_models", "fruit_yolo_detect", "best.pt")
+)

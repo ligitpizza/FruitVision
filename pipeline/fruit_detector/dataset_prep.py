@@ -126,11 +126,9 @@ def prepare(use_symlink=True, val_split=VAL_SPLIT, seed=SEED):
             dst_image_path = os.path.join(dirs[f"images_{split}"], f"{unique_name}{ext}")
             dst_label_path = os.path.join(dirs[f"labels_{split}"], f"{unique_name}.txt")
 
-            if not os.path.exists(dst_image_path):
-                _link_or_copy(path, dst_image_path, use_symlink=use_symlink)
-            if not os.path.exists(dst_label_path):
-                with open(dst_label_path, "w", encoding="utf-8") as label_file:
-                    label_file.write(bbox_to_yolo_line(bbox, w, h) + "\n")
+            _link_or_copy(path, dst_image_path, use_symlink=use_symlink)
+            with open(dst_label_path, "w", encoding="utf-8") as label_file:
+                label_file.write(bbox_to_yolo_line(bbox, w, h) + "\n")
 
             if split == "train":
                 kept_train += 1

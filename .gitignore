@@ -36,3 +36,6 @@ pipeline/pure_yolo/runs/
 pipeline/fruit_detector/runs/
 
 .superpowers/
+
+# Downloaded automatically for open-vocabulary upload validation
+yolov8s-worldv2.pt

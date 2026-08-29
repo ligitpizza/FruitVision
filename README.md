@@ -27,7 +27,7 @@ Originally a university group project (each "member" folder corresponds to one t
 - **Single Fruit Analysis** — upload one photo, pick a fruit and a model, get an instant ripeness call with confidence, blemish/surface-quality analysis, and a marketability recommendation.
 - **Batch Analysis** — upload many photos of the same fruit at once; get a distribution chart and a PDF report. Optional toggles: treat a photo as containing *multiple* fruits (apple/banana/orange only — needs YOLO object detection, not just classification), skip the fruit-match validation for a batch (useful when testing with mismatched or unusual photos), and auto-log results into Fruit Stock.
 - **Mixed-Fruit Analysis** — one photo containing a mix of apples, bananas, and oranges together; YOLOv8n localises each fruit, then the Merged 1+4 model classifies every crop individually.
-- Every prediction is validated first: a COCO-pretrained YOLO detector checks the photo actually contains the selected fruit (or, for fruits COCO can't recognise, falls back to classical shape/contour sanity checks) — before it's run through the expensive per-model prediction so a clearly wrong upload fails fast with a clear reason.
+- Every prediction is validated first: whole-image CLIP comparison checks the selected identity against all ten supported fruits and common non-fruit categories. YOLO-World and classical shape/contour checks provide fallback validation when CLIP is inconclusive, before the image is run through the per-model ripeness prediction.
 
 ### Real-Time Tracking (`/realtime`)
 Live webcam or uploaded-video tracking, with its own engine per model (temporal smoothing / rolling-vote across frames, FPS logging, stock-eligible detections counted once per physical fruit). Session results export to PDF.
@@ -63,7 +63,7 @@ Per-account defaults (default model, confidence-flagging threshold), password ch
 
 `apple`, `banana`, `orange`, `mango`, `pear`, `peach`, `strawberry`, `tomato`, `lemon`, `guava`
 
-Only `apple`, `banana`, and `orange` exist as classes in the standard COCO object-detection model this project reuses for validation and multi-fruit-per-photo detection — every other fruit above falls back to classical shape/contour validation and single-fruit detection instead. This is a structural limit of using an off-the-shelf detector, not a bug: adding a new fruit to bounding-box detection would need its own annotated object-detection dataset, not just ripeness classification photos.
+Upload validation uses whole-image CLIP identity comparison, with YOLO-World configured with all ten fruit names as a secondary detector. Mixed-fruit analysis and real-time tracking still use the existing COCO detector and therefore support bounding-box detection only for `apple`, `banana`, and `orange`; extending those paths to every fruit would require a custom annotated object-detection dataset.
 
 ---
 
@@ -91,7 +91,7 @@ Every one of these 9 selectable options (all 8 models plus `all_four`) has its o
 
 - **Backend**: Flask, SQLite (three tables' worth of app data: auth/settings, harvest results, stock ledger — no ORM, hand-written parameterised SQL)
 - **Classical CV**: OpenCV, scikit-image (colour space, shape/contour, GLCM texture, Gabor filter feature extraction)
-- **ML**: scikit-learn (SVMs), Ultralytics YOLOv8 (object detection for validation/multi-fruit, and YOLOv8-cls for the pure-CNN pipeline), PyTorch
+- **ML**: scikit-learn (SVMs), CLIP + Ultralytics YOLO-World (open-vocabulary upload validation), YOLOv8 (COCO multi-fruit detection and YOLOv8-cls ripeness classification), PyTorch
 - **Reporting**: fpdf2 (branded PDF exports), matplotlib (training/confusion-matrix plots, dashboard charts)
 - **Frontend**: server-rendered Jinja templates, vanilla JS, one hand-written CSS design system (no frontend build step, no framework)
 
@@ -154,6 +154,11 @@ FruitVision/
 ```bash
 pip install -r requirements.txt
 ```
+
+The YOLO-World validation vocabulary uses Ultralytics' CLIP text encoder,
+which `requirements.txt` installs directly from the official Ultralytics
+GitHub repository. Git and network access are therefore required during the
+first dependency installation.
 
 ### Dataset Setup
 Download the base dataset from Kaggle: https://www.kaggle.com/datasets/leftin/fruit-ripeness-unripe-ripe-and-rotten
@@ -227,7 +232,7 @@ Prints a console table of overall accuracy and per-class recall for every model 
 pytest tests/
 ```
 
-Covers auth/admin routes and guardrails, per-user data isolation (stock/history), fruit validation (including the non-COCO-fruit fallback path), the surface-analysis + persistence workflow, marketability logic, PDF report generation, and more.
+Covers auth/admin routes and guardrails, per-user data isolation (stock/history), YOLO-World fruit validation and its inconclusive-result fallback, the surface-analysis + persistence workflow, marketability logic, PDF report generation, and more.
 
 ---
 

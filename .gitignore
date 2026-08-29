@@ -32,4 +32,7 @@ uploads/
 
 pipeline/pure_yolo/runs/
 
+# Downloaded automatically for open-vocabulary upload validation
+yolov8s-worldv2.pt
+
 datasets/yolo_cls/

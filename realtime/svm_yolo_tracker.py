@@ -199,7 +199,7 @@ def _process_fallback_classification(frame, fruit_type, frame_idx):
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
-    conf_str = f"{committed_confidence:.1f}%" if stable and committed_confidence else ""
+    conf_str = f"{committed_confidence * 100:.1f}%" if stable and committed_confidence else ""
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
     cv2.putText(frame, f"{fruit_type} {display_label} {conf_str}", (x0, max(y0 - 8, 0)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)
@@ -280,7 +280,7 @@ def _draw_tracked_box(frame, box, tid, class_name, fruit_type, frame_idx):
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
-    conf_str = f"{committed_confidence:.1f}%" if stable and committed_confidence else ""
+    conf_str = f"{committed_confidence * 100:.1f}%" if stable and committed_confidence else ""
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
     text = f"#{tid} {class_name} {display_label} {conf_str}"
     cv2.putText(frame, text, (x0, max(y0 - 8, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)

@@ -128,6 +128,15 @@ spaces. This already happens today when switching between fruit types
 mid-session (pre-existing behavior, not a regression introduced here) —
 left as-is since fixing it is unrelated to this spec's goal.
 
+The auto-labeled training set is heavily skewed toward strawberry
+(~7,282 of 14,526 train images, about half), with pear contributing only
+~318 (~2%); for a single-class species-agnostic detector this is likely
+benign, but it means the model's learned notion of "fruit shape" is
+disproportionately strawberry-derived, and the classical pseudo-labeler's
+skip rate varies a lot by fruit too (strawberry ~52% degenerate-skip vs
+peach ~10%) — worth keeping in mind if detection quality ever needs
+tuning per-species.
+
 ### Testing / verification
 
 1. After training, sanity-check on a handful of held-out validation

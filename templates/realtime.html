@@ -26,7 +26,7 @@
         <option value="strawberry">Strawberry</option>
         <option value="tomato">Tomato</option>
       </select>
-      <p class="field-hint">Mango/guava/lemon/peach/pear/strawberry/tomato aren't in COCO, so they use a custom-trained detector for tracking instead — full detection + persistent IDs, same as apple/banana/orange, with the SVM Ensemble, Ensemble AB/BC/CD/DA, Merged 1+4 v2, and Merged 1+4 v3 classifiers below. Merged 1+4 (v1) and Pure YOLO weren't trained on these fruits, so they still fall back to the old no-tracking, per-frame method for them.</p>
+      <p class="field-hint">Mango/guava/lemon/peach/pear/strawberry/tomato aren't in COCO, so they use a custom-trained detector for tracking instead — full detection + persistent IDs, same as apple/banana/orange, with the SVM Ensemble, Ensemble AB/BC/CD/DA, Merged 1+4 v2, and Merged 1+4 v3 classifiers below. Merged 1+4 (v1) and Pure YOLO aren't trained on these fruits at all — mango still falls back to the old per-frame method there, but the other six won't be detected.</p>
     </div>
 
     <div class="control-group">

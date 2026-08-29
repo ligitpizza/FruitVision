@@ -35,6 +35,4 @@ pipeline/pure_yolo/runs/
 
 pipeline/fruit_detector/runs/
 
-datasets/yolo_cls/
-
 .superpowers/

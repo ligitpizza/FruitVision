@@ -49,6 +49,13 @@ os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(YOLO_WEIGHTS_PATH), exist_ok=True)
 
 _yolo = YOLO(YOLO_WEIGHTS_PATH)
+
+if not os.path.exists(FRUIT_YOLO_WEIGHTS_PATH):
+    raise FileNotFoundError(
+        f"{FRUIT_YOLO_WEIGHTS_PATH} not found. Run "
+        "pipeline/fruit_detector/dataset_prep.py then "
+        "pipeline/fruit_detector/train.py to produce it."
+    )
 _fruit_yolo = YOLO(FRUIT_YOLO_WEIGHTS_PATH)
 COCO_FRUIT_CLASSES = {"apple", "banana", "orange"}
 CLASSIFY_EVERY_N_FRAMES = 5

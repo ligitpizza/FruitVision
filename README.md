@@ -129,6 +129,7 @@ FruitVision/
 │   └── predict_ensemble.py      # The all_four soft vote
 │
 ├── pipeline/pure_yolo/          # The independent YOLOv8-cls pipeline (dataset prep, train, predict)
+├── pipeline/fruit_detector/     # Auto-labeled dataset builder + trainer for the single-class "fruit" detector used by real-time tracking on non-COCO fruits
 │
 ├── realtime/                    # Webcam/video tracking: one tracker per model + shared routes
 │
@@ -204,7 +205,13 @@ python pipeline/pure_yolo/dataset_prep.py
 ```
 If this hasn't been run for a fruit, `yolo_cls_train.py` silently skips it (prints "Skipping `<fruit>`", exits 0) — check its log if a fruit's YOLO confusion matrix doesn't show up afterward.
 
-**Adding a new fruit**: drop its `ripe`/`unripe`/`rotten` photos under `datasets/fruit_ripeness/<fruit>/`, add the fruit name to the `FRUITS` list in *every* `member_apps/*/m*_train.py` and `pipeline/pure_yolo/{dataset_prep,yolo_cls_train}.py`, run `dataset_prep.py` again, then `train_all.py`. Once trained, add the fruit to `FRUITS` in `app.py` and `core_modules/model_lab.py`, and to `SUPPORTED_FRUITS` in `core_modules/fruit_validation.py` to wire it into the live app (dropdowns, Model Lab, training report, fruit-match validation).
+The single-class fruit detector used by real-time tracking (`trained_models/fruit_yolo_detect/best.pt`) also needs a one-time setup step to (re)produce it:
+```bash
+python pipeline/fruit_detector/dataset_prep.py
+python pipeline/fruit_detector/train.py
+```
+
+**Adding a new fruit**: drop its `ripe`/`unripe`/`rotten` photos under `datasets/fruit_ripeness/<fruit>/`, add the fruit name to the `FRUITS` list in *every* `member_apps/*/m*_train.py` and `pipeline/pure_yolo/{dataset_prep,yolo_cls_train}.py`, run `dataset_prep.py` again, then `train_all.py`. Once trained, add the fruit to `FRUITS` in `app.py` and `core_modules/model_lab.py`, and to `SUPPORTED_FRUITS` in `core_modules/fruit_validation.py` to wire it into the live app (dropdowns, Model Lab, training report, fruit-match validation). Also add it to the `FRUITS` list in `pipeline/fruit_detector/dataset_prep.py` — since the detector trains a single generic "fruit" class rather than per-species classes, an already-trained detector will generally still localize a brand-new species reasonably well without retraining, but re-running `dataset_prep.py` + `train.py` after adding it there is recommended for best detection accuracy on that species (not strictly required for the app to function).
 
 **Comparing every model at once**, after training:
 ```bash

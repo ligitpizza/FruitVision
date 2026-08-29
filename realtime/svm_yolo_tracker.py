@@ -55,7 +55,7 @@ CROP_PAD = 15
 
 _track_state = {}
 _counted_tracks = set()  # track_ids already logged into the stock ledger, once per physical fruit
-_mango_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
+_fallback_state = {"history": deque(maxlen=ROLLING_WINDOW), "label": None, "confidence": None, "last_frame": -999}
 _session_log = []  # every *committed* (post-smoothing) classification made during the current session
 
 # --- MUST-DO #4 step 1: baseline FPS benchmarking ---------------------------
@@ -170,7 +170,7 @@ def _record_classification(crop, fruit_type, label, confidence, tag, cleaned_by_
     })
 
 
-def _process_mango_fallback(frame, fruit_type, frame_idx):
+def _process_fallback_classification(frame, fruit_type, frame_idx):
     enhanced = clean(frame)
     cropped, bbox = classical_detect(enhanced)
     if bbox is None or cropped.size == 0:
@@ -179,29 +179,29 @@ def _process_mango_fallback(frame, fruit_type, frame_idx):
     x0, y0, x1, y1 = bbox
 
     frame_label, frame_confidence = None, None
-    if frame_idx - _mango_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
+    if frame_idx - _fallback_state["last_frame"] >= CLASSIFY_EVERY_N_FRAMES:
         try:
             frame_label, frame_confidence, per_member, _ = predict_ensemble(cropped, fruit_type)
-            _mango_state["cleaned_by_member"] = pop_member_cleaned_images(per_member)
+            _fallback_state["cleaned_by_member"] = pop_member_cleaned_images(per_member)
         except Exception:
             pass
-        _mango_state["last_frame"] = frame_idx
+        _fallback_state["last_frame"] = frame_idx
 
-    prev_label = _mango_state["label"]
-    committed_label, committed_confidence, stable = _update_rolling_vote(_mango_state, frame_label, frame_confidence)
-    _mango_state["label"], _mango_state["confidence"] = committed_label, committed_confidence
+    prev_label = _fallback_state["label"]
+    committed_label, committed_confidence, stable = _update_rolling_vote(_fallback_state, frame_label, frame_confidence)
+    _fallback_state["label"], _fallback_state["confidence"] = committed_label, committed_confidence
 
     if stable and committed_label != prev_label:
         _record_classification(
             cropped, fruit_type, committed_label, committed_confidence,
-            tag=f"mango_frame{frame_idx}", cleaned_by_member=_mango_state.get("cleaned_by_member"),
+            tag=f"{fruit_type}_frame{frame_idx}", cleaned_by_member=_fallback_state.get("cleaned_by_member"),
         )
 
     display_label = committed_label if stable else "analysing..."
     colour = {"ripe": (0, 200, 0), "unripe": (0, 200, 255), "rotten": (0, 0, 200)}.get(committed_label, (200, 200, 200))
     conf_str = f"{committed_confidence:.1f}%" if stable and committed_confidence else ""
     cv2.rectangle(frame, (x0, y0), (x1, y1), colour, 2)
-    cv2.putText(frame, f"mango {display_label} {conf_str}", (x0, max(y0 - 8, 0)),
+    cv2.putText(frame, f"{fruit_type} {display_label} {conf_str}", (x0, max(y0 - 8, 0)),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, colour, 2)
     return frame, True
 
@@ -210,8 +210,8 @@ def process_frame(frame, fruit_type, frame_idx):
     _frame_start = time.time()
     detected_any = False
 
-    if fruit_type == "mango":
-        frame, detected_any = _process_mango_fallback(frame, fruit_type, frame_idx)
+    if fruit_type not in COCO_FRUIT_CLASSES:
+        frame, detected_any = _process_fallback_classification(frame, fruit_type, frame_idx)
     else:
         results = _yolo.track(
             frame,

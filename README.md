@@ -26,7 +26,7 @@ Originally a university group project (each "member" folder corresponds to one t
 ### Fruit Classification (`/classify`)
 - **Single Fruit Analysis** — upload one photo, pick a fruit and a model, get an instant ripeness call with confidence, blemish/surface-quality analysis, and a marketability recommendation.
 - **Batch Analysis** — upload many photos of the same fruit at once; get a distribution chart and a PDF report. Optional toggles: treat a photo as containing *multiple* fruits (apple/banana/orange only — needs YOLO object detection, not just classification), skip the fruit-match validation for a batch (useful when testing with mismatched or unusual photos), and auto-log results into Fruit Stock.
-- **Mixed-Fruit Analysis** — one photo containing a mix of apples, bananas, and oranges together; YOLOv8n localises each fruit, then the Merged 1+4 model classifies every crop individually.
+- **Mixed-Fruit Analysis** — one photo containing any mix of the 10 supported fruits; YOLO-World identifies and localises each fruit, then the Merged 1+4 model classifies every crop individually.
 - Every prediction is validated first: whole-image CLIP comparison checks the selected identity against all ten supported fruits and common non-fruit categories. YOLO-World and classical shape/contour checks provide fallback validation when CLIP is inconclusive, before the image is run through the per-model ripeness prediction.
 
 ### Real-Time Tracking (`/realtime`)
@@ -114,7 +114,7 @@ FruitVision/
 ├── core_modules/                # Shared logic used across every route/model
 │   ├── fruit_validation.py      # "Is this photo actually the selected fruit?" gate
 │   ├── multi_fruit_detect.py    # Same-fruit multi-box detection for one photo
-│   ├── mixed_fruit_m14.py       # Mixed apple/banana/orange detection + M14 classification
+│   ├── mixed_fruit_m14.py       # Mixed 10-species YOLO-World detection + M14 classification
 │   ├── blemish_analysis.py      # Surface-quality / blemish-percentage analysis
 │   ├── marketability.py         # Prediction → farmer-facing handling recommendation
 │   ├── filter_photos.py         # Saves each model's intermediate filtered images

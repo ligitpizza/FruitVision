@@ -13,19 +13,34 @@ from math import isfinite
 # They intentionally represent wider ranges because cultivar, harvest history,
 # temperature, humidity, handling, and internal defects are unknown to an image.
 # Storage-condition references: UC Davis Postharvest Research and Extension
-# Center produce fact sheets for apple, banana, mango, and orange.
+# Center produce fact sheets for all ten supported fruits. The values below
+# are deliberately shorter than maximum controlled-storage potential because
+# the app cannot infer cultivar, harvest date, cold-chain history, or internal
+# quality from an image.
 MARKETABLE_LIFE_DAYS = {
     "apple": {"unripe": (14, 28), "ripe": (7, 14)},
     "banana": {"unripe": (10, 21), "ripe": (3, 7)},
+    "guava": {"unripe": (14, 21), "ripe": (3, 7)},
+    "lemon": {"unripe": (30, 60), "ripe": (7, 21)},
     "mango": {"unripe": (7, 14), "ripe": (3, 7)},
     "orange": {"unripe": (21, 45), "ripe": (14, 30)},
+    "peach": {"unripe": (7, 14), "ripe": (2, 5)},
+    "pear": {"unripe": (14, 28), "ripe": (3, 7)},
+    "strawberry": {"unripe": (3, 7), "ripe": (1, 3)},
+    "tomato": {"unripe": (7, 14), "ripe": (3, 8)},
 }
 
 STORAGE_ASSUMPTIONS = {
     "apple": "whole fruit in suitable cold storage near 0-4°C and 90-95% RH",
     "banana": "whole fruit stored near 13-14°C and 90-95% RH",
+    "guava": "mature-green fruit near 8-10°C or ripe fruit near 5-8°C, at 90-95% RH",
+    "lemon": "whole fruit stored near 12-14°C and 90-95% RH, away from ethylene",
     "mango": "whole fruit stored near 13°C when mature-green or near 10°C when ripe, at 90-95% RH",
     "orange": "whole fruit stored near 3-8°C and 90-95% RH",
+    "peach": "whole fruit promptly cooled and stored near -1 to 0°C at 90-95% RH",
+    "pear": "whole fruit stored near -1 to 0°C and 90-95% RH before ripening",
+    "strawberry": "sound berries rapidly cooled and stored near 0°C at 90-95% RH",
+    "tomato": "mature-green fruit near 12.5-15°C or firm-ripe fruit near 7-10°C, at 90-95% RH",
 }
 
 MIN_RELIABLE_CONFIDENCE = 60.0

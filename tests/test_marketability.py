@@ -2,6 +2,7 @@ import unittest
 
 from core_modules.marketability import (
     MARKETABLE_LIFE_DAYS,
+    STORAGE_ASSUMPTIONS,
     average_member_probabilities,
     estimate_marketability,
     stock_eligible,
@@ -9,6 +10,32 @@ from core_modules.marketability import (
 
 
 class MarketabilityConsistencyTests(unittest.TestCase):
+    def test_every_supported_fruit_has_a_complete_marketability_profile(self):
+        supported = {
+            "apple", "banana", "orange", "mango", "pear",
+            "peach", "strawberry", "tomato", "lemon", "guava",
+        }
+        self.assertEqual(set(MARKETABLE_LIFE_DAYS), supported)
+        self.assertEqual(set(STORAGE_ASSUMPTIONS), supported)
+
+        for fruit in supported:
+            with self.subTest(fruit=fruit):
+                self.assertEqual(
+                    set(MARKETABLE_LIFE_DAYS[fruit]), {"unripe", "ripe"}
+                )
+                result = estimate_marketability(
+                    fruit,
+                    "ripe",
+                    90,
+                    probabilities={"ripe": 0.9, "unripe": 0.08, "rotten": 0.02},
+                    blemish_percentage=2,
+                    quality_grade="Grade A",
+                )
+                self.assertEqual(result["status"], "ready")
+                self.assertNotEqual(result["dispatch_priority"], "unknown")
+                self.assertIsNotNone(result["window"])
+                self.assertIsNotNone(result["storage_assumption"])
+
     def test_rotten_label_never_returns_positive_marketability(self):
         for fruit in MARKETABLE_LIFE_DAYS:
             with self.subTest(fruit=fruit):

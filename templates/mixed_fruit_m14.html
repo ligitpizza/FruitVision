@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Mixed Fruit YOLOv8n + M14 — FruitVision{% endblock %}
+{% block title %}Mixed Fruit YOLO-World + M14 — FruitVision{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
     <div class="eyebrow"><span class="dot"></span> Mixed-fruit analysis</div>
-    <h1>Mixed Fruit — YOLOv8n + Merged 1+4</h1>
-    <p>YOLOv8n detects each apple, banana, and orange; M14 determines the ripeness of every detected crop.</p>
+    <h1>Mixed Fruit — YOLO-World + Merged 1+4</h1>
+    <p>YOLO-World detects all 10 supported fruit classes; M14 determines the ripeness of every detected crop.</p>
   </div>
   <div class="actions">
     <a class="btn btn-outline" href="/classify">Analyse another image</a>
@@ -21,14 +21,14 @@
 {% elif result.detected_count == 0 %}
 <div class="card" style="margin-top:20px;">
   <h3>No supported fruit detected</h3>
-  <p>No apple, banana, or orange box was found. Try a clearer image where the fruits are visible and not heavily obstructed.</p>
+  <p>No supported fruit was found. Try a clearer image where the fruits are visible and not heavily obstructed.</p>
 </div>
 {% else %}
 <div class="grid grid-3 mixed-m14-summary" style="margin-top:20px;">
   <div class="stat-tile">
     <div class="label">Detected Fruit</div>
     <div class="value">{{ result.detected_count }}</div>
-    <div class="delta">apple, banana, and orange</div>
+    <div class="delta">all 10 fruit classes supported</div>
   </div>
   <div class="stat-tile">
     <div class="label">M14 Classified</div>

@@ -48,7 +48,7 @@ def _mixed_m14_analysis(image):
         })
     return {
         "model_key": "merged_1_4",
-        "model_label": "YOLOv8n Detection + Merged 1+4 (M14) Ripeness",
+        "model_label": "YOLO-World Detection + Merged 1+4 (M14) Ripeness",
         "detections": detections,
         "detected_count": 3,
         "classified_count": 3,
@@ -248,7 +248,7 @@ class FlaskSurfaceWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(mixed_response.status_code, 200)
             mixed_html = mixed_response.get_data(as_text=True)
-            self.assertIn("Mixed Fruit — YOLOv8n + Merged 1+4", mixed_html)
+            self.assertIn("Mixed Fruit — YOLO-World + Merged 1+4", mixed_html)
             self.assertIn("Per-fruit results", mixed_html)
             self.assertIn("Apple", mixed_html)
             self.assertIn("Banana", mixed_html)

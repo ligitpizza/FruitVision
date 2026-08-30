@@ -466,7 +466,7 @@ def _decorate_marketability_rows(rows):
 
         source = item.get("source") or ""
         if source == "analyse_mixed_fruit_m14":
-            item["analysis_type"] = "YOLOv8n + M14 mixed fruit"
+            item["analysis_type"] = "YOLO-World + M14 mixed fruit"
             item["analysis_kind"] = "mixed_fruit_m14"
         elif source == "analyse_multi_fruit":
             item["analysis_type"] = "Multi-fruit batch"
@@ -1148,10 +1148,10 @@ PREDICTORS_WITH_ENSEMBLE[ALL_FOUR_KEY] = {"label": ALL_FOUR_LABEL}
 
 @app.route("/analyse-mixed-fruit-m14", methods=["POST"])
 def analyse_mixed_fruit_m14():
-    """Detect apple/banana/orange together and route every crop through M14."""
+    """Detect all 10 fruit classes together and route every crop through M14."""
     uploaded = request.files.get("image")
     if not uploaded or not uploaded.filename:
-        flash("Choose an image containing apple, banana, or orange fruit.")
+        flash("Choose an image containing one or more supported fruits.")
         return redirect(url_for("classify"))
 
     original_name = secure_filename(uploaded.filename) or "mixed_fruit.jpg"

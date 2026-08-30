@@ -34,7 +34,7 @@
       <input type="checkbox" id="validateSingleFruit" checked style="width:auto;">
       Check that the image contains only one fruit
     </label>
-    <p class="field-hint">If YOLOv8n detects multiple apples, bananas, or oranges, this analysis stops and directs you to Mixed-Fruit Analysis. Mango and other non-COCO fruits cannot be counted by this check.</p>
+    <p class="field-hint">If YOLO-World detects multiple supported fruits, this analysis stops and directs you to Mixed-Fruit Analysis. All 10 fruit classes are covered.</p>
 
     <button onclick="submitImage()" style="margin-top:16px;">Check Ripeness</button>
 
@@ -114,25 +114,25 @@
 </div>
 
 <h2 id="mixed-fruit-analysis">Mixed-Fruit Analysis</h2>
-<p>Analyse one image containing apples, bananas, and oranges together.</p>
+<p>Analyse one image containing any mix of all 10 supported fruit classes.</p>
 <div class="card mixed-fruit-m14-card">
   <div class="row-between" style="align-items:flex-start;">
     <div>
       <div class="eyebrow"><span class="dot"></span> Dedicated workflow</div>
-      <h3 style="margin-top:5px;">Mixed Fruit — YOLOv8n + Merged 1+4</h3>
-      <p class="field-hint">YOLOv8n detects each fruit type and location. Every detected crop is then classified for ripeness only by the original Merged 1+4 colour + shape + Gabor SVM.</p>
+      <h3 style="margin-top:5px;">Mixed Fruit — YOLO-World + Merged 1+4</h3>
+      <p class="field-hint">YOLO-World detects each fruit type and location. Every detected crop is then classified for ripeness only by the original Merged 1+4 colour + shape + Gabor SVM.</p>
     </div>
     <span class="badge neutral">M14 ONLY</span>
   </div>
   <form action="/analyse-mixed-fruit-m14" method="post" enctype="multipart/form-data" style="margin-top:14px;">
     <label for="mixed_m14_image">Upload one mixed-fruit image</label>
     <input type="file" id="mixed_m14_image" name="image" accept="image/*" required>
-    <p class="field-hint">Supported fruit detection: apple, banana, and orange. Mango is not included because the existing COCO detector has no mango class.</p>
+    <p class="field-hint">Supported: apple, banana, orange, mango, pear, peach, strawberry, tomato, lemon, and guava.</p>
     <label style="display:flex; align-items:center; gap:8px; margin-top:12px; font-weight:600; font-size:0.88rem;">
       <input type="checkbox" name="add_to_stock" style="width:auto;">
       Add successfully classified fruits to Fruit Stock
     </label>
-    <button type="submit" style="margin-top:12px;">Analyse with YOLOv8n + M14</button>
+    <button type="submit" style="margin-top:12px;">Analyse with YOLO-World + M14</button>
   </form>
 </div>
 
